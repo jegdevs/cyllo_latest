@@ -62,7 +62,7 @@ class Customsnackbar {
       case 'warning':
         return Colors.yellow;
       case 'success':
-        return Colors.green;
+        return Color(0xFFFFFFFF);
       default:
         return const Color.fromARGB(255, 173, 216, 230);
     }

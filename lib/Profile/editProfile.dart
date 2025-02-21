@@ -1,9 +1,16 @@
 import 'dart:convert';
 import 'dart:developer';
+import 'dart:io';
+import 'package:animated_custom_dropdown/custom_dropdown.dart';
+import 'package:cyllo_mobile/Profile/profilePage.dart';
+import 'package:date_picker_plus/date_picker_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:typed_data';
+
+import '../erroDesign.dart';
 
 class Editprofile extends StatefulWidget {
   const Editprofile({super.key});
@@ -13,6 +20,7 @@ class Editprofile extends StatefulWidget {
 }
 
 class _EditprofileState extends State<Editprofile> {
+  final formKey = GlobalKey<FormState>();
   OdooClient? client;
   bool isLoading = true;
   String? email;
@@ -24,6 +32,8 @@ class _EditprofileState extends State<Editprofile> {
   String? department;
   String? gender;
   String? dob;
+  File? selectedImage;
+  String? newImage;
 
   TextEditingController nameController = TextEditingController();
   TextEditingController genderController = TextEditingController();
@@ -39,7 +49,7 @@ class _EditprofileState extends State<Editprofile> {
   TextEditingController departmentController = TextEditingController();
 
   List<Map<String, dynamic>> locations = [];
-  List<Map<String, dynamic>> departments= [];
+  List<Map<String, dynamic>> departments = [];
   List<Map<String, dynamic>> countryList = [];
   List<Map<String, dynamic>> stateList = [];
   String? selectedLocation;
@@ -110,7 +120,7 @@ class _EditprofileState extends State<Editprofile> {
     }
   }
 
-  Future<void> departmnet()async {
+  Future<void> departmnet() async {
     try {
       final response = await client?.callKw({
         'model': 'hr.department',
@@ -142,10 +152,9 @@ class _EditprofileState extends State<Editprofile> {
     } catch (e) {
       print("O Failed: $e");
     }
+  }
 
-}
-
-  Future<void> Country()async {
+  Future<void> Country() async {
     try {
       final response = await client?.callKw({
         'model': 'res.country',
@@ -178,7 +187,8 @@ class _EditprofileState extends State<Editprofile> {
       print("Failed: $e");
     }
   }
-  Future<void> State()async {
+
+  Future<void> State() async {
     try {
       final response = await client?.callKw({
         'model': 'res.country.state',
@@ -211,6 +221,7 @@ class _EditprofileState extends State<Editprofile> {
       print("Failed: $e");
     }
   }
+
   Future<void> getProfileData() async {
     final prefs = await SharedPreferences.getInstance();
     final userid = prefs.getInt("userId") ?? "";
@@ -267,7 +278,10 @@ class _EditprofileState extends State<Editprofile> {
           var imageData = data[0]['image_1920'];
           if (imageData != null && imageData is String) {
             profileImage = base64Decode(imageData);
-            print('imageeeeee$profileImage');
+            if (response != null && response is List && response.isNotEmpty) {
+              newImage = response[0]['image_1920'];
+            }
+              print('imageeeeee$profileImage');
           }
           privateAddress = data[0]['private_street'];
           privateAddress2 = data[0]['private_city'];
@@ -337,27 +351,27 @@ class _EditprofileState extends State<Editprofile> {
       'name': nameController.text,
       'private_street': privateAddressController.text,
       'private_city': privateAddress2Controller.text,
-      'private_state_id':  stateList
-          .where((data) => data['name'] == selectedState)
-          .isNotEmpty
-          ? stateList.firstWhere(
-              (data) => data['name'] == selectedState)['id']
+      'private_state_id': stateList
+              .where((data) => data['name'] == selectedState)
+              .isNotEmpty
+          ? stateList.firstWhere((data) => data['name'] == selectedState)['id']
           : null,
       'private_zip': zipCodeController.text,
       'private_country_id': countryList
-          .where((data) => data['name'] == selectedCountryList)
-          .isNotEmpty
-          ? countryList.firstWhere(
-              (data) => data['name'] == selectedCountryList)['id']
+              .where((data) => data['name'] == selectedCountryList)
+              .isNotEmpty
+          ? countryList
+              .firstWhere((data) => data['name'] == selectedCountryList)['id']
           : null,
       'department_id': departments
-          .where((data) => data['name'] == selectedDepartments)
-          .isNotEmpty
-          ? departments.firstWhere(
-              (data) => data['name'] == selectedDepartments)['id']
+              .where((data) => data['name'] == selectedDepartments)
+              .isNotEmpty
+          ? departments
+              .firstWhere((data) => data['name'] == selectedDepartments)['id']
           : null,
       'gender': genderController.text,
       'birthday': dobController.text,
+      'image_1920' : newImage,
     };
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -373,14 +387,34 @@ class _EditprofileState extends State<Editprofile> {
       });
       print(updatedData);
       print("Profile updated successfully");
+      final snackBar = SnackBar(content: Text('Profile Updated Successfully'));
+      ScaffoldMessenger.of(context).showSnackBar(snackBar);
+      // await getProfileData();
     } catch (e) {
       print("Error updating profile$e");
     }
   }
 
-  void uploadProfile(){
+  Future<void> uploadProfile() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      selectedImage = File(pickedFile.path);
 
+      newImage = base64Encode(await selectedImage!.readAsBytes());
+
+      setState(() {
+        profileImage =
+            base64Decode(newImage!);
+      });
+    }
   }
+  final Map<String, String> genderOptions = {
+    'male': 'Male',
+    'female': 'Female',
+    'other': 'Other',
+  };
+
 
   @override
   void initState() {
@@ -393,6 +427,10 @@ class _EditprofileState extends State<Editprofile> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
+        leading: IconButton(onPressed: (){
+          Navigator.push(context, MaterialPageRoute(builder: (context)=>Profilepage()));
+          // getProfileData();
+        }, icon: Icon(Icons.navigate_before)),
         backgroundColor: Colors.white,
         title: Text('Edit Profile'),
         centerTitle: true,
@@ -403,21 +441,22 @@ class _EditprofileState extends State<Editprofile> {
           : SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 15),
-                child: Column(
-                  children: [
-                    SizedBox(
-                      height: 20,
-                    ),
-                    SafeArea(
-                      child: Center(
-                        child: Stack(
-                          children: [
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        height: 20,
+                      ),
+                      SafeArea(
+                        child: Center(
+                          child: Stack(children: [
                             CircleAvatar(
-                            backgroundImage: profileImage != null
-                                ? MemoryImage(profileImage!)
-                                : AssetImage('assets/pf.jpeg') as ImageProvider,
-                            radius: 100.0,
-                          ),
+                              backgroundImage: profileImage != null
+                                  ? MemoryImage(profileImage!)
+                                  : AssetImage('assets/pf.jpeg') as ImageProvider,
+                              radius: 100.0,
+                            ),
                             Positioned(
                               child: Container(
                                 width: 200,
@@ -426,429 +465,445 @@ class _EditprofileState extends State<Editprofile> {
                                   shape: BoxShape.circle,
                                   color: Color(0x549EA700),
                                 ),
-                                child: Center(child: IconButton(padding: EdgeInsets.all(0),
-                                    color: Colors.white,
-                                    onPressed: (){}, icon: Center(child: Icon(Icons.image_search,size: 35,)))),
+                                child: Center(
+                                    child: IconButton(
+                                        padding: EdgeInsets.all(0),
+                                        color: Colors.white,
+                                        onPressed: () {
+                                          uploadProfile();
+                                        },
+                                        icon: Center(
+                                            child: Icon(
+                                          Icons.image_search,
+                                          size: 35,
+                                        )))),
                               ),
                             ),
-                          ]
+                          ]),
                         ),
                       ),
-                    ),
-                    Text(
-                      name!,
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-                    ),
-                    Text('Chief Executive Officer'),
-                    SizedBox(
-                      height: 20,
-                    ),
-                    TextFormField(
-                      controller: nameController,
-                      decoration: InputDecoration(
-                        prefixIcon: Icon(
-                          Icons.person,
-                          color: Color(0xFF9EA700),
-                        ),
-                        filled: true,
-                        fillColor: Color(0x1B9EA700),
-                        border: InputBorder.none,
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(70),
-                          borderSide: BorderSide(
+                      Text(
+                        name!,
+                        style:
+                            TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                      ),
+                      Text('Chief Executive Officer'),
+                      SizedBox(
+                        height: 20,
+                      ),
+                      TextFormField(
+                        validator: (value) =>
+                        value!.isEmpty ? "Please enter your name" : null,
+                        controller: nameController,
+                        decoration: InputDecoration(
+                          prefixIcon: Icon(
+                            Icons.person,
                             color: Color(0xFF9EA700),
                           ),
-                        ),
-                        contentPadding:
-                            EdgeInsets.symmetric(horizontal: 65, vertical: 8),
-                      ),
-                    ),
-                    SizedBox(height: 10),
-                    TextFormField(
-                      controller: genderController,
-                      decoration: InputDecoration(
-                        prefixIcon: Icon(
-                          Icons.male_rounded,
-                          color: Color(0xFF9EA700),
-                        ),
-                        filled: true,
-                        fillColor: Color(0x1B9EA700),
-                        border: InputBorder.none,
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(70),
-                          borderSide: BorderSide(
-                            color: Color(0xFF9EA700),
+                          filled: true,
+                          fillColor: Color(0x1B9EA700),
+                          border: InputBorder.none,
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(70),
+                            borderSide: BorderSide(
+                              color: Color(0xFF9EA700),
+                            ),
                           ),
+                          contentPadding:
+                              EdgeInsets.symmetric(horizontal: 65, vertical: 8),
                         ),
-                        contentPadding:
-                            EdgeInsets.symmetric(horizontal: 65, vertical: 8),
                       ),
-                    ),
-                    SizedBox(height: 10),
-                    TextFormField(
-                      controller: dobController,
-                      decoration: InputDecoration(
-                        prefixIcon: Icon(
-                          Icons.date_range_rounded,
-                          color: Color(0xFF9EA700),
-                        ),
-                        filled: true,
-                        fillColor: Color(0x1B9EA700),
-                        border: InputBorder.none,
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(70),
-                          borderSide: BorderSide(
-                            color: Color(0xFF9EA700),
-                          ),
-                        ),
-                        contentPadding:
-                            EdgeInsets.symmetric(horizontal: 65, vertical: 8),
+                      SizedBox(height: 10),
+                    CustomDropdown<String>(
+                      decoration: CustomDropdownDecoration(
+                        closedFillColor: Color(0x1B9EA700),
+                        closedBorderRadius: BorderRadius.circular(12),
                       ),
-                    ),
-                    SizedBox(height: 10),
-                    TextFormField(
-                      controller: emailController,
-                      decoration: InputDecoration(
-                        prefixIcon: Icon(
-                          Icons.email,
-                          color: Color(0xFF9EA700),
-                        ),
-                        filled: true,
-                        fillColor: Color(0x1B9EA700),
-                        border: InputBorder.none,
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: Color(0xFF9EA700),
-                          ),
-                        ),
-                        contentPadding:
-                            EdgeInsets.symmetric(horizontal: 65, vertical: 8),
-                      ),
-                    ),
-                    SizedBox(height: 10),
-                    TextFormField(
-                      controller: phoneController,
-                      decoration: InputDecoration(
-                        prefixIcon: Icon(
-                          Icons.phone,
-                          color: Color(0xFF9EA700),
-                        ),
-                        filled: true,
-                        fillColor: Color(0x1B9EA700),
-                        border: InputBorder.none,
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: Color(0xFF9EA700),
-                          ),
-                        ),
-                        contentPadding:
-                            EdgeInsets.symmetric(horizontal: 65, vertical: 8),
-                      ),
-                    ),
-                    SizedBox(height: 10),
-                    DropdownButtonFormField<int>(
-                      value: locations.isNotEmpty &&
-                              locations.any((data) =>
-                                  data['display_name'] ==
-                                  loactionController.text)
-                          ? locations.firstWhere(
-                              (data) =>
-                                  data['display_name'] ==
-                                  loactionController.text,
-                            )['id']
-                          : null,
+                      hintText: 'Select Gender',
+                      items: genderOptions.values.toList(),
+                      initialItem: genderOptions[genderController.text.trim()],
                       onChanged: (value) {
                         setState(() {
-                          var matchedLocations = locations
-                              .where((data) => data['id'] == value)
-                              .toList();
-                          selectedLocation = matchedLocations.isNotEmpty
-                              ? matchedLocations.first['display_name']
-                              : '';
-                          loactionController.text =
-                              selectedLocation!;
+                          genderController.text = genderOptions.entries
+                              .firstWhere((entry) => entry.value == value)
+                              .key;
                         });
                       },
-                      items: locations
-                          .map((data) => DropdownMenuItem<int>(
-                                value: data['id'],
-                                child: Text(data['display_name']),
-                              ))
-                          .toList(),
-                      decoration: InputDecoration(
-                        prefixIcon: Icon(
-                          Icons.work_history_outlined,
-                          color: Color(0xFF9EA700),
-                        ),
-                        filled: true,
-                        fillColor: Color(0x1B9EA700),
-                        border: InputBorder.none,
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Color(0xFF9EA700)),
-                        ),
-                        contentPadding:
-                            EdgeInsets.symmetric(horizontal: 65, vertical: 8),
-                      ),
                     ),
-                    SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: SizedBox(
-                            child: TextFormField(
-                              controller: privateAddressController,
-                              decoration: InputDecoration(
-                                prefixIcon: Icon(
-                                  Icons.location_city,
-                                  color: Color(0xFF9EA700),
-                                ),
-                                filled: true,
-                                fillColor: Color(0x1B9EA700),
-                                border: InputBorder.none,
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: Color(0xFF9EA700),
-                                  ),
-                                ),
-                                contentPadding: EdgeInsets.symmetric(
-                                    horizontal: 65, vertical: 8),
-                              ),
+                      SizedBox(height: 10),
+                      TextFormField(
+                        controller: dobController,
+                        readOnly: true,
+                        decoration: InputDecoration(
+                          prefixIcon: Icon(
+                            Icons.date_range_rounded,
+                            color: Color(0xFF9EA700),
+                          ),
+                          filled: true,
+                          fillColor: Color(0x1B9EA700),
+                          border: InputBorder.none,
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: Color(0xFF9EA700),
                             ),
                           ),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
                         ),
-                        SizedBox(
-                          width: 5,
-                        ),
-                        Expanded(
-                          child: SizedBox(
-                            child: TextFormField(
-                              controller: privateAddress2Controller,
-                              decoration: InputDecoration(
-                                prefixIcon: Icon(
-                                  Icons.location_city,
-                                  color: Color(0xFF9EA700),
-                                ),
-                                filled: true,
-                                fillColor: Color(0x1B9EA700),
-                                border: InputBorder.none,
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: Color(0xFF9EA700),
-                                  ),
-                                ),
-                                contentPadding: EdgeInsets.symmetric(
-                                    horizontal: 65, vertical: 8),
-                              ),
+                        onTap: () async {
+                          final date = await showDatePickerDialog(
+                            context: context,
+                            initialDate: DateTime.now(),
+                            minDate: DateTime(1900),
+                            maxDate: DateTime.now(),
+                            width: 300,
+                            height: 300,
+                            currentDate: DateTime.now(),
+                            daysOfTheWeekTextStyle: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Colors.black54,
                             ),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 5,
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: SizedBox(
-                            child: DropdownButtonFormField<int>(
-                              isExpanded: true,
-                              value: stateList.isNotEmpty &&
-                                  stateList.any((data) =>
-                                  data['name'] ==
-                                      privateAddress3Controller.text)
-                                  ? stateList.firstWhere(
-                                    (data) =>
-                                data['name'] ==
-                                    privateAddress3Controller.text,
-                              )['id']
-                                  : null,
-                              onChanged: (value) {
-                                setState(() {
-                                  var matchedLocations = stateList
-                                      .where((data) => data['id'] == value)
-                                      .toList();
-                                  selectedState = matchedLocations.isNotEmpty
-                                      ? matchedLocations.first['name']
-                                      : '';
-                                  privateAddress3Controller.text =
-                                  selectedState!;
-                                });
-                              },
-                              items: stateList
-                                  .map((data) => DropdownMenuItem<int>(
-                                value: data['id'],
-                                child: Text(data['name']),
-                              ))
-                                  .toList(),
-                              decoration: InputDecoration(
-                                prefixIcon: Icon(
-                                  Icons.location_on,
-                                  color: Color(0xFF9EA700),
-                                ),
-                                filled: true,
-                                fillColor: Color(0x1B9EA700),
-                                border: InputBorder.none,
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: Color(0xFF9EA700)),
-                                ),
-                                contentPadding:
-                                EdgeInsets.symmetric(horizontal: 65, vertical: 8),
-                              ),
+                            disabledCellsTextStyle: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 14,
                             ),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 5,
-                        ),
-                        Expanded(
-                          child: SizedBox(
-                            child: TextFormField(
-                              controller: zipCodeController,
-                              decoration: InputDecoration(
-                                prefixIcon: Icon(
-                                  Icons.location_city,
-                                  color: Color(0xFF9EA700),
-                                ),
-                                filled: true,
-                                fillColor: Color(0x1B9EA700),
-                                border: InputBorder.none,
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: Color(0xFF9EA700),
-                                  ),
-                                ),
-                                contentPadding: EdgeInsets.symmetric(
-                                    horizontal: 65, vertical: 8),
-                              ),
+                            enabledCellsDecoration:  BoxDecoration(),
+                            enabledCellsTextStyle: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.black,
                             ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(
-                      height: 10,
-                    ),
-                    DropdownButtonFormField<int>(
-                      isExpanded: true,
-                      value: countryList.isNotEmpty &&
-                          countryList.any((data) =>
-                          data['name'] ==
-                              countryController.text)
-                          ? countryList.firstWhere(
-                            (data) =>
-                        data['name'] ==
-                            countryController.text,
-                      )['id']
-                          : null,
-                      onChanged: (value) {
-                        setState(() {
-                          var matchedLocations = countryList
-                              .where((data) => data['id'] == value)
-                              .toList();
-                          selectedCountryList = matchedLocations.isNotEmpty
-                              ? matchedLocations.first['name']
-                              : '';
-                          countryController.text =
-                          selectedCountryList!;
-                        });
-                      },
-                      items: countryList
-                          .map((data) => DropdownMenuItem<int>(
-                        value: data['id'],
-                        child: Text(data['name']),
-                      ))
-                          .toList(),
-                      decoration: InputDecoration(
-                        prefixIcon: Icon(
-                          Icons.location_on,
-                          color: Color(0xFF9EA700),
-                        ),
-                        filled: true,
-                        fillColor: Color(0x1B9EA700),
-                        border: InputBorder.none,
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Color(0xFF9EA700)),
-                        ),
-                        contentPadding:
-                        EdgeInsets.symmetric(horizontal: 65, vertical: 8),
-                      ),
-                    ),
-                    SizedBox(
-                      height: 10,
-                    ),
-                    DropdownButtonFormField<int>(
-                      value: departments.isNotEmpty &&
-                          departments.any((data) =>
-                          data['name'] ==
-                              departmentController.text)
-                          ? departments.firstWhere(
-                            (data) =>
-                        data['name'] ==
-                            departmentController.text,
-                      )['id']
-                          : null,
-                      onChanged: (value) {
-                        setState(() {
-                          var matchedLocations = departments
-                              .where((data) => data['id'] == value)
-                              .toList();
-                          selectedDepartments = matchedLocations.isNotEmpty
-                              ? matchedLocations.first['name']
-                              : '';
-                          departmentController.text =
-                          selectedDepartments!;
-                        });
-                      },
-                      items: departments
-                          .map((data) => DropdownMenuItem<int>(
-                        value: data['id'],
-                        child: Text(data['name']),
-                      ))
-                          .toList(),
-                      decoration: InputDecoration(
-                        prefixIcon: Icon(
-                          Icons.work_history_outlined,
-                          color: Color(0xFF9EA700),
-                        ),
-                        filled: true,
-                        fillColor: Color(0x1B9EA700),
-                        border: InputBorder.none,
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Color(0xFF9EA700)),
-                        ),
-                        contentPadding:
-                        EdgeInsets.symmetric(horizontal: 65, vertical: 8),
-                      ),
-                    ),
-                    SizedBox(
-                      height: 12,
-                    ),
-                    ElevatedButton(
-                        onPressed: () {
-                          saveChanges();
+                            selectedCellTextStyle: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                            selectedCellDecoration: BoxDecoration(
+                              color: Color(0xFF9EA700),
+                              shape: BoxShape.circle,
+                            ),
+                            leadingDateTextStyle: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Colors.black38,
+                            ),
+                            initialPickerType: PickerType.days,
+                            currentDateDecoration: BoxDecoration(
+                              color: Color(0xFF9EA700),
+                              shape: BoxShape.circle,
+                            ),
+                            currentDateTextStyle: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Colors.white,
+                            ),
+
+                            slidersColor: Color(0xFF9EA700),
+                            highlightColor: Color(0xFF9EA700),
+                            slidersSize: 25,
+                            splashRadius: 12,
+
+
+                          );
+
+                          if (date != null) {
+                            setState(() {
+                              dobController.text =
+                              "${date.year} - ${date.month} - ${date.day}";
+                            });
+                          }
                         },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Color(0xFF9EA700),
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size(300, 45),
+                      ),
+                      SizedBox(height: 10),
+                      TextFormField(
+                        controller: emailController,
+                        decoration: InputDecoration(
+                          prefixIcon: Icon(
+                            Icons.email,
+                            color: Color(0xFF9EA700),
+                          ),
+                          filled: true,
+                          fillColor: Color(0x1B9EA700),
+                          border: InputBorder.none,
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: Color(0xFF9EA700),
+                            ),
+                          ),
+                          contentPadding:
+                              EdgeInsets.symmetric(horizontal: 65, vertical: 8),
                         ),
-                        child: Text('Save Changes')),
-                    SizedBox(
-                      height: 12,
-                    ),
-                  ],
+                      ),
+                      SizedBox(height: 10),
+                      TextFormField(
+                        controller: phoneController,
+                        decoration: InputDecoration(
+                          prefixIcon: Icon(
+                            Icons.phone,
+                            color: Color(0xFF9EA700),
+                          ),
+                          filled: true,
+                          fillColor: Color(0x1B9EA700),
+                          border: InputBorder.none,
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: Color(0xFF9EA700),
+                            ),
+                          ),
+                          contentPadding:
+                              EdgeInsets.symmetric(horizontal: 65, vertical: 8),
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      // DropdownButtonFormField<int>(
+                      //   value: locations.isNotEmpty &&
+                      //           locations.any((data) =>
+                      //               data['display_name'] ==
+                      //               loactionController.text)
+                      //       ? locations.firstWhere(
+                      //           (data) =>
+                      //               data['display_name'] ==
+                      //               loactionController.text,
+                      //         )['id']
+                      //       : null,
+                      //   onChanged: (value) {
+                      //     setState(() {
+                      //       var matchedLocations = locations
+                      //           .where((data) => data['id'] == value)
+                      //           .toList();
+                      //       selectedLocation = matchedLocations.isNotEmpty
+                      //           ? matchedLocations.first['display_name']
+                      //           : '';
+                      //       loactionController.text = selectedLocation!;
+                      //     });
+                      //   },
+                      //   items: locations
+                      //       .map((data) => DropdownMenuItem<int>(
+                      //             value: data['id'],
+                      //             child: Text(data['display_name']),
+                      //           ))
+                      //       .toList(),
+                      //   decoration: InputDecoration(
+                      //     prefixIcon: Icon(
+                      //       Icons.work_history_outlined,
+                      //       color: Color(0xFF9EA700),
+                      //     ),
+                      //     filled: true,
+                      //     fillColor: Color(0x1B9EA700),
+                      //     border: InputBorder.none,
+                      //     focusedBorder: OutlineInputBorder(
+                      //       borderRadius: BorderRadius.circular(12),
+                      //       borderSide: BorderSide(color: Color(0xFF9EA700)),
+                      //     ),
+                      //     contentPadding:
+                      //         EdgeInsets.symmetric(horizontal: 65, vertical: 8),
+                      //   ),
+                      // ),
+                      CustomDropdown<String>(
+                        decoration: CustomDropdownDecoration(
+                          closedFillColor: Color(0x1B9EA700),
+                          closedBorderRadius: BorderRadius.circular(12),
+                        ),
+                        // hintText: '${privateAddress3Controller.text}',
+                        hintBuilder: (context, selectedItem, enabled) {
+                          return Text('${loactionController.text}',style: TextStyle(color: Colors.black),);
+                        },
+                        items: locations.map<String>((data) => data['display_name'].toString()).toList(),
+                        initialItem: locations.any((data) => data['display_name'] == loactionController.text.trim())
+                            ? loactionController.text.trim()
+                            : null,
+                        onChanged: (value) {
+                          setState(() {
+                            var matchedLocation = locations.firstWhere((data) => data['display_name'] == value);
+                            selectedLocation = matchedLocation['display_name'];
+                            loactionController.text = selectedLocation!;
+                          });
+                        },
+                      ),
+                      SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              child: TextFormField(
+                                controller: privateAddressController,
+                                decoration: InputDecoration(
+                                  prefixIcon: Icon(
+                                    Icons.location_city,
+                                    color: Color(0xFF9EA700),
+                                  ),
+                                  filled: true,
+                                  fillColor: Color(0x1B9EA700),
+                                  border: InputBorder.none,
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(
+                                      color: Color(0xFF9EA700),
+                                    ),
+                                  ),
+                                  contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 65, vertical: 8),
+                                ),
+                              ),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 5,
+                          ),
+                          Expanded(
+                            child: SizedBox(
+                              child: TextFormField(
+                                controller: privateAddress2Controller,
+                                decoration: InputDecoration(
+                                  prefixIcon: Icon(
+                                    Icons.location_city,
+                                    color: Color(0xFF9EA700),
+                                  ),
+                                  filled: true,
+                                  fillColor: Color(0x1B9EA700),
+                                  border: InputBorder.none,
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(
+                                      color: Color(0xFF9EA700),
+                                    ),
+                                  ),
+                                  contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 65, vertical: 8),
+                                ),
+                              ),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 5,
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              child: CustomDropdown<String>(
+                                decoration: CustomDropdownDecoration(
+                                  closedFillColor: Color(0x1B9EA700),
+                                  closedBorderRadius: BorderRadius.circular(12),
+                                ),
+                                // hintText: '${privateAddress3Controller.text}',
+                                hintBuilder: (context, selectedItem, enabled) {
+                                  return Text('${privateAddress3Controller.text}',style: TextStyle(color: Colors.black),);
+                                },
+                                items: stateList.map<String>((data) => data['name'].toString()).toList(),
+                                initialItem: stateList.any((data) => data['name'] == privateAddress3Controller.text.trim())
+                                    ? privateAddress3Controller.text.trim()
+                                    : null,
+                                onChanged: (value) {
+                                  setState(() {
+                                    var matchedLocation = stateList.firstWhere((data) => data['name'] == value);
+                                    selectedState = matchedLocation['name'];
+                                    privateAddress3Controller.text = selectedState!;
+                                  });
+                                },
+                              ),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 5,
+                          ),
+                          Expanded(
+                            child: SizedBox(
+                              child: TextFormField(
+                                controller: zipCodeController,
+                                decoration: InputDecoration(
+                                  prefixIcon: Icon(
+                                    Icons.location_city,
+                                    color: Color(0xFF9EA700),
+                                  ),
+                                  filled: true,
+                                  fillColor: Color(0x1B9EA700),
+                                  border: InputBorder.none,
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(
+                                      color: Color(0xFF9EA700),
+                                    ),
+                                  ),
+                                  contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 65, vertical: 8),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(
+                        height: 10,
+                      ),
+                      CustomDropdown<String>(
+                        decoration: CustomDropdownDecoration(
+                          closedFillColor: Color(0x1B9EA700),
+                          closedBorderRadius: BorderRadius.circular(12),
+                        ),
+                        hintBuilder: (context, selectedItem, enabled) {
+                          return Text('${countryController.text}',style: TextStyle(color: Colors.grey),);
+                        },
+                        items: countryList.map<String>((data) => data['name'].toString()).toList(),
+                        initialItem: countryList.any((data) => data['name'] == countryController.text.trim())
+                            ? countryController.text.trim()
+                            : null,
+                        onChanged: (value) {
+                          setState(() {
+                            var matchedLocation = countryList.firstWhere((data) => data['name'] == value);
+                            selectedCountryList = matchedLocation['name'];
+                            countryController.text = selectedCountryList!;
+                          });
+                        },
+                      ),
+                      SizedBox(
+                        height: 10,
+                      ),
+                      CustomDropdown<String>(
+                        decoration: CustomDropdownDecoration(
+                          closedFillColor: Color(0x1B9EA700),
+                          closedBorderRadius: BorderRadius.circular(12),
+                        ),
+                        hintBuilder: (context, selectedItem, enabled) {
+                          return Text('${departmentController.text}',style: TextStyle(color: Colors.black),);
+                        },
+                        items: departments.map<String>((data) => data['name'].toString()).toList(),
+                        initialItem: departments.any((data) => data['name'] == departmentController.text.trim())
+                            ? departmentController.text.trim()
+                            : null,
+                        onChanged: (value) {
+                          setState(() {
+                            var matchedLocation = departments.firstWhere((data) => data['name'] == value);
+                            selectedDepartments = matchedLocation['name'];
+                            departmentController.text = selectedDepartments!;
+                          });
+                        },
+                      ),
+                      SizedBox(
+                        height: 12,
+                      ),
+                      ElevatedButton(
+                          onPressed: () {
+                            if (formKey.currentState!.validate())
+                            saveChanges();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color(0xFF9EA700),
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(300, 45),
+                          ),
+                          child: Text('Save Changes')),
+                      SizedBox(
+                        height: 12,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
