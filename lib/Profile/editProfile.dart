@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shimmer/shimmer.dart';
 import 'dart:typed_data';
 
 import '../erroDesign.dart';
@@ -281,7 +282,7 @@ class _EditprofileState extends State<Editprofile> {
             if (response != null && response is List && response.isNotEmpty) {
               newImage = response[0]['image_1920'];
             }
-              print('imageeeeee$profileImage');
+            print('imageeeeee$profileImage');
           }
           privateAddress = data[0]['private_street'];
           privateAddress2 = data[0]['private_city'];
@@ -371,13 +372,13 @@ class _EditprofileState extends State<Editprofile> {
           : null,
       'gender': genderController.text,
       'birthday': dobController.text,
-      'image_1920' : newImage,
+      'image_1920': newImage,
     };
     try {
       final prefs = await SharedPreferences.getInstance();
       final userid = prefs.getInt("userId") ?? "";
       await client?.callKw({
-        'model': 'res.users',
+        // 'model': 'res.users',
         'method': 'write',
         'args': [
           [userid],
@@ -387,12 +388,86 @@ class _EditprofileState extends State<Editprofile> {
       });
       print(updatedData);
       print("Profile updated successfully");
-      final snackBar = SnackBar(content: Text('Profile Updated Successfully'));
-      ScaffoldMessenger.of(context).showSnackBar(snackBar);
+      Navigator.push(context, MaterialPageRoute(builder: (context)=>Profilepage()));
       // await getProfileData();
     } catch (e) {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return Dialog(
+            child: Container(
+              height: 280,
+              child: Column(
+                children: [
+                  Container(
+                    height: 120,
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(4),
+                        topRight: Radius.circular(4),
+                      ),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        Icons.warning_amber_rounded,
+                        size: 80 ,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    height: 160,
+                    padding: EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(4),
+                        bottomRight: Radius.circular(4),
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          'There was an error updating the profile. Please try again.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 16,
+                          ),
+                        ),
+                        SizedBox(height: 20),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
+                          child: Container(
+                            padding: EdgeInsets.symmetric(horizontal: 40,
+                                vertical: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'OK',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+    );
       print("Error updating profile$e");
-    }
+    };
+          
   }
 
   Future<void> uploadProfile() async {
@@ -404,17 +479,109 @@ class _EditprofileState extends State<Editprofile> {
       newImage = base64Encode(await selectedImage!.readAsBytes());
 
       setState(() {
-        profileImage =
-            base64Decode(newImage!);
+        profileImage = base64Decode(newImage!);
       });
     }
   }
+
   final Map<String, String> genderOptions = {
     'male': 'Male',
     'female': 'Female',
     'other': 'Other',
   };
 
+  Widget SimmerLoad() {
+    return Padding(
+      padding: EdgeInsets.all(8),
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey[300]!,
+        highlightColor: Colors.grey[100]!,
+        child: Column(children: [
+          Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: CircleAvatar(
+                radius: 100.0,
+                backgroundColor: Colors.white,
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Container(
+              height: 15.0,
+              width: 150,
+              color: Colors.white,
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Container(
+              height: 12.0,
+              width: 130,
+              color: Colors.white,
+            ),
+          ),
+          ...List.generate(5, (index) {
+            return Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Container(
+                height: 50.0,
+                width: 500,
+                color: Colors.white,
+              ),
+            );
+          }),
+          Row(
+              children: [
+                Expanded(
+                    child: Container(
+                      height: 50,
+                      width: 50,
+                      color: Colors.white,
+                    ),
+                ),
+                SizedBox(width: 5,),
+                Expanded(
+                  child: Container(
+                    height: 50,
+                    width: 50,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+          ),
+          SizedBox(height: 6,),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 50,
+                  width: 50,
+                  color: Colors.white,
+                ),
+              ),
+              SizedBox(width: 5,),
+              Expanded(
+                child: Container(
+                  height: 50,
+                  width: 50,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          Padding(padding: EdgeInsets.symmetric(vertical: 8),
+            child: Container(
+              height: 50.0,
+              width: 500,
+              color: Colors.white,
+            ),
+          )
+        ]),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -427,17 +594,20 @@ class _EditprofileState extends State<Editprofile> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        leading: IconButton(onPressed: (){
-          Navigator.push(context, MaterialPageRoute(builder: (context)=>Profilepage()));
-          // getProfileData();
-        }, icon: Icon(Icons.navigate_before)),
-        backgroundColor: Colors.white,
+        leading: IconButton(
+            onPressed: () {
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (context) => Profilepage()));
+              // getProfileData();
+            },
+            icon: Icon(Icons.navigate_before)),
+        backgroundColor:Color(0xFF9EA700),
         title: Text('Edit Profile'),
         centerTitle: true,
       ),
       resizeToAvoidBottomInset: true,
       body: isLoading
-          ? Center(child: CircularProgressIndicator())
+          ? SimmerLoad()
           : SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 15),
@@ -454,7 +624,8 @@ class _EditprofileState extends State<Editprofile> {
                             CircleAvatar(
                               backgroundImage: profileImage != null
                                   ? MemoryImage(profileImage!)
-                                  : AssetImage('assets/pf.jpeg') as ImageProvider,
+                                  : AssetImage('assets/pf.jpeg')
+                                      as ImageProvider,
                               radius: 100.0,
                             ),
                             Positioned(
@@ -484,8 +655,8 @@ class _EditprofileState extends State<Editprofile> {
                       ),
                       Text(
                         name!,
-                        style:
-                            TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 20),
                       ),
                       Text('Chief Executive Officer'),
                       SizedBox(
@@ -493,8 +664,12 @@ class _EditprofileState extends State<Editprofile> {
                       ),
                       TextFormField(
                         validator: (value) =>
-                        value!.isEmpty ? "Please enter your name" : null,
+                            value!.isEmpty ? "Please enter your name" : null,
                         controller: nameController,
+                        onChanged: (text) {
+                          if (formKey.currentState!.validate()) {
+                          }
+                        },
                         decoration: InputDecoration(
                           prefixIcon: Icon(
                             Icons.person,
@@ -504,7 +679,7 @@ class _EditprofileState extends State<Editprofile> {
                           fillColor: Color(0x1B9EA700),
                           border: InputBorder.none,
                           focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(70),
+                            borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide(
                               color: Color(0xFF9EA700),
                             ),
@@ -514,24 +689,35 @@ class _EditprofileState extends State<Editprofile> {
                         ),
                       ),
                       SizedBox(height: 10),
-                    CustomDropdown<String>(
-                      decoration: CustomDropdownDecoration(
-                        closedFillColor: Color(0x1B9EA700),
-                        closedBorderRadius: BorderRadius.circular(12),
+                      CustomDropdown<String>(
+                        validator: (value) {
+                          if (value == null || value.isEmpty)
+                            return "Please select gender";
+                        },
+
+                        decoration: CustomDropdownDecoration(
+                          closedFillColor: Color(0x1B9EA700),
+                          closedBorderRadius: BorderRadius.circular(12),
+                        ),
+                        hintText: 'Select Gender',
+                        items: genderOptions.values.toList(),
+                        initialItem:
+                            genderOptions[genderController.text.trim()],
+                        onChanged: (value) {
+                          setState(() {
+                            genderController.text = genderOptions.entries
+                                .firstWhere((entry) => entry.value == value)
+                                .key;
+                          });
+                        },
                       ),
-                      hintText: 'Select Gender',
-                      items: genderOptions.values.toList(),
-                      initialItem: genderOptions[genderController.text.trim()],
-                      onChanged: (value) {
-                        setState(() {
-                          genderController.text = genderOptions.entries
-                              .firstWhere((entry) => entry.value == value)
-                              .key;
-                        });
-                      },
-                    ),
                       SizedBox(height: 10),
                       TextFormField(
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return "Please enter your date of birth";
+                          }
+                        },
                         controller: dobController,
                         readOnly: true,
                         decoration: InputDecoration(
@@ -548,7 +734,8 @@ class _EditprofileState extends State<Editprofile> {
                               color: Color(0xFF9EA700),
                             ),
                           ),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
+                          contentPadding:
+                              EdgeInsets.symmetric(horizontal: 65, vertical: 8),
                         ),
                         onTap: () async {
                           final date = await showDatePickerDialog(
@@ -568,7 +755,7 @@ class _EditprofileState extends State<Editprofile> {
                               color: Colors.grey,
                               fontSize: 14,
                             ),
-                            enabledCellsDecoration:  BoxDecoration(),
+                            enabledCellsDecoration: BoxDecoration(),
                             enabledCellsTextStyle: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w500,
@@ -598,25 +785,34 @@ class _EditprofileState extends State<Editprofile> {
                               fontSize: 16,
                               color: Colors.white,
                             ),
-
                             slidersColor: Color(0xFF9EA700),
                             highlightColor: Color(0xFF9EA700),
                             slidersSize: 25,
                             splashRadius: 12,
-
-
                           );
-
                           if (date != null) {
                             setState(() {
                               dobController.text =
-                              "${date.year} - ${date.month} - ${date.day}";
+                                  "${date.year} - ${date.month} - ${date.day}";
                             });
                           }
                         },
                       ),
                       SizedBox(height: 10),
                       TextFormField(
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return "Please enter your email";
+                          } else if (!RegExp(
+                                  r'^.+@[a-zA-Z]+\.{1}[a-zA-Z]+(\.{0,1}[a-zA-Z]+)$')
+                              .hasMatch(value)) {
+                            return "Please enter valid email";
+                          }
+                        },
+                        onChanged: (text) {
+                          if (formKey.currentState!.validate()) {
+                          }
+                        },
                         controller: emailController,
                         decoration: InputDecoration(
                           prefixIcon: Icon(
@@ -638,6 +834,18 @@ class _EditprofileState extends State<Editprofile> {
                       ),
                       SizedBox(height: 10),
                       TextFormField(
+                        validator: (value) {
+                          if (value == null || value.isEmpty)
+                            return "Please enter your phone number";
+                          else if (!RegExp(r'^[0-9]{10}$').hasMatch(value)) {
+                            return "Please enter valid 10-digit number";
+                          }
+                          return null;
+                        },
+                        onChanged: (text) {
+                          if (formKey.currentState!.validate()) {
+                          }
+                        },
                         controller: phoneController,
                         decoration: InputDecoration(
                           prefixIcon: Icon(
@@ -703,21 +911,35 @@ class _EditprofileState extends State<Editprofile> {
                       //   ),
                       // ),
                       CustomDropdown<String>(
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return "please enter your work address";
+                          }
+                        },
                         decoration: CustomDropdownDecoration(
                           closedFillColor: Color(0x1B9EA700),
                           closedBorderRadius: BorderRadius.circular(12),
                         ),
                         // hintText: '${privateAddress3Controller.text}',
                         hintBuilder: (context, selectedItem, enabled) {
-                          return Text('${loactionController.text}',style: TextStyle(color: Colors.black),);
+                          return Text(
+                            '${loactionController.text}',
+                            style: TextStyle(color: Colors.black),
+                          );
                         },
-                        items: locations.map<String>((data) => data['display_name'].toString()).toList(),
-                        initialItem: locations.any((data) => data['display_name'] == loactionController.text.trim())
+                        items: locations
+                            .map<String>(
+                                (data) => data['display_name'].toString())
+                            .toList(),
+                        initialItem: locations.any((data) =>
+                                data['display_name'] ==
+                                loactionController.text.trim())
                             ? loactionController.text.trim()
                             : null,
                         onChanged: (value) {
                           setState(() {
-                            var matchedLocation = locations.firstWhere((data) => data['display_name'] == value);
+                            var matchedLocation = locations.firstWhere(
+                                (data) => data['display_name'] == value);
                             selectedLocation = matchedLocation['display_name'];
                             loactionController.text = selectedLocation!;
                           });
@@ -729,6 +951,15 @@ class _EditprofileState extends State<Editprofile> {
                           Expanded(
                             child: SizedBox(
                               child: TextFormField(
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return "Please enter your address";
+                                  }
+                                },
+                                onChanged: (text) {
+                                  if (formKey.currentState!.validate()) {
+                                  }
+                                },
                                 controller: privateAddressController,
                                 decoration: InputDecoration(
                                   prefixIcon: Icon(
@@ -756,6 +987,15 @@ class _EditprofileState extends State<Editprofile> {
                           Expanded(
                             child: SizedBox(
                               child: TextFormField(
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return "Please enter your address";
+                                  }
+                                },
+                                onChanged: (text) {
+                                  if (formKey.currentState!.validate()) {
+                                  }
+                                },
                                 controller: privateAddress2Controller,
                                 decoration: InputDecoration(
                                   prefixIcon: Icon(
@@ -788,23 +1028,38 @@ class _EditprofileState extends State<Editprofile> {
                           Expanded(
                             child: SizedBox(
                               child: CustomDropdown<String>(
+                                // validator: (value) {
+                                //   if (value == null || value.isEmpty) {
+                                //     return "Please enter your address";
+                                //   }
+                                // },
                                 decoration: CustomDropdownDecoration(
                                   closedFillColor: Color(0x1B9EA700),
                                   closedBorderRadius: BorderRadius.circular(12),
                                 ),
                                 // hintText: '${privateAddress3Controller.text}',
                                 hintBuilder: (context, selectedItem, enabled) {
-                                  return Text('${privateAddress3Controller.text}',style: TextStyle(color: Colors.black),);
+                                  return Text(
+                                    '${privateAddress3Controller.text}',
+                                    style: TextStyle(color: Colors.black),
+                                  );
                                 },
-                                items: stateList.map<String>((data) => data['name'].toString()).toList(),
-                                initialItem: stateList.any((data) => data['name'] == privateAddress3Controller.text.trim())
+                                items: stateList
+                                    .map<String>(
+                                        (data) => data['name'].toString())
+                                    .toList(),
+                                initialItem: stateList.any((data) =>
+                                        data['name'] ==
+                                        privateAddress3Controller.text.trim())
                                     ? privateAddress3Controller.text.trim()
                                     : null,
                                 onChanged: (value) {
                                   setState(() {
-                                    var matchedLocation = stateList.firstWhere((data) => data['name'] == value);
+                                    var matchedLocation = stateList.firstWhere(
+                                        (data) => data['name'] == value);
                                     selectedState = matchedLocation['name'];
-                                    privateAddress3Controller.text = selectedState!;
+                                    privateAddress3Controller.text =
+                                        selectedState!;
                                   });
                                 },
                               ),
@@ -816,6 +1071,11 @@ class _EditprofileState extends State<Editprofile> {
                           Expanded(
                             child: SizedBox(
                               child: TextFormField(
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return "Please enter your zip code";
+                                  }
+                                },
                                 controller: zipCodeController,
                                 decoration: InputDecoration(
                                   prefixIcon: Icon(
@@ -843,20 +1103,32 @@ class _EditprofileState extends State<Editprofile> {
                         height: 10,
                       ),
                       CustomDropdown<String>(
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return "Please enter your country";
+                          }
+                        },
                         decoration: CustomDropdownDecoration(
                           closedFillColor: Color(0x1B9EA700),
                           closedBorderRadius: BorderRadius.circular(12),
                         ),
                         hintBuilder: (context, selectedItem, enabled) {
-                          return Text('${countryController.text}',style: TextStyle(color: Colors.grey),);
+                          return Text(
+                            '${countryController.text}',
+                            style: TextStyle(color: Colors.grey),
+                          );
                         },
-                        items: countryList.map<String>((data) => data['name'].toString()).toList(),
-                        initialItem: countryList.any((data) => data['name'] == countryController.text.trim())
+                        items: countryList
+                            .map<String>((data) => data['name'].toString())
+                            .toList(),
+                        initialItem: countryList.any((data) =>
+                                data['name'] == countryController.text.trim())
                             ? countryController.text.trim()
                             : null,
                         onChanged: (value) {
                           setState(() {
-                            var matchedLocation = countryList.firstWhere((data) => data['name'] == value);
+                            var matchedLocation = countryList
+                                .firstWhere((data) => data['name'] == value);
                             selectedCountryList = matchedLocation['name'];
                             countryController.text = selectedCountryList!;
                           });
@@ -871,15 +1143,23 @@ class _EditprofileState extends State<Editprofile> {
                           closedBorderRadius: BorderRadius.circular(12),
                         ),
                         hintBuilder: (context, selectedItem, enabled) {
-                          return Text('${departmentController.text}',style: TextStyle(color: Colors.black),);
+                          return Text(
+                            '${departmentController.text}',
+                            style: TextStyle(color: Colors.black),
+                          );
                         },
-                        items: departments.map<String>((data) => data['name'].toString()).toList(),
-                        initialItem: departments.any((data) => data['name'] == departmentController.text.trim())
+                        items: departments
+                            .map<String>((data) => data['name'].toString())
+                            .toList(),
+                        initialItem: departments.any((data) =>
+                                data['name'] ==
+                                departmentController.text.trim())
                             ? departmentController.text.trim()
                             : null,
                         onChanged: (value) {
                           setState(() {
-                            var matchedLocation = departments.firstWhere((data) => data['name'] == value);
+                            var matchedLocation = departments
+                                .firstWhere((data) => data['name'] == value);
                             selectedDepartments = matchedLocation['name'];
                             departmentController.text = selectedDepartments!;
                           });
@@ -890,8 +1170,7 @@ class _EditprofileState extends State<Editprofile> {
                       ),
                       ElevatedButton(
                           onPressed: () {
-                            if (formKey.currentState!.validate())
-                            saveChanges();
+                            if (formKey.currentState!.validate()) saveChanges();
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Color(0xFF9EA700),

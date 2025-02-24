@@ -1,12 +1,15 @@
-
+import 'dart:convert';
 import 'dart:developer';
 import 'package:animated_custom_dropdown/custom_dropdown.dart';
 import 'package:cyllo_mobile/Profile/profilePage.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
+import 'dart:typed_data';
 
 class Demo extends StatefulWidget {
   const Demo({super.key});
@@ -34,6 +37,8 @@ class _DemoState extends State<Demo> {
   String? type;
   List fields = [];
   bool showNoDataMessage = false;
+  Uint8List? profileImage;
+  bool imageLoad = true;
 
   @override
   void initState() {
@@ -58,6 +63,7 @@ class _DemoState extends State<Demo> {
             await client!.authenticate(dbName, userLogin, userPassword);
         print("Odoo Authenticated: $auth");
         await getChartData();
+        await imageData();
       } catch (e) {
         print("Odoo Authentication Failed: $e");
       }
@@ -136,7 +142,7 @@ class _DemoState extends State<Demo> {
                 value = (stageValues[stageName] ?? 0) +
                     (item['probability'] as double);
               } else if (selectedFilter ==
-                  "recurring_revenue_monthly_prorated" &&
+                      "recurring_revenue_monthly_prorated" &&
                   item['recurring_revenue_monthly_prorated'] != false) {
                 value = (stageValues[stageName] ?? 0) +
                     (item['recurring_revenue_monthly_prorated'] as double);
@@ -174,11 +180,10 @@ class _DemoState extends State<Demo> {
 
             chartDatavalues = sortedData;
 
-            if(stageOrder.isEmpty || sortedData.every((data) => data.y == 0)){
+            if (stageOrder.isEmpty || sortedData.every((data) => data.y == 0)) {
               showNoDataMessage = true;
-            }
-            else{
-              showNoDataMessage =false;
+            } else {
+              showNoDataMessage = false;
             }
 
             isLoading = false;
@@ -217,7 +222,7 @@ class _DemoState extends State<Demo> {
       }
       try {
         final List<Map<String, dynamic>> data =
-        List<Map<String, dynamic>>.from(response);
+            List<Map<String, dynamic>>.from(response);
         // Map<String, double> forecastCounts = {};
         Map<String, double> forecastValues = {};
         double noneValue = 0;
@@ -226,15 +231,15 @@ class _DemoState extends State<Demo> {
           if (item['date_deadline'] != null &&
               item['date_deadline'] is String) {
             DateTime currentDate = DateTime.now();
-            DateTime tempDate = DateFormat("yyyy-MM-dd").parse(
-                item['date_deadline']);
+            DateTime tempDate =
+                DateFormat("yyyy-MM-dd").parse(item['date_deadline']);
             print("dayyyyyyyyyyyyyyy$tempDate");
             DateTime date = DateTime.parse(item['date_deadline']);
             String monthYear = DateFormat('MMMM yyyy').format(date);
             double value = forecastValues[monthYear] ?? 0;
             log('before check${item.length}');
-            if (tempDate.isAfter(
-                DateTime(currentDate.year, currentDate.month, 1))) {
+            if (tempDate
+                .isAfter(DateTime(currentDate.year, currentDate.month, 1))) {
               log('after check&${item.length} ');
               if (selectedFilter == "count") {
                 value += 1;
@@ -245,7 +250,7 @@ class _DemoState extends State<Demo> {
                   item['expected_revenue'] != false) {
                 value += (item['expected_revenue'] as double);
               } else if (selectedFilter ==
-                  "recurring_revenue_monthly_prorated" &&
+                      "recurring_revenue_monthly_prorated" &&
                   item['recurring_revenue_monthly_prorated'] != false) {
                 value += (item['recurring_revenue_monthly_prorated'] as double);
               } else if (selectedFilter == "recurring_revenue_prorated" &&
@@ -260,8 +265,7 @@ class _DemoState extends State<Demo> {
               }
               forecastValues[monthYear] = value;
             }
-          }
-          else if (item['date_deadline'] == false) {
+          } else if (item['date_deadline'] == false) {
             print('itemmmmmm$item');
             print("ansaf");
             log("beffffff${item.length}");
@@ -275,11 +279,9 @@ class _DemoState extends State<Demo> {
             } else if (selectedFilter == "expected_revenue" &&
                 item['expected_revenue'] is num) {
               itemValue = item['expected_revenue'].toDouble();
-            } else if (selectedFilter ==
-                "recurring_revenue_monthly_prorated" &&
+            } else if (selectedFilter == "recurring_revenue_monthly_prorated" &&
                 item['recurring_revenue_monthly_prorated'] is num) {
-              itemValue =
-                  item['recurring_revenue_monthly_prorated'].toDouble();
+              itemValue = item['recurring_revenue_monthly_prorated'].toDouble();
             } else if (selectedFilter == "recurring_revenue_prorated" &&
                 item['recurring_revenue_prorated'] is num) {
               itemValue = item['recurring_revenue_prorated'].toDouble();
@@ -305,11 +307,11 @@ class _DemoState extends State<Demo> {
               .map((entry) => ChartData(entry.key, entry.value))
               .toList();
           print('lllloooooooo$chartDatavalues');
-          if(chartDatavalues.isEmpty || chartDatavalues.every((data) => data.y == 0)){
+          if (chartDatavalues.isEmpty ||
+              chartDatavalues.every((data) => data.y == 0)) {
             showNoDataMessage = true;
-          }
-          else{
-            showNoDataMessage =false;
+          } else {
+            showNoDataMessage = false;
           }
           isLoading = false;
         });
@@ -319,8 +321,7 @@ class _DemoState extends State<Demo> {
         print("Error processing forecast data ");
         setState(() => isLoading = false);
       }
-    }
-    else if (selectedReport == "Activities") {
+    } else if (selectedReport == "Activities") {
       final response = await client?.callKw({
         'model': "crm.activity.report",
         'method': 'search_read',
@@ -335,15 +336,13 @@ class _DemoState extends State<Demo> {
         String monthYear = DateFormat('MMMM yyyy').format(date);
         chartDatavalues.add(ChartData(monthYear, data.length.toDouble()));
         isLoading = false;
-        if(chartDatavalues.isEmpty){
-          showNoDataMessage =true;
-        }
-        else{
+        if (chartDatavalues.isEmpty) {
+          showNoDataMessage = true;
+        } else {
           showNoDataMessage = false;
         }
       });
-    }
-    else {
+    } else {
       final response = await client?.callKw({
         'model': model,
         'method': 'search_read',
@@ -352,16 +351,14 @@ class _DemoState extends State<Demo> {
       });
       if (response != null && response is List) {
         Map<String, double> stageValues = {};
-          print("partner dataa$response");
+        print("partner dataa$response");
         for (var item in response) {
-          if (item['grade_id'] != null &&
-              item['grade_id'] is List) {
+          if (item['grade_id'] != null && item['grade_id'] is List) {
             String stageName = item['grade_id'][1].toString();
             double value;
             if (selectedFilter == "count") {
               value = (stageValues[stageName] ?? 0) + 1;
-            }
-            else {
+            } else {
               value = 0;
             }
             stageValues[stageName] = value;
@@ -384,7 +381,6 @@ class _DemoState extends State<Demo> {
               showNoDataMessage = false;
             }
 
-
             // chartDatavalues = sortedData;
 
             isLoading = false;
@@ -395,7 +391,13 @@ class _DemoState extends State<Demo> {
   }
 
   Widget buildReportTypeDropdown() {
-    final dropvalues = ['Leads', 'Activities', 'Forecast', 'Pipeline','Partnerships'];
+    final dropvalues = [
+      'Leads',
+      'Activities',
+      'Forecast',
+      'Pipeline',
+      'Partnerships'
+    ];
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 15),
       child: Padding(
@@ -470,10 +472,7 @@ class _DemoState extends State<Demo> {
                 case "Partnerships":
                   model = "crm.partner.report.assign";
                   type = "";
-                  fields = [
-                    'turnover',
-                    'grade_id'
-                  ];
+                  fields = ['turnover', 'grade_id'];
                 default:
                   model = "";
                   type = null;
@@ -546,78 +545,72 @@ class _DemoState extends State<Demo> {
 
   Widget buildChart() {
     if (selectedChart == "bar") {
-      return
-        showNoDataMessage
-            ? Column(
-          children: [
-            Center(
-                child: Image.asset('assets/nodata.png')
-            ),
-            Text("No data to display",style: TextStyle(
-                color: Colors.blueGrey
-            ),),
-          ],
-        )
-        :SfCartesianChart(
-        primaryXAxis: CategoryAxis(),
-        series: <CartesianSeries<ChartData, String>>[
-          ColumnSeries<ChartData, String>(
-            dataSource: chartDatavalues,
-            xValueMapper: (ChartData data, _) => data.x,
-            yValueMapper: (ChartData data, _) => data.y,
-            color: Color(0xFF9EA700),
-          ),
-        ],
-      );
-    } else if (selectedChart == "line") {
-      return
-        showNoDataMessage
-            ? Column(
-          children: [
-            Center(
-                child: Image.asset('assets/nodata.png')
-            ),
-            Text("No data to display",style: TextStyle(
-                color: Colors.blueGrey
-            ),),
-          ],
-        )
-        :SfCartesianChart(
-        primaryXAxis: CategoryAxis(),
-        series: <CartesianSeries<ChartData, String>>[
-          LineSeries<ChartData, String>(
-            dataSource: chartDatavalues,
-            xValueMapper: (ChartData data, _) => data.x,
-            yValueMapper: (ChartData data, _) => data.y,
-            color: Color(0xFF9EA700),
-          ),
-        ],
-      );
-    } else {
-      return
-        showNoDataMessage
-            ? Column(
+      return showNoDataMessage
+          ? Column(
               children: [
-                Center(
-                child: Image.asset('assets/nodata.png')
-                        ),
-                Text("No data to display",style: TextStyle(
-                  color: Colors.blueGrey
-                ),),
+                Center(child: Image.asset('assets/nodata.png')),
+                Text(
+                  "No data to display",
+                  style: TextStyle(color: Colors.blueGrey),
+                ),
               ],
             )
-            :SfCircularChart(
-        legend: Legend(isVisible: true),
-        series: <CircularSeries<ChartData, String>>[
-          PieSeries<ChartData, String>(
-            dataLabelSettings: DataLabelSettings(isVisible: true),
-            explode: true,
-            dataSource: chartDatavalues,
-            xValueMapper: (ChartData data, _) => data.x,
-            yValueMapper: (ChartData data, _) => data.y,
-          ),
-        ],
-      );
+          : SfCartesianChart(
+              primaryXAxis: CategoryAxis(),
+              series: <CartesianSeries<ChartData, String>>[
+                ColumnSeries<ChartData, String>(
+                  dataSource: chartDatavalues,
+                  xValueMapper: (ChartData data, _) => data.x,
+                  yValueMapper: (ChartData data, _) => data.y,
+                  color: Color(0xFF9EA700),
+                ),
+              ],
+            );
+    } else if (selectedChart == "line") {
+      return showNoDataMessage
+          ? Column(
+              children: [
+                Center(child: Image.asset('assets/nodata.png')),
+                Text(
+                  "No data to display",
+                  style: TextStyle(color: Colors.blueGrey),
+                ),
+              ],
+            )
+          : SfCartesianChart(
+              primaryXAxis: CategoryAxis(),
+              series: <CartesianSeries<ChartData, String>>[
+                LineSeries<ChartData, String>(
+                  dataSource: chartDatavalues,
+                  xValueMapper: (ChartData data, _) => data.x,
+                  yValueMapper: (ChartData data, _) => data.y,
+                  color: Color(0xFF9EA700),
+                ),
+              ],
+            );
+    } else {
+      return showNoDataMessage
+          ? Column(
+              children: [
+                Center(child: Image.asset('assets/nodata.png')),
+                Text(
+                  "No data to display",
+                  style: TextStyle(color: Colors.blueGrey),
+                ),
+              ],
+            )
+          : SfCircularChart(
+              legend: Legend(isVisible: true),
+              series: <CircularSeries<ChartData, String>>[
+                PieSeries<ChartData, String>(
+                  dataLabelSettings: DataLabelSettings(isVisible: true),
+                  explode: true,
+                  dataSource: chartDatavalues,
+                  xValueMapper: (ChartData data, _) => data.x,
+                  yValueMapper: (ChartData data, _) => data.y,
+                ),
+              ],
+            );
     }
   }
 
@@ -652,21 +645,20 @@ class _DemoState extends State<Demo> {
                   height: 12,
                 ),
                 Container(
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(12),
-                      border: Border(
-                        left: BorderSide(
-                          color: selectedFilter == "count"
-                              ? Color(0xFF656805)
-                              : Colors.transparent,
-                          width: 6,  // Border thickness
-                        ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border(
+                      left: BorderSide(
+                        color: selectedFilter == "count"
+                            ? Color(0xFF656805)
+                            : Colors.transparent,
+                        width: 6, // Border thickness
                       ),
                     ),
+                  ),
                   child: ListTile(
                     leading: Icon(
-                      selectedFilter == "count"
-                        ? Icons.done:
-                      Icons.timelapse,
+                      selectedFilter == "count" ? Icons.done : Icons.timelapse,
                       color: Color(0xFF9EA700),
                     ),
                     title: Text('Count'),
@@ -683,59 +675,61 @@ class _DemoState extends State<Demo> {
                 SizedBox(
                   height: 5,
                 ),
-                if(selectedReport == 'Partnerships')
+                if (selectedReport == 'Partnerships')
                   Container(
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
                       border: Border(
                         left: BorderSide(
                           color: selectedFilter == "turnover"
                               ? Color(0xFF656805)
                               : Colors.transparent,
-                          width: 6,  // Border thickness
+                          width: 6, // Border thickness
                         ),
                       ),
                     ),
                     child: ListTile(
                       leading: Icon(
                         selectedFilter == "turnover"
-                            ? Icons.done:
-                        Icons.timelapse,
+                            ? Icons.done
+                            : Icons.timelapse,
                         color: Color(0xFF9EA700),
                       ),
                       title: Text('Turnover'),
                       onTap: () {
-                        applyFilter("turnover",
-                            'Turnover');
+                        applyFilter("turnover", 'Turnover');
                       },
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                       tileColor: Color(0x1B9EA700),
                       focusColor: Colors.red,
                       contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     ),
                   ),
                 SizedBox(
                   height: 5,
                 ),
-                if (selectedReport != "Activities" && selectedReport !="Partnerships" ) ...[
+                if (selectedReport != "Activities" &&
+                    selectedReport != "Partnerships") ...[
                   if (selectedReport == 'Leads' || selectedReport == 'Pipeline')
                     Container(
-                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
                         border: Border(
                           left: BorderSide(
                             color: selectedFilter == "day_open"
                                 ? Color(0xFF656805)
                                 : Colors.transparent,
-                            width: 6,  // Border thickness
+                            width: 6, // Border thickness
                           ),
                         ),
                       ),
                       child: ListTile(
                         leading: Icon(
                           selectedFilter == "day_open"
-                              ? Icons.done:
-                          Icons.timelapse,
+                              ? Icons.done
+                              : Icons.timelapse,
                           color: Color(0xFF9EA700),
                         ),
                         title: Text('Days to Assign'),
@@ -754,21 +748,22 @@ class _DemoState extends State<Demo> {
                   ),
                   if (selectedReport == 'Leads' || selectedReport == 'Pipeline')
                     Container(
-                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
                         border: Border(
                           left: BorderSide(
                             color: selectedFilter == "day_close"
                                 ? Color(0xFF656805)
                                 : Colors.transparent,
-                            width: 6,  // Border thickness
+                            width: 6, // Border thickness
                           ),
                         ),
                       ),
                       child: ListTile(
                         leading: Icon(
                           selectedFilter == "day_close"
-                              ? Icons.done:
-                          Icons.timelapse,
+                              ? Icons.done
+                              : Icons.timelapse,
                           color: Color(0xFF9EA700),
                         ),
                         title: Text('Days to Close'),
@@ -786,26 +781,28 @@ class _DemoState extends State<Demo> {
                     height: 5,
                   ),
                   Container(
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
                       border: Border(
                         left: BorderSide(
                           color: selectedFilter == "recurring_revenue_monthly"
                               ? Color(0xFF656805)
                               : Colors.transparent,
-                          width: 7,  // Border thickness
+                          width: 7, // Border thickness
                         ),
                       ),
                     ),
                     child: ListTile(
                       leading: Icon(
                         selectedFilter == "recurring_revenue_monthly"
-                            ? Icons.done:
-                        Icons.timelapse,
+                            ? Icons.done
+                            : Icons.timelapse,
                         color: Color(0xFF9EA700),
                       ),
                       title: Text('Expected MRR'),
                       onTap: () {
-                        applyFilter("recurring_revenue_monthly", 'Expected MRR');
+                        applyFilter(
+                            "recurring_revenue_monthly", 'Expected MRR');
                       },
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
@@ -818,21 +815,22 @@ class _DemoState extends State<Demo> {
                     height: 5,
                   ),
                   Container(
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
                       border: Border(
                         left: BorderSide(
                           color: selectedFilter == "expected_revenue"
                               ? Color(0xFF656805)
                               : Colors.transparent,
-                          width: 7,  // Border thickness
+                          width: 7, // Border thickness
                         ),
                       ),
                     ),
                     child: ListTile(
                       leading: Icon(
                         selectedFilter == "expected_revenue"
-                            ? Icons.done:
-                        Icons.timelapse,
+                            ? Icons.done
+                            : Icons.timelapse,
                         color: Color(0xFF9EA700),
                       ),
                       title: Text('Expected Revenue'),
@@ -851,21 +849,22 @@ class _DemoState extends State<Demo> {
                   ),
                   if (selectedReport == 'Leads' || selectedReport == 'Pipeline')
                     Container(
-                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
                         border: Border(
                           left: BorderSide(
                             color: selectedFilter == "probability"
                                 ? Color(0xFF656805)
                                 : Colors.transparent,
-                            width: 7,  // Border thickness
+                            width: 7, // Border thickness
                           ),
                         ),
                       ),
                       child: ListTile(
                         leading: Icon(
                           selectedFilter == "probability"
-                              ? Icons.done:
-                          Icons.timelapse,
+                              ? Icons.done
+                              : Icons.timelapse,
                           color: Color(0xFF9EA700),
                         ),
                         title: Text('Probability'),
@@ -883,27 +882,29 @@ class _DemoState extends State<Demo> {
                     height: 5,
                   ),
                   Container(
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
                       border: Border(
                         left: BorderSide(
-                          color: selectedFilter == "recurring_revenue_monthly_prorated"
+                          color: selectedFilter ==
+                                  "recurring_revenue_monthly_prorated"
                               ? Color(0xFF656805)
                               : Colors.transparent,
-                          width: 7,  // Border thickness
+                          width: 7, // Border thickness
                         ),
                       ),
                     ),
                     child: ListTile(
                       leading: Icon(
                         selectedFilter == "recurring_revenue_monthly_prorated"
-                            ? Icons.done:
-                        Icons.timelapse,
+                            ? Icons.done
+                            : Icons.timelapse,
                         color: Color(0xFF9EA700),
                       ),
                       title: Text('Prorated MRR'),
                       onTap: () {
-                        applyFilter(
-                            "recurring_revenue_monthly_prorated", 'Prorated MRR');
+                        applyFilter("recurring_revenue_monthly_prorated",
+                            'Prorated MRR');
                       },
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
@@ -916,21 +917,22 @@ class _DemoState extends State<Demo> {
                     height: 5,
                   ),
                   Container(
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
                       border: Border(
                         left: BorderSide(
                           color: selectedFilter == "recurring_revenue_prorated"
                               ? Color(0xFF656805)
                               : Colors.transparent,
-                          width: 7,  // Border thickness
+                          width: 7, // Border thickness
                         ),
                       ),
                     ),
                     child: ListTile(
                       leading: Icon(
                         selectedFilter == "recurring_revenue_prorated"
-                            ? Icons.done:
-                        Icons.timelapse,
+                            ? Icons.done
+                            : Icons.timelapse,
                         color: Color(0xFF9EA700),
                       ),
                       title: Text('Prorated Recurring Revenues'),
@@ -950,21 +952,22 @@ class _DemoState extends State<Demo> {
                     height: 5,
                   ),
                   Container(
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
                       border: Border(
                         left: BorderSide(
                           color: selectedFilter == "prorated_revenue"
                               ? Color(0xFF656805)
                               : Colors.transparent,
-                          width: 7,  // Border thickness
+                          width: 7, // Border thickness
                         ),
                       ),
                     ),
                     child: ListTile(
                       leading: Icon(
                         selectedFilter == "prorated_revenue"
-                            ? Icons.done:
-                        Icons.timelapse,
+                            ? Icons.done
+                            : Icons.timelapse,
                         color: Color(0xFF9EA700),
                       ),
                       title: Text('Prorated Revenue'),
@@ -982,21 +985,22 @@ class _DemoState extends State<Demo> {
                     height: 5,
                   ),
                   Container(
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
                       border: Border(
                         left: BorderSide(
                           color: selectedFilter == "recurring_revenue"
-                              ? Color(0xFF656805)  
+                              ? Color(0xFF656805)
                               : Colors.transparent,
-                          width: 7,  // Border thickness
+                          width: 7, // Border thickness
                         ),
                       ),
                     ),
                     child: ListTile(
                       leading: Icon(
                         selectedFilter == "recurring_revenue"
-                            ? Icons.done:
-                        Icons.timelapse,
+                            ? Icons.done
+                            : Icons.timelapse,
                         color: Color(0xFF9EA700),
                       ),
                       title: Text('Recurring Revenues'),
@@ -1029,15 +1033,103 @@ class _DemoState extends State<Demo> {
     Navigator.pop(context);
   }
 
+  Widget SimmerLoad() {
+    return Padding(
+      padding: EdgeInsets.all(2),
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey[300]!,
+        highlightColor: Colors.grey[100]!,
+        child: Column(
+          children: [
+            CircleAvatar(
+              radius: 18.0,
+              backgroundColor: Colors.white,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> imageData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userid = prefs.getInt("userId") ?? "";
+    print('iddddd$userid');
+    try {
+      setState(() {
+        isLoading = true;
+      });
+      final response = await client?.callKw({
+        'model': 'res.users',
+        'method': 'search_read',
+        'args': [
+          [
+            ["id", "=", userid],
+          ]
+        ],
+        'kwargs': {
+          'fields': [
+            'image_1920',
+          ]
+        },
+      });
+      if (response == null || response.isEmpty || response is! List) {
+        print('No data received or invalid format');
+        setState(() => isLoading = false);
+        return;
+      }
+      try {
+        final List<Map<String, dynamic>> data =
+            List<Map<String, dynamic>>.from(response);
+        setState(() {
+          var imageData = data[0]['image_1920'];
+          if (imageData != null && imageData is String) {
+            profileImage = base64Decode(imageData);
+            print('imageeeeee$profileImage');
+          }
+        });
+        print('dataaaaaaaaaaaaa$data');
+        print('response$response');
+        setState(() {
+          isLoading = false;
+        });
+      } catch (e) {
+        print("Odoo fetch Failed: $e");
+      }
+    } catch (e) {
+      print("Error processing forecast data ");
+      setState(() => isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         actions: [
-          IconButton(onPressed: (){
-            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context)=>Profilepage()));
-          }, icon: Icon(Icons.person_outline_rounded,size: 33,)),
-          SizedBox(width: 5,),
+          GestureDetector(
+            onTap: () {
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (context) => Profilepage()));
+            },
+            child: Container(
+              height: 40,
+              width: 40,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+              ),
+              child: isLoading
+                  ?SimmerLoad()
+                  : CircleAvatar(
+                      backgroundImage: profileImage != null
+                          ? MemoryImage(profileImage!)
+                          : AssetImage('assets/pf.jpeg') as ImageProvider,
+                    ),
+            ),
+          ),
+          SizedBox(
+            width: 8,
+          ),
         ],
         title: Text(
           'Dashboard',
@@ -1047,7 +1139,11 @@ class _DemoState extends State<Demo> {
         backgroundColor: Color(0xFF9EA700),
       ),
       body: isLoading
-          ? Center(child: CircularProgressIndicator())
+          ? Center(
+              child: LoadingAnimationWidget.fourRotatingDots(
+              color: Color(0xFF9EA700),
+              size: 100,
+            ))
           : Column(
               children: [
                 SizedBox(height: 20),
