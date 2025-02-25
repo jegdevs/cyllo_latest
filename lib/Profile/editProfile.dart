@@ -35,6 +35,7 @@ class _EditprofileState extends State<Editprofile> {
   String? dob;
   File? selectedImage;
   String? newImage;
+  IconData? errorIcon;
 
   TextEditingController nameController = TextEditingController();
   TextEditingController genderController = TextEditingController();
@@ -340,12 +341,14 @@ class _EditprofileState extends State<Editprofile> {
   }
 
   Future<void> saveChanges() async {
+    bool trycheck = false;
+    String errorMessage = "An error occurred. Please try again.";
     final updatedData = {
       'work_email': emailController.text,
       'work_phone': phoneController.text,
       'work_location_id': locations
-              .where((data) => data['display_name'] == selectedLocation)
-              .isNotEmpty
+          .where((data) => data['display_name'] == selectedLocation)
+          .isNotEmpty
           ? locations.firstWhere(
               (data) => data['display_name'] == selectedLocation)['id']
           : null,
@@ -353,121 +356,166 @@ class _EditprofileState extends State<Editprofile> {
       'private_street': privateAddressController.text,
       'private_city': privateAddress2Controller.text,
       'private_state_id': stateList
-              .where((data) => data['name'] == selectedState)
-              .isNotEmpty
+          .where((data) => data['name'] == selectedState)
+          .isNotEmpty
           ? stateList.firstWhere((data) => data['name'] == selectedState)['id']
           : null,
       'private_zip': zipCodeController.text,
       'private_country_id': countryList
-              .where((data) => data['name'] == selectedCountryList)
-              .isNotEmpty
+          .where((data) => data['name'] == selectedCountryList)
+          .isNotEmpty
           ? countryList
-              .firstWhere((data) => data['name'] == selectedCountryList)['id']
+          .firstWhere((data) => data['name'] == selectedCountryList)['id']
           : null,
       'department_id': departments
-              .where((data) => data['name'] == selectedDepartments)
-              .isNotEmpty
+          .where((data) => data['name'] == selectedDepartments)
+          .isNotEmpty
           ? departments
-              .firstWhere((data) => data['name'] == selectedDepartments)['id']
+          .firstWhere((data) => data['name'] == selectedDepartments)['id']
           : null,
       'gender': genderController.text,
       'birthday': dobController.text,
       'image_1920': newImage,
     };
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final userid = prefs.getInt("userId") ?? "";
-      await client?.callKw({
-        // 'model': 'res.users',
-        'method': 'write',
-        'args': [
-          [userid],
-          updatedData,
-        ],
-        'kwargs': {},
-      });
-      print(updatedData);
-      print("Profile updated successfully");
-      Navigator.push(context, MaterialPageRoute(builder: (context)=>Profilepage()));
-      // await getProfileData();
-    } catch (e) {
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return Dialog(
-            child: Container(
-              height: 280,
-              child: Column(
-                children: [
-                  Container(
-                    height: 120,
-                    decoration: BoxDecoration(
-                      color: Colors.redAccent,
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(4),
-                        topRight: Radius.circular(4),
+      try {
+        print("user ID...");
+        final prefs = await SharedPreferences.getInstance();
+        final userid = prefs.getInt("userId") ?? "";
+        if (userid == "" || userid == 0) {
+          throw Exception("User ID not found. Please log in again.");
+        }
+        final response = await client?.callKw({
+          'model': 'res.users',
+          'method': 'write',
+          'args': [
+            [userid],
+            updatedData,
+          ],
+          'kwargs': {},
+        });
+        print('uiii$response');
+        print("Profile updated successfully");
+        if (response == true){
+          setState(() {
+            trycheck = true;
+          });
+        Navigator.push(
+            context, MaterialPageRoute(builder: (context) => Profilepage()));
+        await getProfileData();
+      }
+          else{
+      throw Exception("API call failed");
+      }
+      } catch (e) {
+        print('1');
+        setState(() {
+          errorIcon = Icons.warning_amber_rounded;
+        });
+        if (e is SocketException) {
+          print('2');
+          setState(() {
+            errorIcon =
+                Icons.signal_wifi_statusbar_connected_no_internet_4_outlined;
+          });
+          errorMessage = "No internet connection. Please check your network.";
+        } else if (e.toString().contains("OdooException")) {
+          print('3');
+          setState(() {
+            errorIcon = Icons.warning_amber_rounded;
+          });
+          errorMessage = "Cyllo Server Error......";
+        }
+        else if (trycheck == false) {
+          print('4');
+          setState(() {
+            errorIcon = Icons.warning_amber_rounded;
+          });
+          errorMessage = "API call failed......";
+        }
+        else {
+          print('5');
+          setState(() {
+            errorIcon = Icons.warning_amber_rounded;
+          });
+          errorMessage = "Error: ${e.toString()}";
+        }
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return Dialog(
+              child: Container(
+                height: 280,
+                child: Column(
+                  children: [
+                    Container(
+                      height: 120,
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent,
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(4),
+                          topRight: Radius.circular(4),
+                        ),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          errorIcon,
+                          size: 80,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
-                    child: Center(
-                      child: Icon(
-                        Icons.warning_amber_rounded,
-                        size: 80 ,
+                    Container(
+                      height: 160,
+                      width: 329,
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
                         color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    height: 160,
-                    padding: EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.only(
-                        bottomLeft: Radius.circular(4),
-                        bottomRight: Radius.circular(4),
-                      ),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          'There was an error updating the profile. Please try again.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 16,
-                          ),
+                        borderRadius: BorderRadius.only(
+                          bottomLeft: Radius.circular(4),
+                          bottomRight: Radius.circular(4),
                         ),
-                        SizedBox(height: 20),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                          },
-                          child: Container(
-                            padding: EdgeInsets.symmetric(horizontal: 40,
-                                vertical: 10),
-                            decoration: BoxDecoration(
-                              color: Colors.redAccent,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              'OK',
-                              style: TextStyle(color: Colors.white),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(
+                            errorMessage,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 16,
                             ),
                           ),
-                        ),
-                      ],
+                          SizedBox(height: 20),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                            },
+                            child: Container(
+                              padding: EdgeInsets.symmetric(horizontal: 40,
+                                  vertical: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.redAccent,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'OK',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          );
-        },
-    );
-      print("Error updating profile$e");
-    };
-          
+            );
+          },
+        );
+        print("Error updating profile$e");
+      };
   }
 
   Future<void> uploadProfile() async {

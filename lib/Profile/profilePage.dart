@@ -213,12 +213,12 @@ class _ProfilepageState extends State<Profilepage> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         actions: [
-          IconButton(
-              onPressed: () {
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (context) => Editprofile()));
-              },
-              icon: Icon(Icons.edit)),
+          // IconButton(
+          //     onPressed: () {
+          //       Navigator.push(context,
+          //           MaterialPageRoute(builder: (context) => Editprofile()));
+          //     },
+          //     icon: Icon(Icons.edit)),
           SizedBox(
             width: 5,
           ),
@@ -242,171 +242,170 @@ class _ProfilepageState extends State<Profilepage> {
                   SizedBox(
                     height: 20,
                   ),
-                  SafeArea(
-                    child: Center(
-                      child: CircleAvatar(
-                        backgroundImage: profileImage != null
-                            ? MemoryImage(profileImage!)
-                            : AssetImage('assets/pf.jpeg') as ImageProvider,
-                        radius: 100.0,
-                      ),
-                  ),
-                  ),
-                  Text(
-                    name!,
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-                  ),
-                  Text('Chief Executive Officer'),
-                  SizedBox(
-                    height: 20,
-                  ),
                   Padding(
-                    padding: const EdgeInsets.only(left: 10.0 ,right: 10),
-                    child: ListTile(
-                      leading: Icon(
-                        Icons.person,
-                        color: Color(0xFF9EA700),
-                      ),
-                      title: Text('Name'),
-                      subtitle: Text(name!),
-                      shape:
-                          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      tileColor: Color(0x1B9EA700),
-                      focusColor: Colors.red,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
-                    ),
-                  ),
-                  SizedBox(
-                    height: 10,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 10.0 ,right: 10),
-                    child: ListTile(
-                      leading: Icon(
-                        Icons.male_rounded,
-                        color: Color(0xFF9EA700),
-                      ),
-                      title: Text('Gender'),
-                      subtitle: Text(gender??'Not available'),
-                      shape:
-                      RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      tileColor: Color(0x1B9EA700),
-                      focusColor: Colors.red,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
-                    ),
-                  ),
-                  SizedBox(
-                    height: 10,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 10.0 ,right: 10),
-                    child: ListTile(
-                      leading: Icon(
-                        Icons.date_range_rounded,
-                        color: Color(0xFF9EA700),
-                      ),
-                      title: Text('Date of Birth'),
-                      subtitle: Text(dob??'Not available'),
-                      shape:
-                      RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      tileColor: Color(0x1B9EA700),
-                      focusColor: Colors.red,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
-                    ),
-                  ),
-                  SizedBox(
-                    height: 10,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 10.0 ,right: 10),
-                    child: ListTile(
-                      leading: Icon(
-                        Icons.email,
-                        color: Color(0xFF9EA700),
-                      ),
-                      title: Text('Work Email'),
-                      subtitle: Text(email!),
-                      shape:
-                          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      tileColor: Color(0x1B9EA700),
-                      focusColor: Colors.red,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
-                    ),
-                  ),
-                  SizedBox(
-                    height: 10,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 10.0 ,right: 10),
-                    child: ListTile(
-                      leading: Icon(
-                        Icons.phone,
-                        color: Color(0xFF9EA700),
-                      ),
-                      title: Text('Work Phone'),
-                      subtitle: Text(phone!),
-                      shape:
-                          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      tileColor: Color(0x1B9EA700),
-                      focusColor: Colors.red,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
-                    ),
-                  ),
-                  SizedBox(
-                    height: 10,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 10.0 ,right: 10),
-                    child: ListTile(
-                      leading: Icon(
-                        Icons.location_city,
-                        color: Color(0xFF9EA700),
-                      ),
-                      title: Text('Work Location'),
-                      subtitle: Text(loaction!),
-                      shape:
-                          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      tileColor: Color(0x1B9EA700),
-                      focusColor: Colors.red,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
-                    ),
-                  ),
-                  SizedBox(
-                    height: 10,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 10.0 ,right: 10),
-                    child: ListTile(
-                      leading: Icon(
-                        Icons.location_city,
-                        color: Color(0xFF9EA700),
-                      ),
-                      title: Text('Private Address'),
-                      subtitle: Text('${privateAddress!} , ${privateAddress2} , ${privateAddress3} , ${zipCode} , ${country}'),
-                      shape:
-                      RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      tileColor: Color(0x1B9EA700),
-                      focusColor: Colors.red,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
-                    ),
-                  ),
-                  SizedBox(
-                    height: 10,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 10.0 ,right: 10),
-                    child: ListTile(
-                      leading: Icon(
-                        Icons.topic,
-                        color: Color(0xFF9EA700),
-                      ),
-                      title: Text('Departmnet'),
-                      subtitle: Text(department!),
-                      shape:
-                      RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      tileColor: Color(0x1B9EA700),
-                      focusColor: Colors.red,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
+                    padding: const EdgeInsets.all(8.0),
+                    child: Column(
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            boxShadow: [new BoxShadow(
+                              color: Colors.grey.shade400,
+                              blurRadius: 14.0,
+                            ),],
+                            color: Colors.grey.shade200,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          height: 130,
+                          width: 500,
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 8,
+                              ),
+                              CircleAvatar(
+                                backgroundImage: profileImage != null
+                                    ? MemoryImage(profileImage!)
+                                    : AssetImage('assets/pf.jpeg')
+                                        as ImageProvider,
+                                radius: 50.0,
+                              ),
+                              SizedBox(
+                                width: 20,
+                              ),
+                              Column(crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  SizedBox(height: 20,),
+                                  Text(
+                                    name!,
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold, fontSize: 18),
+                                  ),
+                                  SizedBox(height: 5,),
+                                  Text('Chief Executive Officer'),
+                                  SizedBox(height: 3,),
+                                  ElevatedButton(onPressed: (){
+                                    Navigator.push(context,
+                                        MaterialPageRoute(builder: (context) => Editprofile()));
+                                  },
+                                    child: Text('Edit profile'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor:  Color(0xFF9EA700),
+                                      foregroundColor: Colors.white,
+                                      shape:RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8.0),
+                                          side: BorderSide(color: Color(0xFF9EA700)),
+                                      ),
+                                    ) ,),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(
+                          height: 20,
+                        ),
+                        Container(
+                          height: 300,
+                          width: 500,
+                          decoration: BoxDecoration(
+                            color: Color(0x1B9EA700),
+                            borderRadius: BorderRadius.circular(10),
+                              boxShadow: [new BoxShadow(
+                                color:Color(0x1B9EA700),
+                                blurRadius: 20.0,
+                              ),]
+                          ),
+                          child: Column(
+                            children: [
+                              ListTile(
+                                leading: Icon(
+                                  Icons.male_rounded,
+                                  color: Color(0xFF9EA700),
+                                ),
+                                title: Text('Gender'),
+                                subtitle: Text(gender ?? 'Not available'),
+                              ),
+                              ListTile(
+                                leading: Icon(
+                                  Icons.date_range_rounded,
+                                  color: Color(0xFF9EA700),
+                                ),
+                                title: Text('Date of Birth'),
+                                subtitle: Text(dob ?? 'Not available'),
+                              ),
+                              ListTile(
+                                leading: Icon(
+                                  Icons.email,
+                                  color: Color(0xFF9EA700),
+                                ),
+                                title: Text('Work Email'),
+                                subtitle: Text(email!),
+                              ),
+                              ListTile(
+                                leading: Icon(
+                                  Icons.phone,
+                                  color: Color(0xFF9EA700),
+                                ),
+                                title: Text('Work Phone'),
+                                subtitle: Text(phone!),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(
+                          height: 10,
+                        ),
+                        Container(
+                          height: 300,
+                          width: 500,
+                          decoration: BoxDecoration(
+                            color: Color(0x1B9EA700),
+                            borderRadius: BorderRadius.circular(10),
+                              boxShadow: [new BoxShadow(
+                                color:Color(0x1B9EA700),
+                                blurRadius: 20.0,
+                              ),],
+                          ),
+                          child: Column(
+                            children: [
+                              SizedBox(
+                                height: 20,
+                              ),
+                              ListTile(
+                                leading: Icon(
+                                  Icons.location_city,
+                                  color: Color(0xFF9EA700),
+                                ),
+                                title: Text('Work Location'),
+                                subtitle: Text(loaction!),
+                              ),
+                              SizedBox(
+                                height: 10,
+                              ),
+                              ListTile(
+                                leading: Icon(
+                                  Icons.location_city,
+                                  color: Color(0xFF9EA700),
+                                ),
+                                title: Text('Private Address'),
+                                subtitle: Text(
+                                    '${privateAddress!} , ${privateAddress2} , ${privateAddress3} , ${zipCode} , ${country}'),
+                              ),
+                              SizedBox(
+                                height: 10,
+                              ),
+                              ListTile(
+                                leading: Icon(
+                                  Icons.topic,
+                                  color: Color(0xFF9EA700),
+                                ),
+                                title: Text('Departmnet'),
+                                subtitle: Text(department!),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -415,131 +414,174 @@ class _ProfilepageState extends State<Profilepage> {
     );
   }
 }
-//
-// Padding(
-// padding: const EdgeInsets.all(8.0),
-// child: Column(
-// children: [
-// Container(
-// decoration: BoxDecoration(
-// color: Colors.grey.shade300,
-// borderRadius: BorderRadius.circular(10),
-// ),
-// height: 120,
-// width: 500,
-// child: Row(
-// children: [
-// SizedBox(
-// width: 10,
-// ),
-// CircleAvatar(
-// backgroundImage: profileImage != null
-// ? MemoryImage(profileImage!)
-//     : AssetImage('assets/pf.jpeg')
-// as ImageProvider,
-// radius: 50.0,
-// ),
-// SizedBox(
-// width: 15,
-// ),
-// Text(
-// name!,
-// style: TextStyle(
-// fontWeight: FontWeight.bold, fontSize: 18),
-// ),
-// ],
-// ),
-// ),
-// SizedBox(
-// height: 20,
-// ),
-// Container(
-// height: 300,
-// width: 500,
-// decoration: BoxDecoration(
-// color: Color(0x1B9EA700),
-// borderRadius: BorderRadius.circular(10),
-// ),
-// child: Column(
-// children: [
-// ListTile(
-// leading: Icon(
-// Icons.male_rounded,
-// color: Color(0xFF9EA700),
-// ),
-// title: Text('Gender'),
-// subtitle: Text(gender ?? 'Not available'),
-// ),
-// ListTile(
-// leading: Icon(
-// Icons.date_range_rounded,
-// color: Color(0xFF9EA700),
-// ),
-// title: Text('Date of Birth'),
-// subtitle: Text(dob ?? 'Not available'),
-// ),
-// ListTile(
-// leading: Icon(
-// Icons.email,
-// color: Color(0xFF9EA700),
-// ),
-// title: Text('Work Email'),
-// subtitle: Text(email!),
-// ),
-// ListTile(
-// leading: Icon(
-// Icons.phone,
-// color: Color(0xFF9EA700),
-// ),
-// title: Text('Work Phone'),
-// subtitle: Text(phone!),
-// ),
-// ],
-// ),
-// ),
-// SizedBox(
-// height: 10,
-// ),
-// Container(
-// height: 300,
-// width: 500,
-// decoration: BoxDecoration(
-// color: Color(0x1B9EA700),
-// borderRadius: BorderRadius.circular(10),
-// ),
-// child: Column(
-// children: [
-// SizedBox(height: 10,),
-// ListTile(
-// leading: Icon(
-// Icons.location_city,
-// color: Color(0xFF9EA700),
-// ),
-// title: Text('Work Location'),
-// subtitle: Text(loaction!),
-// ),
-// SizedBox(height: 10,),
-// ListTile(
-// leading: Icon(
-// Icons.location_city,
-// color: Color(0xFF9EA700),
-// ),
-// title: Text('Private Address'),
-// subtitle: Text(
-// '${privateAddress!} , ${privateAddress2} , ${privateAddress3} , ${zipCode} , ${country}'),
-// ),
-// SizedBox(height: 10,),
-// ListTile(
-// leading: Icon(
-// Icons.topic,
-// color: Color(0xFF9EA700),
-// ),
-// title: Text('Departmnet'),
-// subtitle: Text(department!),
-// ),
-// ],
-// ),
-// ),
-// ],
-// ),
+
+//       SafeArea(
+//         child: Center(
+//           child: CircleAvatar(
+//             backgroundImage: profileImage != null
+//                 ? MemoryImage(profileImage!)
+//                 : AssetImage('assets/pf.jpeg') as ImageProvider,
+//             radius: 100.0,
+//           ),
+//       ),
+//       ),
+//       Text(
+//         name!,
+//         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+//       ),
+//       Text('Chief Executive Officer'),
+//       SizedBox(
+//         height: 20,
+//       ),
+//       Padding(
+//         padding: const EdgeInsets.only(left: 10.0 ,right: 10),
+//         child: ListTile(
+//           leading: Icon(
+//             Icons.person,
+//             color: Color(0xFF9EA700),
+//           ),
+//           title: Text('Name'),
+//           subtitle: Text(name!),
+//           shape:
+//               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+//           tileColor: Color(0x1B9EA700),
+//           focusColor: Colors.red,
+//           contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
+//         ),
+//       ),
+//       SizedBox(
+//         height: 10,
+//       ),
+//       Padding(
+//         padding: const EdgeInsets.only(left: 10.0 ,right: 10),
+//         child: ListTile(
+//           leading: Icon(
+//             Icons.male_rounded,
+//             color: Color(0xFF9EA700),
+//           ),
+//           title: Text('Gender'),
+//           subtitle: Text(gender??'Not available'),
+//           shape:
+//           RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+//           tileColor: Color(0x1B9EA700),
+//           focusColor: Colors.red,
+//           contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
+//         ),
+//       ),
+//       SizedBox(
+//         height: 10,
+//       ),
+//       Padding(
+//         padding: const EdgeInsets.only(left: 10.0 ,right: 10),
+//         child: ListTile(
+//           leading: Icon(
+//             Icons.date_range_rounded,
+//             color: Color(0xFF9EA700),
+//           ),
+//           title: Text('Date of Birth'),
+//           subtitle: Text(dob??'Not available'),
+//           shape:
+//           RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+//           tileColor: Color(0x1B9EA700),
+//           focusColor: Colors.red,
+//           contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
+//         ),
+//       ),
+//       SizedBox(
+//         height: 10,
+//       ),
+//       Padding(
+//         padding: const EdgeInsets.only(left: 10.0 ,right: 10),
+//         child: ListTile(
+//           leading: Icon(
+//             Icons.email,
+//             color: Color(0xFF9EA700),
+//           ),
+//           title: Text('Work Email'),
+//           subtitle: Text(email!),
+//           shape:
+//               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+//           tileColor: Color(0x1B9EA700),
+//           focusColor: Colors.red,
+//           contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
+//         ),
+//       ),
+//       SizedBox(
+//         height: 10,
+//       ),
+//       Padding(
+//         padding: const EdgeInsets.only(left: 10.0 ,right: 10),
+//         child: ListTile(
+//           leading: Icon(
+//             Icons.phone,
+//             color: Color(0xFF9EA700),
+//           ),
+//           title: Text('Work Phone'),
+//           subtitle: Text(phone!),
+//           shape:
+//               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+//           tileColor: Color(0x1B9EA700),
+//           focusColor: Colors.red,
+//           contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
+//         ),
+//       ),
+//       SizedBox(
+//         height: 10,
+//       ),
+//       Padding(
+//         padding: const EdgeInsets.only(left: 10.0 ,right: 10),
+//         child: ListTile(
+//           leading: Icon(
+//             Icons.location_city,
+//             color: Color(0xFF9EA700),
+//           ),
+//           title: Text('Work Location'),
+//           subtitle: Text(loaction!),
+//           shape:
+//               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+//           tileColor: Color(0x1B9EA700),
+//           focusColor: Colors.red,
+//           contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
+//         ),
+//       ),
+//       SizedBox(
+//         height: 10,
+//       ),
+//       Padding(
+//         padding: const EdgeInsets.only(left: 10.0 ,right: 10),
+//         child: ListTile(
+//           leading: Icon(
+//             Icons.location_city,
+//             color: Color(0xFF9EA700),
+//           ),
+//           title: Text('Private Address'),
+//           subtitle: Text('${privateAddress!} , ${privateAddress2} , ${privateAddress3} , ${zipCode} , ${country}'),
+//           shape:
+//           RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+//           tileColor: Color(0x1B9EA700),
+//           focusColor: Colors.red,
+//           contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
+//         ),
+//       ),
+//       SizedBox(
+//         height: 10,
+//       ),
+//       Padding(
+//         padding: const EdgeInsets.only(left: 10.0 ,right: 10),
+//         child: ListTile(
+//           leading: Icon(
+//             Icons.topic,
+//             color: Color(0xFF9EA700),
+//           ),
+//           title: Text('Departmnet'),
+//           subtitle: Text(department!),
+//           shape:
+//           RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+//           tileColor: Color(0x1B9EA700),
+//           focusColor: Colors.red,
+//           contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
+//         ),
+//       ),
+//     ],
+//   ),
 // ),
