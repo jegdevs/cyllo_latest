@@ -42,8 +42,9 @@ dependencies:
   intl: ^0.18.0
   image_picker: ^1.1.2
   date_picker_plus: ^4.1.0
-  loading_animation_widget: ^1.3.0
-  kanban_board: ^0.1.0
+  loading_animation_widget:
+  appflowy_board: ^0.1.2
+  cross_scroll: ^0.1.1
 
 dev_dependencies:
   flutter_test:

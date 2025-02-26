@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:developer';
 import 'package:animated_custom_dropdown/custom_dropdown.dart';
 import 'package:cyllo_mobile/Profile/profilePage.dart';
+import 'package:cyllo_mobile/Sales/myPipeline.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
@@ -60,7 +61,7 @@ class _DemoState extends State<Demo> {
       client = OdooClient(baseUrl);
       try {
         final auth =
-        await client!.authenticate(dbName, userLogin, userPassword);
+            await client!.authenticate(dbName, userLogin, userPassword);
         print("Odoo Authenticated: $auth");
         await getChartData();
         await imageData();
@@ -142,7 +143,7 @@ class _DemoState extends State<Demo> {
                 value = (stageValues[stageName] ?? 0) +
                     (item['probability'] as double);
               } else if (selectedFilter ==
-                  "recurring_revenue_monthly_prorated" &&
+                      "recurring_revenue_monthly_prorated" &&
                   item['recurring_revenue_monthly_prorated'] != false) {
                 value = (stageValues[stageName] ?? 0) +
                     (item['recurring_revenue_monthly_prorated'] as double);
@@ -222,7 +223,7 @@ class _DemoState extends State<Demo> {
       }
       try {
         final List<Map<String, dynamic>> data =
-        List<Map<String, dynamic>>.from(response);
+            List<Map<String, dynamic>>.from(response);
         // Map<String, double> forecastCounts = {};
         Map<String, double> forecastValues = {};
         double noneValue = 0;
@@ -232,7 +233,7 @@ class _DemoState extends State<Demo> {
               item['date_deadline'] is String) {
             DateTime currentDate = DateTime.now();
             DateTime tempDate =
-            DateFormat("yyyy-MM-dd").parse(item['date_deadline']);
+                DateFormat("yyyy-MM-dd").parse(item['date_deadline']);
             print("dayyyyyyyyyyyyyyy$tempDate");
             DateTime date = DateTime.parse(item['date_deadline']);
             String monthYear = DateFormat('MMMM yyyy').format(date);
@@ -250,7 +251,7 @@ class _DemoState extends State<Demo> {
                   item['expected_revenue'] != false) {
                 value += (item['expected_revenue'] as double);
               } else if (selectedFilter ==
-                  "recurring_revenue_monthly_prorated" &&
+                      "recurring_revenue_monthly_prorated" &&
                   item['recurring_revenue_monthly_prorated'] != false) {
                 value += (item['recurring_revenue_monthly_prorated'] as double);
               } else if (selectedFilter == "recurring_revenue_prorated" &&
@@ -404,7 +405,7 @@ class _DemoState extends State<Demo> {
         padding: EdgeInsets.only(left: 10, right: 10, top: 8, bottom: 8),
         child: CustomDropdown<String>(
           decoration:
-          CustomDropdownDecoration(closedFillColor: Colors.grey.shade300),
+              CustomDropdownDecoration(closedFillColor: Colors.grey.shade300),
           hintText: 'Reporting',
           items: dropvalues,
           initialItem: selectedReport,
@@ -547,70 +548,70 @@ class _DemoState extends State<Demo> {
     if (selectedChart == "bar") {
       return showNoDataMessage
           ? Column(
-        children: [
-          Center(child: Image.asset('assets/nodata.png')),
-          Text(
-            "No data to display",
-            style: TextStyle(color: Colors.blueGrey),
-          ),
-        ],
-      )
+              children: [
+                Center(child: Image.asset('assets/nodata.png')),
+                Text(
+                  "No data to display",
+                  style: TextStyle(color: Colors.blueGrey),
+                ),
+              ],
+            )
           : SfCartesianChart(
-        primaryXAxis: CategoryAxis(),
-        series: <CartesianSeries<ChartData, String>>[
-          ColumnSeries<ChartData, String>(
-            dataSource: chartDatavalues,
-            xValueMapper: (ChartData data, _) => data.x,
-            yValueMapper: (ChartData data, _) => data.y,
-            color: Color(0xFF9EA700),
-          ),
-        ],
-      );
+              primaryXAxis: CategoryAxis(),
+              series: <CartesianSeries<ChartData, String>>[
+                ColumnSeries<ChartData, String>(
+                  dataSource: chartDatavalues,
+                  xValueMapper: (ChartData data, _) => data.x,
+                  yValueMapper: (ChartData data, _) => data.y,
+                  color: Color(0xFF9EA700),
+                ),
+              ],
+            );
     } else if (selectedChart == "line") {
       return showNoDataMessage
           ? Column(
-        children: [
-          Center(child: Image.asset('assets/nodata.png')),
-          Text(
-            "No data to display",
-            style: TextStyle(color: Colors.blueGrey),
-          ),
-        ],
-      )
+              children: [
+                Center(child: Image.asset('assets/nodata.png')),
+                Text(
+                  "No data to display",
+                  style: TextStyle(color: Colors.blueGrey),
+                ),
+              ],
+            )
           : SfCartesianChart(
-        primaryXAxis: CategoryAxis(),
-        series: <CartesianSeries<ChartData, String>>[
-          LineSeries<ChartData, String>(
-            dataSource: chartDatavalues,
-            xValueMapper: (ChartData data, _) => data.x,
-            yValueMapper: (ChartData data, _) => data.y,
-            color: Color(0xFF9EA700),
-          ),
-        ],
-      );
+              primaryXAxis: CategoryAxis(),
+              series: <CartesianSeries<ChartData, String>>[
+                LineSeries<ChartData, String>(
+                  dataSource: chartDatavalues,
+                  xValueMapper: (ChartData data, _) => data.x,
+                  yValueMapper: (ChartData data, _) => data.y,
+                  color: Color(0xFF9EA700),
+                ),
+              ],
+            );
     } else {
       return showNoDataMessage
           ? Column(
-        children: [
-          Center(child: Image.asset('assets/nodata.png')),
-          Text(
-            "No data to display",
-            style: TextStyle(color: Colors.blueGrey),
-          ),
-        ],
-      )
+              children: [
+                Center(child: Image.asset('assets/nodata.png')),
+                Text(
+                  "No data to display",
+                  style: TextStyle(color: Colors.blueGrey),
+                ),
+              ],
+            )
           : SfCircularChart(
-        legend: Legend(isVisible: true),
-        series: <CircularSeries<ChartData, String>>[
-          PieSeries<ChartData, String>(
-            dataLabelSettings: DataLabelSettings(isVisible: true),
-            explode: true,
-            dataSource: chartDatavalues,
-            xValueMapper: (ChartData data, _) => data.x,
-            yValueMapper: (ChartData data, _) => data.y,
-          ),
-        ],
-      );
+              legend: Legend(isVisible: true),
+              series: <CircularSeries<ChartData, String>>[
+                PieSeries<ChartData, String>(
+                  dataLabelSettings: DataLabelSettings(isVisible: true),
+                  explode: true,
+                  dataSource: chartDatavalues,
+                  xValueMapper: (ChartData data, _) => data.x,
+                  yValueMapper: (ChartData data, _) => data.y,
+                ),
+              ],
+            );
     }
   }
 
@@ -669,7 +670,7 @@ class _DemoState extends State<Demo> {
                         borderRadius: BorderRadius.circular(12)),
                     tileColor: Color(0x1B9EA700),
                     contentPadding:
-                    EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   ),
                 ),
                 SizedBox(
@@ -704,7 +705,7 @@ class _DemoState extends State<Demo> {
                       tileColor: Color(0x1B9EA700),
                       focusColor: Colors.red,
                       contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     ),
                   ),
                 SizedBox(
@@ -740,7 +741,7 @@ class _DemoState extends State<Demo> {
                             borderRadius: BorderRadius.circular(12)),
                         tileColor: Color(0x1B9EA700),
                         contentPadding:
-                        EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       ),
                     ),
                   SizedBox(
@@ -774,7 +775,7 @@ class _DemoState extends State<Demo> {
                             borderRadius: BorderRadius.circular(12)),
                         tileColor: Color(0x1B9EA700),
                         contentPadding:
-                        EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       ),
                     ),
                   SizedBox(
@@ -808,7 +809,7 @@ class _DemoState extends State<Demo> {
                           borderRadius: BorderRadius.circular(12)),
                       tileColor: Color(0x1B9EA700),
                       contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     ),
                   ),
                   SizedBox(
@@ -841,7 +842,7 @@ class _DemoState extends State<Demo> {
                           borderRadius: BorderRadius.circular(12)),
                       tileColor: Color(0x1B9EA700),
                       contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     ),
                   ),
                   SizedBox(
@@ -875,7 +876,7 @@ class _DemoState extends State<Demo> {
                             borderRadius: BorderRadius.circular(12)),
                         tileColor: Color(0x1B9EA700),
                         contentPadding:
-                        EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       ),
                     ),
                   SizedBox(
@@ -887,7 +888,7 @@ class _DemoState extends State<Demo> {
                       border: Border(
                         left: BorderSide(
                           color: selectedFilter ==
-                              "recurring_revenue_monthly_prorated"
+                                  "recurring_revenue_monthly_prorated"
                               ? Color(0xFF656805)
                               : Colors.transparent,
                           width: 7, // Border thickness
@@ -910,7 +911,7 @@ class _DemoState extends State<Demo> {
                           borderRadius: BorderRadius.circular(12)),
                       tileColor: Color(0x1B9EA700),
                       contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     ),
                   ),
                   SizedBox(
@@ -945,7 +946,7 @@ class _DemoState extends State<Demo> {
                       tileColor: Color(0x1B9EA700),
                       focusColor: Colors.red,
                       contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     ),
                   ),
                   SizedBox(
@@ -978,7 +979,7 @@ class _DemoState extends State<Demo> {
                           borderRadius: BorderRadius.circular(12)),
                       tileColor: Color(0x1B9EA700),
                       contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     ),
                   ),
                   SizedBox(
@@ -1011,7 +1012,7 @@ class _DemoState extends State<Demo> {
                           borderRadius: BorderRadius.circular(12)),
                       tileColor: Color(0x1B9EA700),
                       contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     ),
                   ),
                 ],
@@ -1080,7 +1081,7 @@ class _DemoState extends State<Demo> {
       }
       try {
         final List<Map<String, dynamic>> data =
-        List<Map<String, dynamic>>.from(response);
+            List<Map<String, dynamic>>.from(response);
         setState(() {
           var imageData = data[0]['image_1920'];
           if (imageData != null && imageData is String) {
@@ -1102,7 +1103,17 @@ class _DemoState extends State<Demo> {
     }
   }
 
-  bool isSelected = false;
+  bool Selected = false;
+  int selectedIndex = -1;
+  bool expand = false;
+  bool subMenus = false;
+  List<String> Options = [
+    'My Pipeline',
+    'My Activities',
+    'My Quotations',
+    'Teams',
+    'Customers'
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -1113,7 +1124,7 @@ class _DemoState extends State<Demo> {
           child: Column(
             children: [
               SizedBox(
-                height: 10,
+                height: 20,
               ),
               Image.asset(
                 'assets/images.png',
@@ -1127,18 +1138,63 @@ class _DemoState extends State<Demo> {
                 child: ListTile(
                   onTap: () {
                     setState(() {
-                      isSelected = true;
+                      selectedIndex = 1;
+                      expand = !expand;
                     });
                   },
-                  shape: isSelected ? RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25),
-                  ) : null,
-                  tileColor: isSelected ? Colors.white : Color(0xFF9EA700),
-                  title: Text('Sales', style: TextStyle(
-                      color: isSelected ? Color(0xFF9EA700) : Colors.white70,
-                      fontSize: 20
-                  ),),
-                  trailing: Icon(Icons.keyboard_arrow_down_rounded),
+                  shape: selectedIndex == 1
+                      ? RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(25),
+                        )
+                      : null,
+                  tileColor:
+                      selectedIndex == 1 ? Colors.white : Color(0xFF9EA700),
+                  title: Text(
+                    'Sales',
+                    style: TextStyle(
+                        color: selectedIndex == 1
+                            ? Color(0xFF9EA700)
+                            : Colors.white70,
+                        fontSize: 20),
+                  ),
+                  trailing: Icon(
+                    expand
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    color:
+                        selectedIndex == 1 ? Color(0xFF9EA700) : Colors.white70,
+                  ),
+                ),
+              ),
+              Visibility(
+                visible: expand,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 20, right: 10),
+                  child: Column(
+                    children: Options.map((item) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: ListTile(
+                          contentPadding: EdgeInsets.symmetric(horizontal: 15),
+                          onTap: () {
+                            if(item =="My Pipeline"){
+                              Navigator.push(context, MaterialPageRoute(builder: (context)=>Mypipeline()));
+                            }
+                          },
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          tileColor: Colors.white.withOpacity(0.2),
+                          title: Text(
+                            item,
+                            style: TextStyle(color: Colors.white, fontSize: 16),
+                          ),
+                          leading: Icon(Icons.circle,
+                              size: 8, color: Colors.white70),
+                        ),
+                      );
+                    }).toList(),
+                  ),
                 ),
               ),
               SizedBox(
@@ -1149,17 +1205,25 @@ class _DemoState extends State<Demo> {
                 child: ListTile(
                   onTap: () {
                     setState(() {
-                      isSelected = true;
+                      selectedIndex = 2;
+                      expand = false;
                     });
                   },
-                  shape: isSelected ? RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25),
-                  ) : null,
-                  tileColor: isSelected ? Colors.white : Color(0xFF9EA700),
-                  title: Text('Leads', style: TextStyle(
-                      color: isSelected ? Color(0xFF9EA700) : Colors.white70,
-                      fontSize: 20
-                  ),),
+                  shape: selectedIndex == 2
+                      ? RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(25),
+                        )
+                      : null,
+                  tileColor:
+                      selectedIndex == 2 ? Colors.white : Color(0xFF9EA700),
+                  title: Text(
+                    'Leads',
+                    style: TextStyle(
+                        color: selectedIndex == 2
+                            ? Color(0xFF9EA700)
+                            : Colors.white70,
+                        fontSize: 20),
+                  ),
                 ),
               ),
             ],
@@ -1182,10 +1246,10 @@ class _DemoState extends State<Demo> {
               child: isLoading
                   ? SimmerLoad()
                   : CircleAvatar(
-                backgroundImage: profileImage != null
-                    ? MemoryImage(profileImage!)
-                    : AssetImage('assets/pf.jpeg') as ImageProvider,
-              ),
+                      backgroundImage: profileImage != null
+                          ? MemoryImage(profileImage!)
+                          : AssetImage('assets/pf.jpeg') as ImageProvider,
+                    ),
             ),
           ),
           SizedBox(
@@ -1201,26 +1265,26 @@ class _DemoState extends State<Demo> {
       ),
       body: isLoading
           ? Center(
-          child: LoadingAnimationWidget.fourRotatingDots(
-            color: Color(0xFF9EA700),
-            size: 100,
-          ))
+              child: LoadingAnimationWidget.fourRotatingDots(
+              color: Color(0xFF9EA700),
+              size: 100,
+            ))
           : Column(
-        children: [
-          SizedBox(height: 20),
-          buildReportTypeDropdown(),
-          SizedBox(
-            height: 10,
-          ),
-          buildChartSelection(),
-          SizedBox(
-            height: 12,
-          ),
-          Text('$showVariable'),
-          SizedBox(height: 15),
-          Expanded(child: buildChart()),
-        ],
-      ),
+              children: [
+                SizedBox(height: 20),
+                buildReportTypeDropdown(),
+                SizedBox(
+                  height: 10,
+                ),
+                buildChartSelection(),
+                SizedBox(
+                  height: 12,
+                ),
+                Text('$showVariable'),
+                SizedBox(height: 15),
+                Expanded(child: buildChart()),
+              ],
+            ),
     );
   }
 }
