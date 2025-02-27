@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:appflowy_board/appflowy_board.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
@@ -16,6 +18,8 @@ final AppFlowyBoardController controller = AppFlowyBoardController();
 late AppFlowyBoardScrollController boardController;
 
 class _MypipelineState extends State<Mypipeline> {
+
+  Uint8List? profileImage;
   Future<void> initializeOdooClient() async {
     final prefs = await SharedPreferences.getInstance();
     final baseUrl = prefs.getString("urldata") ?? "";
@@ -32,7 +36,9 @@ class _MypipelineState extends State<Mypipeline> {
         final auth =
             await client!.authenticate(dbName, userLogin, userPassword);
         print("Odoo Authenticated: $auth");
+        await userImage();
         await pipe();
+        await tag();
       } catch (e) {
         print("Odoo Authentication Failed: $e");
       }
@@ -40,11 +46,79 @@ class _MypipelineState extends State<Mypipeline> {
     setState(() => isLoading = false);
   }
 
+  Future<Map<int, String>> tag() async {
+    Map<int, String> tagMap = {};
+    try {
+      final response = await client?.callKw({
+        'model': 'crm.tag',
+        'method': 'search_read',
+        'args': [],
+        'kwargs': {
+          'fields': ['id', 'name','color'],
+        }
+      });
+      print('lolkoko$response');
+      if (response != null) {
+        for (var tag in response) {
+          tagMap[tag['id']] = tag['name'];
+        }
+      }
+      print('Tags fetched: $tagMap');
+      return tagMap;
+    } catch (e) {
+      print("Failed to fetch tags: $e");
+      return {};
+    }
+  }
+
+  Future<void> userImage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userid = prefs.getInt("userId") ?? "";
+    try {
+      final response = await client?.callKw({
+        'model': 'res.users',
+        'method': 'search_read',
+        'args': [
+          [
+            ["id", "=", userid],
+          ]
+        ],
+        'kwargs': {
+          'fields': [
+            'image_1920',
+          ]
+        },
+      });
+      print('imggg$response');
+      if (response == null || response.isEmpty || response is! List) {
+        print('No data received or invalid format');
+        setState(() => isLoading = false);
+        return;
+      }
+      try {
+        final List<Map<String, dynamic>> data =
+            List<Map<String, dynamic>>.from(response);
+        setState(() {
+          var imageData = data[0]['image_1920'];
+          if (imageData != null && imageData is String) {
+            profileImage = base64Decode(imageData);
+            print('imageeeeee$profileImage');
+          }
+        });
+      } catch (e) {
+        print("Odoo error$e");
+      }
+    } catch (e) {
+      print("Image error$e");
+    }
+  }
+
   Future<void> pipe() async {
     final prefs = await SharedPreferences.getInstance();
     final userid = prefs.getInt("userId") ?? "";
     print('iddddd$userid');
     try {
+      Map<int, String> tagMap = await tag();
       final response = await client?.callKw({
         'model': 'crm.lead',
         'method': 'search_read',
@@ -63,15 +137,24 @@ class _MypipelineState extends State<Mypipeline> {
             'tag_ids',
             'priority',
             'activity_state',
-            // 'image_1920',
+            'activity_type_id',
           ],
         }
       });
+      print('ressss$response');
       if (response != null) {
         Map<String, List<Map<String, dynamic>>> groupedLeads = {};
 
         for (var lead in response) {
           String stage = lead['stage_id'][1] ?? '';
+          List<String> tagNames = [];
+          if (lead['tag_ids'] != null && lead['tag_ids'] is List) {
+            for (var tagId in lead['tag_ids']) {
+              if (tagMap.containsKey(tagId)) {
+                tagNames.add(tagMap[tagId]!);
+              }
+            }
+          }
           groupedLeads.putIfAbsent(stage, () => []).add(lead);
         }
 
@@ -81,15 +164,41 @@ class _MypipelineState extends State<Mypipeline> {
           final groupData = AppFlowyGroupData(
             id: entry.key,
             name: entry.key,
-            items: entry.value
-                .map((lead) => LeadItem(
-                      name: lead['name'],
-                      revenue: lead['expected_revenue'].toString(),
-                      customerName: lead['partner_id']!= null && lead['partner_id'] is List && lead['partner_id'].length > 1
-                          ? lead['partner_id'][1]
-                          : "",
-                    ))
-                .toList(),
+            items: entry.value.map((lead) {
+              List<String> tagNames = [];
+              if (lead['tag_ids'] != null && lead['tag_ids'] is List) {
+                for (var tagId in lead['tag_ids']) {
+                  if (tagMap.containsKey(tagId)) {
+                    tagNames.add(tagMap[tagId]!);
+                  }
+                }
+              }
+              return LeadItem(
+                name: lead['name'],
+                revenue: lead['expected_revenue'].toString(),
+                customerName: lead['partner_id'] != null &&
+                        lead['partner_id'] is List &&
+                        lead['partner_id'].length > 1
+                    ? lead['partner_id'][1]
+                    : "",
+                priority: (lead['priority'] is int)
+                    ? lead['priority']
+                    : int.tryParse(lead['priority'].toString()) ?? 0,
+                tags: tagNames,
+                activityState: lead['activity_state'] != null
+                    ? (lead['activity_state'] is bool
+                        ? (lead['activity_state'] ? "true" : "false")
+                        : lead['activity_state'].toString())
+                    : '',
+                activityType: lead['activity_type_id'] != null &&
+                        lead['activity_type_id'] is List &&
+                        lead['activity_type_id'].length > 1
+                    ? lead['activity_type_id'][1]
+                    : "",
+                imageData: profileImage != null ? base64Encode(profileImage!) : null,
+
+              );
+            }).toList(),
           );
 
           controller.addGroup(groupData);
@@ -102,18 +211,18 @@ class _MypipelineState extends State<Mypipeline> {
     }
   }
 
-  Widget buildChartSelection() {
+  Widget ChartSelection() {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 15),
       child: Container(
-        width: double.infinity, // Make it responsive
+        width: double.infinity,
         height: 50,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(6),
           color: Colors.grey.shade200,
         ),
         child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal, // Allow scrolling if needed
+          scrollDirection: Axis.horizontal,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -124,27 +233,27 @@ class _MypipelineState extends State<Mypipeline> {
               VerticalDivider(thickness: 2, color: Colors.white),
               IconButton(
                 onPressed: () {},
-                icon: Icon(Icons.view_list_rounded, color: Color(0xFF9EA700)),
+                icon: Icon(Icons.view_list_rounded, color: Colors.black),
               ),
               VerticalDivider(thickness: 2, color: Colors.white),
               IconButton(
                 onPressed: () {},
-                icon: Icon(Icons.calendar_month, color: Color(0xFF9EA700)),
+                icon: Icon(Icons.calendar_month, color: Colors.black),
               ),
               VerticalDivider(thickness: 2, color: Colors.white),
               IconButton(
                 onPressed: () {},
-                icon: Icon(Icons.table_rows_outlined, color: Color(0xFF9EA700)),
+                icon: Icon(Icons.table_rows_outlined, color: Colors.black),
               ),
               VerticalDivider(thickness: 2, color: Colors.white),
               IconButton(
                 onPressed: () {},
-                icon: Icon(Icons.graphic_eq_rounded, color: Color(0xFF9EA700)),
+                icon: Icon(Icons.graphic_eq_rounded, color: Colors.black),
               ),
               VerticalDivider(thickness: 2, color: Colors.white),
               IconButton(
                 onPressed: () {},
-                icon: Icon(Icons.access_time, color: Color(0xFF9EA700)),
+                icon: Icon(Icons.access_time, color: Colors.black),
               ),
             ],
           ),
@@ -217,10 +326,8 @@ class _MypipelineState extends State<Mypipeline> {
             ),
           ),
           Divider(thickness: 1, color: Colors.grey.shade300),
-          buildChartSelection(),
-          Divider(
-            thickness: 1, color: Colors.grey.shade300
-          ),
+          ChartSelection(),
+          Divider(thickness: 1, color: Colors.grey.shade300),
           SizedBox(
             height: 25,
           ),
@@ -233,7 +340,7 @@ class _MypipelineState extends State<Mypipeline> {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(10)),
                     key: ValueKey(groupItem.id),
-                    child: _buildCard(groupItem),
+                    child: Card(groupItem),
                   );
                 },
                 boardScrollController: boardController,
@@ -279,7 +386,49 @@ class _MypipelineState extends State<Mypipeline> {
   }
 }
 
-Widget _buildCard(AppFlowyGroupItem item) {
+Widget ActivityIconDesign(String activityState, String activityType) {
+  IconData iconData;
+  Color iconColor;
+  if (activityType.isEmpty) {
+    iconData = Icons.access_time;
+  } else if (activityType.toLowerCase().contains('call') ||
+      activityType.toLowerCase().contains('phone')) {
+    iconData = Icons.phone_outlined;
+  } else if (activityType.toLowerCase().contains('email') ||
+      activityType.toLowerCase().contains('mail')) {
+    iconData = Icons.email_outlined;
+  } else if (activityType.toLowerCase().contains('meeting')) {
+    iconData = Icons.event;
+  } else if (activityType.toLowerCase().contains('todo')) {
+    iconData = Icons.check_circle;
+  } else {
+    iconData = Icons.calendar_today;
+  }
+
+  if (activityState == 'overdue') {
+    iconColor = Colors.red;
+  } else if (activityState == 'today') {
+    iconColor = Colors.orange;
+  } else if (activityState == 'planned') {
+    iconColor = Colors.green;
+  } else {
+    iconColor = Colors.grey;
+  }
+
+  if (activityState.isEmpty) {
+    return SizedBox();
+  }
+
+  return Container(
+    child: Icon(
+      iconData,
+      size: 16,
+      color: iconColor,
+    ),
+  );
+}
+
+Widget Card(AppFlowyGroupItem item) {
   if (item is LeadItem) {
     return Row(
       children: [
@@ -324,6 +473,69 @@ Widget _buildCard(AppFlowyGroupItem item) {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
+                SizedBox(
+                  height: 6,
+                ),
+                Wrap(
+                  spacing: 5,
+                  children: item.tags.map((tag) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(tag, style: const TextStyle(fontSize: 12)),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    ...List.generate(
+                      3,
+                      (index) => Icon(
+                        index < item.priority ? Icons.star : Icons.star_border,
+                        color: Colors.amber,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ActivityIconDesign(item.activityState, item.activityType),
+                    SizedBox(width: 58,),
+                    if (item.imageData != null && item.imageData!.isNotEmpty)
+                      Container(
+                        width: 24,
+                        height: 24,
+                        margin: EdgeInsets.only(left: 8),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(4),
+                          image: DecorationImage(
+                            image: MemoryImage(
+                              base64Decode(item.imageData!),
+                            ),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      )
+                    else
+                      Container(
+                        width: 24,
+                        height: 24,
+                        margin: EdgeInsets.only(left: 55),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.grey.shade300,
+                        ),
+                        child: Icon(
+                          Icons.person,
+                          size: 16,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -338,8 +550,22 @@ class LeadItem extends AppFlowyGroupItem {
   final String name;
   final String revenue;
   final String customerName;
+  final List<String> tags;
+  final int priority;
+  final String activityState;
+  final String activityType;
+  final String? imageData;
 
-  LeadItem({required this.name, required this.revenue,required this.customerName});
+  LeadItem({
+    required this.name,
+    required this.revenue,
+    required this.customerName,
+    required this.tags,
+    required this.priority,
+    this.activityState = '',
+    this.activityType = '',
+    this.imageData,
+  });
 
   @override
   String get id => name;

@@ -53,6 +53,7 @@ class _LoginState extends State<Login> {
           passwordController.text.trim(),
         );
         print("Login successful: $session");
+        print(session.id);
         if (session != null) {
           await saveSession(session);
           await addShared();
