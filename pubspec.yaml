@@ -43,7 +43,7 @@ dependencies:
   image_picker: ^1.1.2
   date_picker_plus: ^4.1.0
   loading_animation_widget:
-  appflowy_board: ^0.1.2
+  appflowy_board:
   cross_scroll: ^0.1.1
 
 dev_dependencies:
