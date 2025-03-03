@@ -2,8 +2,10 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:appflowy_board/appflowy_board.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:syncfusion_flutter_calendar/calendar.dart';
 
 class Mypipeline extends StatefulWidget {
   const Mypipeline({super.key});
@@ -21,6 +23,7 @@ List<Map<String, dynamic>> leadsList = [];
 
 class _MypipelineState extends State<Mypipeline> {
   Uint8List? profileImage;
+  String? userName;
 
   Future<void> initializeOdooClient() async {
     final prefs = await SharedPreferences.getInstance();
@@ -42,6 +45,7 @@ class _MypipelineState extends State<Mypipeline> {
         await pipe();
         await tag();
         await iconSelectedView();
+
       } catch (e) {
         print("Odoo Authentication Failed: $e");
       }
@@ -89,6 +93,7 @@ class _MypipelineState extends State<Mypipeline> {
         'kwargs': {
           'fields': [
             'image_1920',
+            'name',
           ]
         },
       });
@@ -107,6 +112,8 @@ class _MypipelineState extends State<Mypipeline> {
             profileImage = base64Decode(imageData);
             print('imageeeeee$profileImage');
           }
+
+          userName = data[0]['name'] ?? '';
         });
       } catch (e) {
         print("Odoo error$e");
@@ -144,12 +151,15 @@ class _MypipelineState extends State<Mypipeline> {
             'email_from',
             'recurring_revenue_monthly',
             'contact_name',
+            'activity_ids',
+            'activity_date_deadline',
           ],
         }
       });
       print('ressss$response');
       if (response != null) {
         leadsList = List<Map<String, dynamic>>.from(response);
+        calendarOppurtunity(leadsList);
         Map<String, List<Map<String, dynamic>>> groupedLeads = {};
 
         for (var lead in response) {
@@ -202,6 +212,14 @@ class _MypipelineState extends State<Mypipeline> {
                         lead['activity_type_id'].length > 1
                     ? lead['activity_type_id'][1]
                     : "",
+                hasActivity: lead['activity_ids'] != null &&
+                    lead['activity_ids'] is List &&
+                    lead['activity_ids'].isNotEmpty,
+                activityIds:
+                    lead['activity_ids'] != null && lead['activity_ids'] is List
+                        ? List<String>.from(
+                            lead['activity_ids'].map((e) => e.toString()))
+                        : [],
                 imageData:
                     profileImage != null ? base64Encode(profileImage!) : null,
               );
@@ -239,8 +257,10 @@ class _MypipelineState extends State<Mypipeline> {
                     selectedView = 0;
                   });
                 },
-                icon: Icon(Icons.bar_chart_rounded,
-                  color: selectedView == 0 ? Color(0xFF9EA700) : Colors.black,),
+                icon: Icon(
+                  Icons.bar_chart_rounded,
+                  color: selectedView == 0 ? Color(0xFF9EA700) : Colors.black,
+                ),
               ),
               VerticalDivider(thickness: 2, color: Colors.white),
               IconButton(
@@ -249,8 +269,10 @@ class _MypipelineState extends State<Mypipeline> {
                     selectedView = 1;
                   });
                 },
-                icon: Icon(Icons.view_list_rounded,
-                  color: selectedView == 1 ? Color(0xFF9EA700) : Colors.black,),
+                icon: Icon(
+                  Icons.view_list_rounded,
+                  color: selectedView == 1 ? Color(0xFF9EA700) : Colors.black,
+                ),
               ),
               VerticalDivider(thickness: 2, color: Colors.white),
               IconButton(
@@ -299,209 +321,434 @@ class _MypipelineState extends State<Mypipeline> {
     print('ghghghhg$leadsList');
     return leadsList.isEmpty
         ? Center(
-      child: Text(
-        "No leads found",
-        style: TextStyle(fontSize: 16, color: Colors.grey),
-      ),
-    )
+            child: Text(
+              "No leads found",
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          )
         : ListView.builder(
-      itemCount: leadsList.length,
-      padding: EdgeInsets.all(8),
-      itemBuilder: (context, index) {
-        final lead = leadsList[index];
+            itemCount: leadsList.length,
+            padding: EdgeInsets.all(8),
+            itemBuilder: (context, index) {
+              final lead = leadsList[index];
 
-        final name = lead['name'] ?? '';
-        final revenue = lead['expected_revenue']?.toString() ?? '';
-        final customerName = lead['contact_name'] == false ?'':lead['contact_name']?.toString() ?? '';
-        final email = lead['email_from'] ?? '';
-        final stageName = lead['stage_id'] != null &&
-            lead['stage_id'] is List &&
-            lead['stage_id'].length > 1
-            ? lead['stage_id'][1]
-            : "New";
-        final salesperson = lead['user_id'] != null &&
-            lead['user_id'] is List &&
-            lead['user_id'].length > 1
-            ? lead['user_id'][1]
-            : "";
-        final mrr = lead['recurring_revenue_monthly'] ?? '';
-        imageData:
-        profileImage != null ? base64Encode(profileImage!) : null;
+              final name = lead['name'] ?? '';
+              final revenue = lead['expected_revenue']?.toString() ?? '';
+              final customerName = lead['contact_name'] == false
+                  ? ''
+                  : lead['contact_name']?.toString() ?? '';
+              final email = lead['email_from'] ?? '';
+              final stageName = lead['stage_id'] != null &&
+                      lead['stage_id'] is List &&
+                      lead['stage_id'].length > 1
+                  ? lead['stage_id'][1]
+                  : "New";
+              final salesperson = lead['user_id'] != null &&
+                      lead['user_id'] is List &&
+                      lead['user_id'].length > 1
+                  ? lead['user_id'][1]
+                  : "";
+              final mrr = lead['recurring_revenue_monthly'] ?? '';
+              final hasActivity = lead['activity_ids'] != null &&
+                  lead['activity_ids'] is List &&
+                  lead['activity_ids'].isNotEmpty;
+              final activityIds =
+                  lead['activity_ids'] != null && lead['activity_ids'] is List
+                      ? List<int>.from(lead['activity_ids'])
+                      : [];
+              final activityState =
+                  lead['activity_state']?.toString().toLowerCase() ?? '';
+              imageData:
+              profileImage != null ? base64Encode(profileImage!) : null;
 
+              Color stageColor;
+              if (stageName.toLowerCase().contains('new')) {
+                stageColor = Colors.red.shade200;
+              } else if (stageName.toLowerCase().contains('qualified')) {
+                stageColor = Colors.orange.shade200;
+              } else if (stageName.toLowerCase().contains('proposition')) {
+                stageColor = Colors.blue.shade200;
+              } else if (stageName.toLowerCase().contains('won')) {
+                stageColor = Colors.green.shade200;
+              } else {
+                stageColor = Colors.purple.shade200;
+              }
 
-
-        Color stageColor;
-        if (stageName.toLowerCase().contains('new')) {
-          stageColor = Colors.red.shade200;
-        } else if (stageName.toLowerCase().contains('qualified')) {
-          stageColor = Colors.orange.shade200;
-        } else if (stageName.toLowerCase().contains('proposition')) {
-          stageColor = Colors.blue.shade200;
-        } else if (stageName.toLowerCase().contains('won')) {
-          stageColor = Colors.green.shade200;
-        } else {
-          stageColor = Colors.purple.shade200;
-        }
-
-        return Card(
-          color: Colors.grey.shade200,
-          elevation: 2,
-          margin: EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-          child: Padding(
-            padding: EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.radio_button_unchecked, size: 20),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        name,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+              return isLoading
+                  ? Center(
+                      child: LoadingAnimationWidget.fourRotatingDots(
+                      color: Color(0xFF9EA700),
+                      size: 100,
+                    ))
+                  : Card(
+                      color: Colors.white,
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      // Rounded corners
+                      margin: EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade200),
+                          color: Color(0x69EA700),
                         ),
-                      ),
-                    ),
-                    Container(
-                      padding:
-                      EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: stageColor,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: stageColor.withOpacity(0.8)),
-                      ),
-                      child: Text(
-                        stageName,
-                        style: TextStyle(
-                            color: stageColor.withOpacity(1.0) != Colors.white
-                                ? Colors.black.withOpacity(0.7)
-                                : Colors.black,
-                            fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-                Divider(height: 24),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Contact',
-                              style: TextStyle(
-                                  color: Colors.grey[600], fontSize: 12)),
-                          SizedBox(height: 4),
-                          Text(customerName,
-                              style: TextStyle(fontWeight: FontWeight.w500)),
-                          SizedBox(height: 4),
-                          email.isNotEmpty
-                              ? Text(email,
-                              style: TextStyle(color: Colors.blue))
-                              : SizedBox(),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Salesperson',
-                              style: TextStyle(
-                                  color: Colors.grey[600], fontSize: 12)),
-                          SizedBox(height: 4),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.start,
+                        child: Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // profileImage != null
-                              //     ? CircleAvatar(
-                              //   backgroundImage:
-                              //   MemoryImage(profileImage!),
-                              //   radius: 12,
-                              // ):
-                              profileImage != null?
-                              Container(
-                                width: 24,
-                                height: 24,
-                                margin: EdgeInsets.only(left: 8),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(4),
-                                  image: DecorationImage(
-                                    image: MemoryImage(
-                                      profileImage!),
-                                    fit: BoxFit.cover,
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 12,
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      color: stageColor,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                            color: stageColor.withOpacity(0.3),
+                                            blurRadius: 4,
+                                            offset: Offset(0, 2))
+                                      ],
+                                    ),
                                   ),
+                                  SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      name,
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.grey.shade800,
+                                      ),
+                                    ),
                                   ),
-                                ):
-                              CircleAvatar(
-                                backgroundColor: Colors.blue,
-                                radius: 12,
-                                child: Icon(Icons.person,
-                                    size: 16, color: Colors.white),
+                                  Container(
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: stageColor.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                          color: stageColor, width: 1.5),
+                                    ),
+                                    child: Text(
+                                      stageName,
+                                      style: TextStyle(
+                                        color: stageColor,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              SizedBox(width: 8),
-                              Text(salesperson),
+                              Divider(
+                                  height: 24,
+                                  thickness: 1,
+                                  color: Colors.grey.shade200),
+                              Container(
+                                padding: EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border:
+                                      Border.all(color: Colors.grey.shade200),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      flex: 2,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Contact',
+                                            style: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                          SizedBox(height: 6),
+                                          Text(
+                                            customerName,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 15,
+                                              color: Colors.grey.shade900,
+                                            ),
+                                          ),
+                                          SizedBox(height: 4),
+                                          email.isNotEmpty
+                                              ? Row(
+                                                  children: [
+                                                    Icon(Icons.email_outlined,
+                                                        size: 14,
+                                                        color: Colors.blue),
+                                                    SizedBox(width: 4),
+                                                    Expanded(
+                                                      child: Text(
+                                                        email,
+                                                        style: TextStyle(
+                                                          color: Colors.blue,
+                                                          fontSize: 13,
+                                                        ),
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                )
+                                              : SizedBox(),
+                                          SizedBox(height: 16),
+                                          Text(
+                                            'Salesperson',
+                                            style: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                          SizedBox(height: 6),
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.start,
+                                            children: [
+                                              profileImage != null
+                                                  ? Container(
+                                                      width: 32,
+                                                      height: 32,
+                                                      decoration: BoxDecoration(
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(6),
+                                                        boxShadow: [
+                                                          BoxShadow(
+                                                            color: Colors.black
+                                                                .withOpacity(
+                                                                    0.1),
+                                                            blurRadius: 4,
+                                                            offset:
+                                                                Offset(0, 2),
+                                                          ),
+                                                        ],
+                                                        image: DecorationImage(
+                                                          image: MemoryImage(
+                                                              profileImage!),
+                                                          fit: BoxFit.cover,
+                                                        ),
+                                                      ),
+                                                    )
+                                                  : Container(
+                                                      width: 32,
+                                                      height: 32,
+                                                      decoration: BoxDecoration(
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(6),
+                                                        gradient:
+                                                            LinearGradient(
+                                                          colors: [
+                                                            Colors
+                                                                .blue.shade700,
+                                                            Colors.blue.shade500
+                                                          ],
+                                                          begin:
+                                                              Alignment.topLeft,
+                                                          end: Alignment
+                                                              .bottomRight,
+                                                        ),
+                                                        boxShadow: [
+                                                          BoxShadow(
+                                                            color: Colors.blue
+                                                                .withOpacity(
+                                                                    0.3),
+                                                            blurRadius: 4,
+                                                            offset:
+                                                                Offset(0, 2),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      child: Icon(Icons.person,
+                                                          size: 18,
+                                                          color: Colors.white),
+                                                    ),
+                                              SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  userName ?? 'Loading...',
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: Colors.grey.shade800,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    SizedBox(width: 16),
+                                    Expanded(
+                                      flex: 2,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Expected Revenue',
+                                            style: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                          SizedBox(height: 6),
+                                          Container(
+                                            padding: EdgeInsets.symmetric(
+                                                horizontal: 10, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: Color(0xFF9EA700)
+                                                  .withOpacity(0.15),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              '\$${revenue}',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: Color(0xFF9EA700),
+                                                fontSize: 16,
+                                              ),
+                                            ),
+                                          ),
+                                          SizedBox(height: 16),
+                                          Text(
+                                            'Expected MRR',
+                                            style: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                          SizedBox(height: 6),
+                                          Container(
+                                            padding: EdgeInsets.symmetric(
+                                                horizontal: 10, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: Color(0xFF9EA700)
+                                                  .withOpacity(0.15),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              '\$${mrr}',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: Color(0xFF9EA700),
+                                                fontSize: 16,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(height: 16),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  ElevatedButton.icon(
+                                    icon: Icon(
+                                      Icons.email_outlined,
+                                      size: 16,
+                                      color: Colors.black,
+                                    ),
+                                    label: Text('Email'),
+                                    onPressed: () {},
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor:
+                                          Color(0xFF9EA700).withOpacity(0.15),
+                                      foregroundColor: Color(0xFF9EA700),
+                                      elevation: 0,
+                                      padding: EdgeInsets.symmetric(
+                                          horizontal: 16, vertical: 8),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        //   // side: BorderSide(color: Colors.green.shade200),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(width: 12),
+                                  ElevatedButton.icon(
+                                    icon: Icon(
+                                      Icons.message_outlined,
+                                      size: 16,
+                                      color: Colors.black,
+                                    ),
+                                    label: Text('Message'),
+                                    onPressed: () {},
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor:
+                                          Color(0xFF9EA700).withOpacity(0.15),
+                                      foregroundColor: Color(0xFF9EA700),
+                                      elevation: 0,
+                                      padding: EdgeInsets.symmetric(
+                                          horizontal: 16, vertical: 8),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        // side: BorderSide(color: Colors.green.shade200),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(width: 12),
+                                  if (hasActivity &&
+                                      activityState.toLowerCase() != "overdue")
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        icon: Icon(
+                                          Icons.snooze_rounded,
+                                          size: 16,
+                                          color: Colors.black,
+                                        ),
+                                        label: Text(
+                                          'Snooze 7d',
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        onPressed: () {},
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              Colors.grey.withOpacity(0.15),
+                                          foregroundColor: Colors.grey,
+                                          elevation: 0,
+                                          padding: EdgeInsets.symmetric(
+                                              horizontal: 16, vertical: 8),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Expected Revenue',
-                              style: TextStyle(
-                                  color: Colors.grey[600], fontSize: 12)),
-                          SizedBox(height: 4),
-                          Text('\$${revenue}',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF9EA700))),
-                          Text('Expected MRR',
-                              style: TextStyle(
-                                  color: Colors.grey[600], fontSize: 12)),
-                          SizedBox(height: 4),
-                          Text('\$${mrr}',style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF9EA700))),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.email_outlined, color: Colors.green),
-                      onPressed: () {},
-                      constraints: BoxConstraints(),
-                      padding: EdgeInsets.all(8),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.message_outlined, color: Colors.green),
-                      onPressed: () {},
-                      constraints: BoxConstraints(),
-                      padding: EdgeInsets.all(8),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+                    );
+            },
+          );
   }
+
   Widget iconSelectedView() {
     final config = AppFlowyBoardConfig(
       groupBackgroundColor: Colors.grey.shade100,
@@ -514,7 +761,8 @@ class _MypipelineState extends State<Mypipeline> {
             cardBuilder: (context, group, groupItem) {
               return AppFlowyGroupCard(
                 decoration: BoxDecoration(
-                    color: Colors.white, borderRadius: BorderRadius.circular(10)),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10)),
                 key: ValueKey(groupItem.id),
                 child: customCard(groupItem),
               );
@@ -558,7 +806,7 @@ class _MypipelineState extends State<Mypipeline> {
         return listCard();
 
       case 2:
-        return Container();
+        return event();
 
       case 3:
         return Container();
@@ -612,6 +860,175 @@ class _MypipelineState extends State<Mypipeline> {
         iconData,
         size: 16,
         color: iconColor,
+      ),
+    );
+  }
+
+  List<Appointment> appointments = [];
+
+  void calendarOppurtunity(List<Map<String, dynamic>> leads) {
+    appointments.clear();
+
+    for (var lead in leads) {
+      if (lead['activity_date_deadline'] != null && lead['activity_date_deadline'] != false) {
+        try {
+          DateTime deadlineDate = DateTime.parse(lead['activity_date_deadline'].toString());
+
+          String customer = lead['partner_id'] != null && lead['partner_id'] is List && lead['partner_id'].length > 1
+              ? lead['partner_id'][1]
+              : "No customer";
+
+          String stageInfo = lead['stage_id'] != null && lead['stage_id'] is List && lead['stage_id'].length > 1
+              ? lead['stage_id'][1]
+              : "Unknown stage";
+
+          String revenue = lead['expected_revenue'] != null
+              ? "\$${lead['expected_revenue']}"
+              : "No revenue data";
+
+          appointments.add(Appointment(
+            startTime: deadlineDate,
+            endTime: deadlineDate.add(Duration(hours: 1)),
+            subject: lead['name'] ?? "Unnamed Opportunity",
+            color: Color(0xFF9EA700),
+            notes: customer,
+            location: stageInfo,
+            recurrenceRule: revenue,
+          ));
+
+          print('Added appointment for ${lead['name']} on $deadlineDate');
+        } catch (e) {
+          print('Error parsing date for ${lead['name']}: $e');
+        }
+      }
+    }
+  }
+
+  Widget event() {
+    return Container(
+      child: SfCalendar(
+        view: CalendarView.month,
+        dataSource: newDataSource(appointments),
+        monthViewSettings: MonthViewSettings(
+          appointmentDisplayMode: MonthAppointmentDisplayMode.indicator,
+          showAgenda: true,
+          agendaStyle: AgendaStyle(
+            appointmentTextStyle: TextStyle(
+              color: Colors.black87,
+              fontWeight: FontWeight.w500,
+            ),
+            dateTextStyle: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: Color(0xFF9EA700),
+            ),
+            dayTextStyle: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey.shade700,
+            ),
+          ),
+          agendaViewHeight: MediaQuery.of(context).size.height * 0.4,
+        ),
+        todayHighlightColor: Color(0xFF9EA700),
+        cellBorderColor: Colors.grey.shade300,
+        appointmentBuilder: (BuildContext context, CalendarAppointmentDetails details) {
+          final Appointment appointment = details.appointments.first as Appointment;
+          return Container(
+            decoration: BoxDecoration(
+              color: Color(0xFF9EA700).withOpacity(0.2),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: Color(0xFF9EA700), width: 0.5),
+            ),
+            padding: EdgeInsets.symmetric(horizontal: 3),
+            child: Text(
+              appointment.subject,
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.black87,
+                overflow: TextOverflow.ellipsis,
+              ),
+              maxLines: 1,
+            ),
+          );
+        },
+        onTap: (CalendarTapDetails details) {
+          if (details.targetElement == CalendarElement.appointment) {
+            final Appointment appointment = details.appointments!.first;
+            showDialog(
+              context: context,
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  title: Text('Opportunity Details'),
+                  content: Container(
+                    width: double.maxFinite,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        detailRow('Name', appointment.subject),
+                        Divider(),
+                        detailRow('Customer', appointment.notes ?? 'No customer specified'),
+                        Divider(),
+                      ],
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      child: Text('Edit'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Color(0xFF9EA700),
+                      ),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+
+                        Navigator.of(context).pop();
+                      },
+                      child: Text('Delete'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xFF9EA700),
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          }
+        },
+      ),
+    );
+  }
+
+
+  Widget detailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -683,8 +1100,10 @@ class _MypipelineState extends State<Mypipeline> {
                     children: [
                       ...List.generate(
                         3,
-                            (index) => Icon(
-                          index < item.priority ? Icons.star : Icons.star_border,
+                        (index) => Icon(
+                          index < item.priority
+                              ? Icons.star
+                              : Icons.star_border,
                           color: Colors.amber,
                           size: 18,
                         ),
@@ -809,9 +1228,11 @@ class _MypipelineState extends State<Mypipeline> {
   }
 }
 
-
-
-
+class newDataSource extends CalendarDataSource {
+  newDataSource(List<Appointment> source) {
+    appointments = source;
+  }
+}
 
 class LeadItem extends AppFlowyGroupItem {
   final String name;
@@ -822,6 +1243,8 @@ class LeadItem extends AppFlowyGroupItem {
   final String activityState;
   final String activityType;
   final String? imageData;
+  final bool hasActivity;
+  final List<String> activityIds;
 
   LeadItem({
     required this.name,
@@ -832,6 +1255,8 @@ class LeadItem extends AppFlowyGroupItem {
     this.activityState = '',
     this.activityType = '',
     this.imageData,
+    required this.hasActivity,
+    required this.activityIds,
   });
 
   @override

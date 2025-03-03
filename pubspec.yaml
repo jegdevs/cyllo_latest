@@ -45,6 +45,7 @@ dependencies:
   loading_animation_widget:
   appflowy_board:
   cross_scroll: ^0.1.1
+  syncfusion_flutter_calendar: ^28.2.7
 
 dev_dependencies:
   flutter_test:
