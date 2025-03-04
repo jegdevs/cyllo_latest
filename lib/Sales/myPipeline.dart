@@ -2,10 +2,12 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:appflowy_board/appflowy_board.dart';
+import 'package:intl/intl.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_flutter_calendar/calendar.dart';
+import 'package:syncfusion_flutter_datagrid/datagrid.dart';
 
 class Mypipeline extends StatefulWidget {
   const Mypipeline({super.key});
@@ -45,6 +47,9 @@ class _MypipelineState extends State<Mypipeline> {
         await pipe();
         await tag();
         await iconSelectedView();
+        // await processTableData();
+        // await buildTableView();
+        await fetchData();
 
       } catch (e) {
         print("Odoo Authentication Failed: $e");
@@ -153,13 +158,14 @@ class _MypipelineState extends State<Mypipeline> {
             'contact_name',
             'activity_ids',
             'activity_date_deadline',
+            'create_date'
           ],
         }
       });
       print('ressss$response');
       if (response != null) {
         leadsList = List<Map<String, dynamic>>.from(response);
-        calendarOppurtunity(leadsList);
+        // calendarOppurtunity(leadsList);
         Map<String, List<Map<String, dynamic>>> groupedLeads = {};
 
         for (var lead in response) {
@@ -281,7 +287,8 @@ class _MypipelineState extends State<Mypipeline> {
                     selectedView = 2;
                   });
                 },
-                icon: Icon(Icons.calendar_month, color: Colors.black),
+                icon: Icon(Icons.calendar_month,
+                  color: selectedView == 2 ? Color(0xFF9EA700) : Colors.black,),
               ),
               VerticalDivider(thickness: 2, color: Colors.white),
               IconButton(
@@ -290,7 +297,8 @@ class _MypipelineState extends State<Mypipeline> {
                     selectedView = 3;
                   });
                 },
-                icon: Icon(Icons.table_rows_outlined, color: Colors.black),
+                icon: Icon(Icons.table_rows_outlined,
+                  color: selectedView == 3 ? Color(0xFF9EA700) : Colors.black,),
               ),
               VerticalDivider(thickness: 2, color: Colors.white),
               IconButton(
@@ -335,20 +343,20 @@ class _MypipelineState extends State<Mypipeline> {
               final name = lead['name'] ?? '';
               final revenue = lead['expected_revenue']?.toString() ?? '';
               final customerName = lead['contact_name'] == false
-                  ? ''
-                  : lead['contact_name']?.toString() ?? '';
-              final email = lead['email_from'] ?? '';
+                  ? 'None'
+                  : lead['contact_name']?.toString() ?? 'None';
+              final email = lead['email_from'] ?? 'None';
               final stageName = lead['stage_id'] != null &&
                       lead['stage_id'] is List &&
                       lead['stage_id'].length > 1
                   ? lead['stage_id'][1]
-                  : "New";
+                  : "None";
               final salesperson = lead['user_id'] != null &&
                       lead['user_id'] is List &&
                       lead['user_id'].length > 1
                   ? lead['user_id'][1]
-                  : "";
-              final mrr = lead['recurring_revenue_monthly'] ?? '';
+                  : "None";
+              final mrr = lead['recurring_revenue_monthly'] ?? 'None';
               final hasActivity = lead['activity_ids'] != null &&
                   lead['activity_ids'] is List &&
                   lead['activity_ids'].isNotEmpty;
@@ -357,7 +365,7 @@ class _MypipelineState extends State<Mypipeline> {
                       ? List<int>.from(lead['activity_ids'])
                       : [];
               final activityState =
-                  lead['activity_state']?.toString().toLowerCase() ?? '';
+                  lead['activity_state']?.toString().toLowerCase() ?? 'None';
               imageData:
               profileImage != null ? base64Encode(profileImage!) : null;
 
@@ -806,10 +814,10 @@ class _MypipelineState extends State<Mypipeline> {
         return listCard();
 
       case 2:
-        return event();
+        return calendarView();
 
       case 3:
-        return Container();
+        return fetchData();
 
       case 4:
         return Container();
@@ -821,6 +829,203 @@ class _MypipelineState extends State<Mypipeline> {
         return Container();
     }
   }
+
+  Widget calendarView() {
+    List<Appointment> appointments = [];
+    Map<String, Map<String, dynamic>> appointmentLeadMap = {};
+
+    for (var lead in leadsList) {
+      if (lead['activity_date_deadline'] != null && lead['activity_date_deadline'] != false) {
+        DateTime deadlineDate;
+        try {
+          if (lead['activity_date_deadline'] is String) {
+            deadlineDate = DateTime.parse(lead['activity_date_deadline']);
+          } else {
+            deadlineDate = lead['activity_date_deadline'];
+          }
+
+          String appointmentId = "${lead['id']}_${deadlineDate.toString()}";
+
+
+          appointments.add(
+            Appointment(
+              startTime: deadlineDate,
+              endTime: deadlineDate.add(Duration(hours: 1)),
+              subject: lead['name'] ?? 'No Title',
+              color: Color(0xFF9EA700),
+              isAllDay: true,
+              id: appointmentId
+            ),
+          );
+          appointmentLeadMap[appointmentId] = lead;
+        } catch (e) {
+          print('Error parsing deadline date: $e');
+        }
+      }
+    }
+
+    return Container(
+      child: SfCalendar(
+        view: CalendarView.month,
+        headerStyle: CalendarHeaderStyle(backgroundColor:  Color(0x69EA700),),
+        dataSource: AppointmentDataSource(appointments),
+        monthViewSettings: MonthViewSettings(
+          showAgenda: true,
+          agendaViewHeight: 200,
+          appointmentDisplayMode: MonthAppointmentDisplayMode.appointment,
+        ),
+        todayHighlightColor: Color(0xFF9EA700),
+        selectionDecoration: BoxDecoration(
+          color: Colors.transparent,
+          border: Border.all(color: Color(0xFF9EA700), width: 2),
+          borderRadius: const BorderRadius.all(Radius.circular(4)),
+          shape: BoxShape.rectangle,
+        ),
+        onTap: (CalendarTapDetails details) {
+          if (details.targetElement == CalendarElement.appointment) {
+            Appointment appointment = details.appointments![0];
+            String appointmentId = appointment.id.toString();
+
+            if (appointmentLeadMap.containsKey(appointmentId)) {
+              calendarDialogue(context, appointmentLeadMap[appointmentId]!);
+            }
+          }
+        },
+      ),
+    );
+  }
+
+  void calendarDialogue(BuildContext context, Map<String, dynamic> lead){
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: Text(
+            'Opportunity Details',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF9EA700),
+            ),
+          ),
+          content: Container(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(height: 4),
+                Text(
+                  lead['name'] ?? 'None ',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Expected Revenue',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  '\$${lead['expected_revenue']?.toString() ?? '0.00'}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Color(0xFF9EA700),
+                  ),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Customer',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  lead['partner_id'] != null &&
+                      lead['partner_id'] is List &&
+                      lead['partner_id'].length > 1
+                      ? lead['partner_id'][1]
+                      : 'None',
+                  style: TextStyle(
+                    fontSize: 16,
+                  ),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Activity Deadline',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  lead['activity_date_deadline'] != null && lead['activity_date_deadline'] != false
+                      ? lead['activity_date_deadline'] is DateTime
+                      ? lead['activity_date_deadline'].toString().split(' ')[0]
+                      : lead['activity_date_deadline'].toString()
+                      : 'No deadline',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: lead['activity_state'] == 'overdue' ? Colors.red : null,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                ElevatedButton.icon(
+                  icon: Icon(Icons.edit, size: 16, color: Colors.black,),
+                  label: Text('Edit'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey[200],
+                    foregroundColor: Color(0xFF9EA700),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+                ElevatedButton.icon(
+                  icon: Icon(Icons.delete, size: 16,color: Colors.black,),
+                  label: Text('Delete'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:  Colors.grey[200],
+                    foregroundColor: Color(0xFF9EA700),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
 
   Widget ActivityIconDesign(String activityState, String activityType) {
     IconData iconData;
@@ -864,174 +1069,84 @@ class _MypipelineState extends State<Mypipeline> {
     );
   }
 
-  List<Appointment> appointments = [];
-
-  void calendarOppurtunity(List<Map<String, dynamic>> leads) {
-    appointments.clear();
-
-    for (var lead in leads) {
-      if (lead['activity_date_deadline'] != null && lead['activity_date_deadline'] != false) {
-        try {
-          DateTime deadlineDate = DateTime.parse(lead['activity_date_deadline'].toString());
-
-          String customer = lead['partner_id'] != null && lead['partner_id'] is List && lead['partner_id'].length > 1
-              ? lead['partner_id'][1]
-              : "No customer";
-
-          String stageInfo = lead['stage_id'] != null && lead['stage_id'] is List && lead['stage_id'].length > 1
-              ? lead['stage_id'][1]
-              : "Unknown stage";
-
-          String revenue = lead['expected_revenue'] != null
-              ? "\$${lead['expected_revenue']}"
-              : "No revenue data";
-
-          appointments.add(Appointment(
-            startTime: deadlineDate,
-            endTime: deadlineDate.add(Duration(hours: 1)),
-            subject: lead['name'] ?? "Unnamed Opportunity",
-            color: Color(0xFF9EA700),
-            notes: customer,
-            location: stageInfo,
-            recurrenceRule: revenue,
-          ));
-
-          print('Added appointment for ${lead['name']} on $deadlineDate');
-        } catch (e) {
-          print('Error parsing date for ${lead['name']}: $e');
-        }
-      }
+  Widget fetchData() {
+    if (leadsList.isEmpty) {
+      print("No data ");
+      return Center(child: Text("No data available"));
     }
-  }
 
-  Widget event() {
-    return Container(
-      child: SfCalendar(
-        view: CalendarView.month,
-        dataSource: newDataSource(appointments),
-        monthViewSettings: MonthViewSettings(
-          appointmentDisplayMode: MonthAppointmentDisplayMode.indicator,
-          showAgenda: true,
-          agendaStyle: AgendaStyle(
-            appointmentTextStyle: TextStyle(
-              color: Colors.black87,
-              fontWeight: FontWeight.w500,
-            ),
-            dateTextStyle: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-              color: Color(0xFF9EA700),
-            ),
-            dayTextStyle: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey.shade700,
-            ),
+    Set<String> uniqueStages = {};
+    Map<String, Map<String, dynamic>> groupedData = {};
+
+    for (var lead in leadsList) {
+      String stage = (lead['stage_id'] is List && lead['stage_id'].length > 1)
+          ? lead['stage_id'][1]
+          : 'Unknown';
+      if (!uniqueStages.contains(stage)) {
+        uniqueStages.add(stage);
+      }
+      // uniqueStages.add(stage);
+      String date = lead['create_date'] ?? "None";
+      String formattedDate = formatDate(date);
+      print('klkll$date');
+      double revenue = double.tryParse(lead['expected_revenue']?.toString() ?? "0") ?? 0.0;
+
+      // Initialize the date row if not present
+      // groupedData.putIfAbsent(formattedDate, () => {'date': formattedDate});
+      if (!groupedData.containsKey(formattedDate)) {
+        groupedData[formattedDate] = {'date': formattedDate};
+      }
+
+      groupedData[formattedDate]![stage] =
+          ((double.tryParse(groupedData[formattedDate]![stage]?.toString() ?? "0") ?? 0.0) + revenue).toString();
+    }
+
+    List<GridColumn> columns = [
+      GridColumn(
+        columnName: 'date',
+        label: Container(
+          alignment: Alignment.center,
+          child: Text(
+            '',
+            style: TextStyle(fontWeight: FontWeight.bold),
           ),
-          agendaViewHeight: MediaQuery.of(context).size.height * 0.4,
         ),
-        todayHighlightColor: Color(0xFF9EA700),
-        cellBorderColor: Colors.grey.shade300,
-        appointmentBuilder: (BuildContext context, CalendarAppointmentDetails details) {
-          final Appointment appointment = details.appointments.first as Appointment;
-          return Container(
-            decoration: BoxDecoration(
-              color: Color(0xFF9EA700).withOpacity(0.2),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: Color(0xFF9EA700), width: 0.5),
-            ),
-            padding: EdgeInsets.symmetric(horizontal: 3),
-            child: Text(
-              appointment.subject,
-              style: TextStyle(
-                fontSize: 10,
-                color: Colors.black87,
-                overflow: TextOverflow.ellipsis,
-              ),
-              maxLines: 1,
-            ),
-          );
-        },
-        onTap: (CalendarTapDetails details) {
-          if (details.targetElement == CalendarElement.appointment) {
-            final Appointment appointment = details.appointments!.first;
-            showDialog(
-              context: context,
-              builder: (BuildContext context) {
-                return AlertDialog(
-                  title: Text('Opportunity Details'),
-                  content: Container(
-                    width: double.maxFinite,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        detailRow('Name', appointment.subject),
-                        Divider(),
-                        detailRow('Customer', appointment.notes ?? 'No customer specified'),
-                        Divider(),
-                      ],
-                    ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                      child: Text('Edit'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Color(0xFF9EA700),
-                      ),
-                    ),
-                    ElevatedButton(
-                      onPressed: () {
-
-                        Navigator.of(context).pop();
-                      },
-                      child: Text('Delete'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFF9EA700),
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ],
-                );
-              },
-            );
-          }
-        },
       ),
-    );
-  }
-
-
-  Widget detailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+      ...uniqueStages.map(
+            (stage) => GridColumn(
+          columnName: stage,
+          label: Container(
+            alignment: Alignment.center,
+            child: Text(
+              stage,
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
-          SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
+        ),
+      ),
+    ];
+
+    List<DataGridRow> rows = groupedData.entries.map((entry) {
+      return DataGridRow(
+        cells: [
+          DataGridCell<String>(columnName: 'date', value: entry.value['date']),
+          ...uniqueStages.map(
+                (stage) => DataGridCell<String>(
+              columnName: stage,
+              value: entry.value[stage] ?? "0",
             ),
           ),
         ],
-      ),
+      );
+    }).toList();
+
+    return SfDataGrid(
+      source: tableSource(rows),
+      columns: columns,
+      columnWidthMode: ColumnWidthMode.fill,
     );
   }
+
 
   Widget customCard(AppFlowyGroupItem item) {
     if (item is LeadItem) {
@@ -1228,11 +1343,43 @@ class _MypipelineState extends State<Mypipeline> {
   }
 }
 
-class newDataSource extends CalendarDataSource {
-  newDataSource(List<Appointment> source) {
+class AppointmentDataSource extends CalendarDataSource {
+  AppointmentDataSource(List<Appointment> source) {
     appointments = source;
   }
 }
+
+class tableSource extends DataGridSource {
+  List<DataGridRow> dataGridRows;
+
+  tableSource(this.dataGridRows);
+
+  @override
+  List<DataGridRow> get rows => dataGridRows;
+
+  @override
+  DataGridRowAdapter? buildRow(DataGridRow row) {
+    return DataGridRowAdapter(
+      cells: row.getCells().map((cell) {
+        return Container(
+          alignment: Alignment.center,
+          padding: EdgeInsets.all(8.0),
+          child: Text(cell.value.toString()),
+        );
+      }).toList(),
+    );
+  }
+}
+
+String formatDate(String date) {
+  try {
+    DateTime parsedDate = DateTime.parse(date);
+    return DateFormat("MMMM yyyy").format(parsedDate);
+  } catch (e) {
+    return "Unknown";
+  }
+}
+
 
 class LeadItem extends AppFlowyGroupItem {
   final String name;
