@@ -47,6 +47,7 @@ dependencies:
   cross_scroll: ^0.1.1
   syncfusion_flutter_calendar: ^28.2.7
   syncfusion_flutter_datagrid: ^28.2.9
+  flutter_expandable_fab: ^2.3.0
 
 dev_dependencies:
   flutter_test:

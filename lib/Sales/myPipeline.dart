@@ -7,6 +7,7 @@ import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_flutter_calendar/calendar.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datagrid/datagrid.dart';
 
 class Mypipeline extends StatefulWidget {
@@ -22,11 +23,17 @@ final AppFlowyBoardController controller = AppFlowyBoardController();
 late AppFlowyBoardScrollController boardController;
 int selectedView = 0;
 List<Map<String, dynamic>> leadsList = [];
+List<Map<String, dynamic>> opportunitiesList = [];
 
 class _MypipelineState extends State<Mypipeline> {
+  List<ChartData> chartDatavalues = [];
   Uint8List? profileImage;
   String? userName;
-
+  bool showNoDataMessage = false;
+  String selectedChart = "bar";
+  String selectedFilter = "count";
+  String showVariable = "count";
+  String? selectedReport = "Pipeline";
   Future<void> initializeOdooClient() async {
     final prefs = await SharedPreferences.getInstance();
     final baseUrl = prefs.getString("urldata") ?? "";
@@ -47,9 +54,9 @@ class _MypipelineState extends State<Mypipeline> {
         await pipe();
         await tag();
         await iconSelectedView();
-        // await processTableData();
-        // await buildTableView();
         await fetchData();
+        await buildChart();
+        await buildOpportunityTable(opportunitiesList);
 
       } catch (e) {
         print("Odoo Authentication Failed: $e");
@@ -158,7 +165,15 @@ class _MypipelineState extends State<Mypipeline> {
             'contact_name',
             'activity_ids',
             'activity_date_deadline',
-            'create_date'
+            'create_date',
+            'day_open',
+            'day_close',
+            'recurring_revenue_monthly',
+            'probability',
+            'recurring_revenue_monthly_prorated',
+            'recurring_revenue_prorated',
+            'prorated_revenue',
+            'recurring_revenue',
           ],
         }
       });
@@ -167,6 +182,8 @@ class _MypipelineState extends State<Mypipeline> {
         leadsList = List<Map<String, dynamic>>.from(response);
         // calendarOppurtunity(leadsList);
         Map<String, List<Map<String, dynamic>>> groupedLeads = {};
+        opportunitiesList = List<Map<String, dynamic>>.from(response);
+
 
         for (var lead in response) {
           String stage = lead['stage_id'][1] ?? '';
@@ -200,8 +217,8 @@ class _MypipelineState extends State<Mypipeline> {
                 name: lead['name'],
                 revenue: lead['expected_revenue'].toString(),
                 customerName: lead['partner_id'] != null &&
-                        lead['partner_id'] is List &&
-                        lead['partner_id'].length > 1
+                    lead['partner_id'] is List &&
+                    lead['partner_id'].length > 1
                     ? lead['partner_id'][1]
                     : "",
                 priority: (lead['priority'] is int)
@@ -210,24 +227,24 @@ class _MypipelineState extends State<Mypipeline> {
                 tags: tagNames,
                 activityState: lead['activity_state'] != null
                     ? (lead['activity_state'] is bool
-                        ? (lead['activity_state'] ? "true" : "false")
-                        : lead['activity_state'].toString())
+                    ? (lead['activity_state'] ? "true" : "false")
+                    : lead['activity_state'].toString())
                     : '',
                 activityType: lead['activity_type_id'] != null &&
-                        lead['activity_type_id'] is List &&
-                        lead['activity_type_id'].length > 1
+                    lead['activity_type_id'] is List &&
+                    lead['activity_type_id'].length > 1
                     ? lead['activity_type_id'][1]
                     : "",
                 hasActivity: lead['activity_ids'] != null &&
                     lead['activity_ids'] is List &&
                     lead['activity_ids'].isNotEmpty,
                 activityIds:
-                    lead['activity_ids'] != null && lead['activity_ids'] is List
-                        ? List<String>.from(
-                            lead['activity_ids'].map((e) => e.toString()))
-                        : [],
+                lead['activity_ids'] != null && lead['activity_ids'] is List
+                    ? List<String>.from(
+                    lead['activity_ids'].map((e) => e.toString()))
+                    : [],
                 imageData:
-                    profileImage != null ? base64Encode(profileImage!) : null,
+                profileImage != null ? base64Encode(profileImage!) : null,
               );
             }).toList(),
           );
@@ -235,7 +252,86 @@ class _MypipelineState extends State<Mypipeline> {
           controller.addGroup(groupData);
         }
 
-        setState(() {});
+        if (response != null && response is List) {
+          Map<String, double> stageValues = {};
+
+          for (var item in response) {
+            if (item['stage_id'] != null &&
+                item['stage_id'] is List &&
+                item['stage_id'].length > 1) {
+              String stageName = item['stage_id'][1].toString();
+              double value;
+              if (selectedFilter == "count") {
+                value = (stageValues[stageName] ?? 0) + 1;
+              } else if (selectedFilter == "day_open" &&
+                  item['day_open'] != false) {
+                value = (stageValues[stageName] ?? 0) +
+                    (item['day_open'] as double);
+              } else if (selectedFilter == "day_close" &&
+                  item['day_close'] != false) {
+                value = (stageValues[stageName] ?? 0) +
+                    (item['day_close'] as double);
+              } else if (selectedFilter == "recurring_revenue_monthly" &&
+                  item['recurring_revenue_monthly'] != false) {
+                value = (stageValues[stageName] ?? 0) +
+                    (item['recurring_revenue_monthly'] as double);
+              } else if (selectedFilter == "expected_revenue" &&
+                  item['expected_revenue'] != false) {
+                value = (stageValues[stageName] ?? 0) +
+                    (item['expected_revenue'] as double);
+              } else if (selectedFilter == "probability" &&
+                  item['probability'] != false) {
+                value = (stageValues[stageName] ?? 0) +
+                    (item['probability'] as double);
+              } else if (selectedFilter ==
+                  "recurring_revenue_monthly_prorated" &&
+                  item['recurring_revenue_monthly_prorated'] != false) {
+                value = (stageValues[stageName] ?? 0) +
+                    (item['recurring_revenue_monthly_prorated'] as double);
+              } else if (selectedFilter == "recurring_revenue_prorated" &&
+                  item['recurring_revenue_prorated'] != false) {
+                value = (stageValues[stageName] ?? 0) +
+                    (item['recurring_revenue_prorated'] as double);
+              } else if (selectedFilter == "prorated_revenue" &&
+                  item['prorated_revenue'] != false) {
+                value = (stageValues[stageName] ?? 0) +
+                    (item['prorated_revenue'] as double);
+              } else if (selectedFilter == "recurring_revenue" &&
+                  item['recurring_revenue'] != false) {
+                value = (stageValues[stageName] ?? 0) +
+                    (item['recurring_revenue'] as double);
+              } else {
+                value = 0;
+              }
+              stageValues[stageName] = value;
+              //print('adadadad${stageName}');
+            }
+          }
+
+
+          setState(() {
+            chartDatavalues.clear();
+
+            // print(selectedReport);
+
+            Set<String> stageOrderSet = stageValues.keys.toSet();
+            List<String> stageOrder = stageOrderSet.toList();
+            List<ChartData> sortedData = stageOrder
+                .where((stage) => stageValues.containsKey(stage))
+                .map((stage) => ChartData(stage, stageValues[stage]!))
+                .toList();
+
+            chartDatavalues = sortedData;
+
+            if (stageOrder.isEmpty || sortedData.every((data) => data.y == 0)) {
+              showNoDataMessage = true;
+            } else {
+              showNoDataMessage = false;
+            }
+
+            isLoading = false;
+          });
+        }
       }
     } catch (e) {
       print("Odoo Fetch Failed: $e");
@@ -307,7 +403,8 @@ class _MypipelineState extends State<Mypipeline> {
                     selectedView = 4;
                   });
                 },
-                icon: Icon(Icons.graphic_eq_rounded, color: Colors.black),
+                icon: Icon(Icons.graphic_eq_rounded,
+                  color: selectedView == 4 ? Color(0xFF9EA700) : Colors.black,),
               ),
               VerticalDivider(thickness: 2, color: Colors.white),
               IconButton(
@@ -316,7 +413,8 @@ class _MypipelineState extends State<Mypipeline> {
                     selectedView = 5;
                   });
                 },
-                icon: Icon(Icons.access_time, color: Colors.black),
+                icon: Icon(Icons.access_time,
+                  color: selectedView == 5 ? Color(0xFF9EA700) : Colors.black,),
               ),
             ],
           ),
@@ -729,7 +827,8 @@ class _MypipelineState extends State<Mypipeline> {
                                         ),
                                         label: Text(
                                           'Snooze 7d',
-                                          overflow: TextOverflow.ellipsis,
+                                          overflow: TextOverflow
+                                              .ellipsis,
                                         ),
                                         onPressed: () {},
                                         style: ElevatedButton.styleFrom(
@@ -820,15 +919,116 @@ class _MypipelineState extends State<Mypipeline> {
         return fetchData();
 
       case 4:
-        return Container();
+        return buildChart();
 
       case 5:
-        return Container();
-
+        return buildOpportunityTable(opportunitiesList);
       default:
         return Container();
     }
   }
+
+
+  Widget buildOpportunityTable(List<Map<String, dynamic>>? opportunities) {
+
+    final filteredOpportunities = opportunities?.where((opportunity) {
+      return opportunity['activity_ids'] != null &&
+          (opportunity['activity_ids'] as List).isNotEmpty;
+    }).toList() ?? [];
+
+    Set<String> activityTypes = {};
+    for (var opportunity in filteredOpportunities) {
+      if (opportunity['activity_ids'] != null &&
+          opportunity['activity_ids'] is List) {
+        for (var activity in opportunity['activity_ids']) {
+          if (activity is Map<String, dynamic> &&
+              activity.containsKey('type') &&
+              activity['type'] is String) {
+            activityTypes.add(activity['type']);
+          }
+        }
+      }
+    }
+
+    List<String> activityColumns = activityTypes.toList();
+    activityColumns.sort();
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: DataTable(
+        columnSpacing: 20,
+        dataRowMaxHeight: 60,
+        headingRowColor: MaterialStateColor.resolveWith(
+                (states) => Colors.blue[100]!),
+        columns: [
+          DataColumn(
+            label: Expanded(
+              child: Text(
+                'Opportunity Name',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ),
+            tooltip: 'Opportunity Details',
+          ),
+          ...activityColumns.map(
+                (type) => DataColumn(
+              label: Text(
+                type,
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              tooltip: 'Activity Type',
+            ),
+          ),
+        ],
+        rows: filteredOpportunities.isEmpty
+            ? [
+          DataRow(cells: [
+            DataCell(Text('No opportunities  found')),
+            ...activityColumns.map((_) => DataCell(Text(''))),
+          ])
+        ]
+            : filteredOpportunities.map((opportunity) {
+          return DataRow(
+            cells: [
+              DataCell(
+                Container(
+                  width: 250,
+                  child: Text(
+                    opportunity['name'] ?? '',
+                    style: TextStyle(fontSize: 15),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+              ...activityColumns.map((type) {
+                List<String> matchingActivities = [];
+                if (opportunity['activity_ids'] != null &&
+                    opportunity['activity_ids'] is List) {
+                  for (var activity in opportunity['activity_ids']) {
+                    if (activity is Map<String, dynamic> &&
+                        activity.containsKey('type') &&
+                        activity['type'] == type) {
+                      matchingActivities.add(
+                          '${activity['name'] ?? ''} (${activity['state'] ?? ''})');
+                    }
+                  }
+                }
+                return DataCell(
+                  Text(
+                    matchingActivities.isNotEmpty
+                        ? matchingActivities.join(', ')
+                        : 'None',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                );
+              }),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+
 
   Widget calendarView() {
     List<Appointment> appointments = [];
@@ -1077,6 +1277,7 @@ class _MypipelineState extends State<Mypipeline> {
 
     Set<String> uniqueStages = {};
     Map<String, Map<String, dynamic>> groupedData = {};
+    Map<String, double> columnTotals = {};
 
     for (var lead in leadsList) {
       String stage = (lead['stage_id'] is List && lead['stage_id'].length > 1)
@@ -1091,7 +1292,6 @@ class _MypipelineState extends State<Mypipeline> {
       print('klkll$date');
       double revenue = double.tryParse(lead['expected_revenue']?.toString() ?? "0") ?? 0.0;
 
-      // Initialize the date row if not present
       // groupedData.putIfAbsent(formattedDate, () => {'date': formattedDate});
       if (!groupedData.containsKey(formattedDate)) {
         groupedData[formattedDate] = {'date': formattedDate};
@@ -1099,6 +1299,8 @@ class _MypipelineState extends State<Mypipeline> {
 
       groupedData[formattedDate]![stage] =
           ((double.tryParse(groupedData[formattedDate]![stage]?.toString() ?? "0") ?? 0.0) + revenue).toString();
+          columnTotals[stage] = (columnTotals[stage] ?? 0.0) + revenue;
+
     }
 
     List<GridColumn> columns = [
@@ -1140,6 +1342,18 @@ class _MypipelineState extends State<Mypipeline> {
       );
     }).toList();
 
+    rows.add(DataGridRow(
+      cells: [
+        DataGridCell<String>(columnName: 'date', value: "Total"),
+        ...uniqueStages.map(
+              (stage) => DataGridCell<String>(
+            columnName: stage,
+            value: columnTotals[stage]?.toStringAsFixed(2) ?? "0",
+          ),
+        ),
+      ],
+    ));
+
     return SfDataGrid(
       source: tableSource(rows),
       columns: columns,
@@ -1147,6 +1361,576 @@ class _MypipelineState extends State<Mypipeline> {
     );
   }
 
+  Widget buildChart() {
+    if (selectedChart == "bar") {
+      return showNoDataMessage
+          ? Column(
+        children: [
+          Center(child: Image.asset('assets/nodata.png')),
+          Text(
+            "No data to display",
+            style: TextStyle(color: Colors.blueGrey),
+          ),
+        ],
+      )
+          : SfCartesianChart(
+        primaryXAxis: CategoryAxis(),
+        series: <CartesianSeries<ChartData, String>>[
+          ColumnSeries<ChartData, String>(
+            dataSource: chartDatavalues,
+            xValueMapper: (ChartData data, _) => data.x,
+            yValueMapper: (ChartData data, _) => data.y,
+            color: Color(0xFF9EA700),
+          ),
+        ],
+      );
+    } else if (selectedChart == "line") {
+      return showNoDataMessage
+          ? Column(
+        children: [
+          Center(child: Image.asset('assets/nodata.png')),
+          Text(
+            "No data to display",
+            style: TextStyle(color: Colors.blueGrey),
+          ),
+        ],
+      )
+          : SfCartesianChart(
+        primaryXAxis: CategoryAxis(),
+        series: <CartesianSeries<ChartData, String>>[
+          LineSeries<ChartData, String>(
+            dataSource: chartDatavalues,
+            xValueMapper: (ChartData data, _) => data.x,
+            yValueMapper: (ChartData data, _) => data.y,
+            color: Color(0xFF9EA700),
+          ),
+        ],
+      );
+    } else {
+      return showNoDataMessage
+          ? Column(
+        children: [
+          Center(child: Image.asset('assets/nodata.png')),
+          Text(
+            "No data to display",
+            style: TextStyle(color: Colors.blueGrey),
+          ),
+        ],
+      )
+          : SfCircularChart(
+        legend: Legend(isVisible: true),
+        series: <CircularSeries<ChartData, String>>[
+          PieSeries<ChartData, String>(
+            dataLabelSettings: DataLabelSettings(isVisible: true),
+            explode: true,
+            dataSource: chartDatavalues,
+            xValueMapper: (ChartData data, _) => data.x,
+            yValueMapper: (ChartData data, _) => data.y,
+          ),
+        ],
+      );
+    }
+  }
+
+  void changeChartType(String type) {
+    setState(() {
+      selectedChart = type;
+    });
+  }
+  void filterOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      backgroundColor: Colors.white,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.all(16.0),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "Select Filter",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(
+                  height: 12,
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border(
+                      left: BorderSide(
+                        color: selectedFilter == "count"
+                            ? Color(0xFF656805)
+                            : Colors.transparent,
+                        width: 6, // Border thickness
+                      ),
+                    ),
+                  ),
+                  child: ListTile(
+                    leading: Icon(
+                      selectedFilter == "count" ? Icons.done : Icons.timelapse,
+                      color: Color(0xFF9EA700),
+                    ),
+                    title: Text('Count'),
+                    onTap: () {
+                      applyFilter("count", 'Count');
+                    },
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    tileColor: Color(0x1B9EA700),
+                    contentPadding:
+                    EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  ),
+                ),
+                SizedBox(
+                  height: 5,
+                ),
+                if (selectedReport == 'Partnerships')
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border(
+                        left: BorderSide(
+                          color: selectedFilter == "turnover"
+                              ? Color(0xFF656805)
+                              : Colors.transparent,
+                          width: 6, // Border thickness
+                        ),
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: Icon(
+                        selectedFilter == "turnover"
+                            ? Icons.done
+                            : Icons.timelapse,
+                        color: Color(0xFF9EA700),
+                      ),
+                      title: Text('Turnover'),
+                      onTap: () {
+                        applyFilter("turnover", 'Turnover');
+                      },
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      tileColor: Color(0x1B9EA700),
+                      focusColor: Colors.red,
+                      contentPadding:
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    ),
+                  ),
+                SizedBox(
+                  height: 5,
+                ),
+                if (selectedReport != "Activities" &&
+                    selectedReport != "Partnerships") ...[
+                  if (selectedReport == 'Leads' || selectedReport == 'Pipeline')
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border(
+                          left: BorderSide(
+                            color: selectedFilter == "day_open"
+                                ? Color(0xFF656805)
+                                : Colors.transparent,
+                            width: 6, // Border thickness
+                          ),
+                        ),
+                      ),
+                      child: ListTile(
+                        leading: Icon(
+                          selectedFilter == "day_open"
+                              ? Icons.done
+                              : Icons.timelapse,
+                          color: Color(0xFF9EA700),
+                        ),
+                        title: Text('Days to Assign'),
+                        onTap: () {
+                          applyFilter("day_open", 'Days to Assign');
+                        },
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        tileColor: Color(0x1B9EA700),
+                        contentPadding:
+                        EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      ),
+                    ),
+                  SizedBox(
+                    height: 5,
+                  ),
+                  if (selectedReport == 'Leads' || selectedReport == 'Pipeline')
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border(
+                          left: BorderSide(
+                            color: selectedFilter == "day_close"
+                                ? Color(0xFF656805)
+                                : Colors.transparent,
+                            width: 6, // Border thickness
+                          ),
+                        ),
+                      ),
+                      child: ListTile(
+                        leading: Icon(
+                          selectedFilter == "day_close"
+                              ? Icons.done
+                              : Icons.timelapse,
+                          color: Color(0xFF9EA700),
+                        ),
+                        title: Text('Days to Close'),
+                        onTap: () {
+                          applyFilter("day_close", 'Days to Close');
+                        },
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        tileColor: Color(0x1B9EA700),
+                        contentPadding:
+                        EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      ),
+                    ),
+                  SizedBox(
+                    height: 5,
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border(
+                        left: BorderSide(
+                          color: selectedFilter == "recurring_revenue_monthly"
+                              ? Color(0xFF656805)
+                              : Colors.transparent,
+                          width: 7, // Border thickness
+                        ),
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: Icon(
+                        selectedFilter == "recurring_revenue_monthly"
+                            ? Icons.done
+                            : Icons.timelapse,
+                        color: Color(0xFF9EA700),
+                      ),
+                      title: Text('Expected MRR'),
+                      onTap: () {
+                        applyFilter(
+                            "recurring_revenue_monthly", 'Expected MRR');
+                      },
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      tileColor: Color(0x1B9EA700),
+                      contentPadding:
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    ),
+                  ),
+                  SizedBox(
+                    height: 5,
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border(
+                        left: BorderSide(
+                          color: selectedFilter == "expected_revenue"
+                              ? Color(0xFF656805)
+                              : Colors.transparent,
+                          width: 7, // Border thickness
+                        ),
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: Icon(
+                        selectedFilter == "expected_revenue"
+                            ? Icons.done
+                            : Icons.timelapse,
+                        color: Color(0xFF9EA700),
+                      ),
+                      title: Text('Expected Revenue'),
+                      onTap: () {
+                        applyFilter("expected_revenue", 'Expected Revenue');
+                      },
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      tileColor: Color(0x1B9EA700),
+                      contentPadding:
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    ),
+                  ),
+                  SizedBox(
+                    height: 5,
+                  ),
+                  if (selectedReport == 'Leads' || selectedReport == 'Pipeline')
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border(
+                          left: BorderSide(
+                            color: selectedFilter == "probability"
+                                ? Color(0xFF656805)
+                                : Colors.transparent,
+                            width: 7, // Border thickness
+                          ),
+                        ),
+                      ),
+                      child: ListTile(
+                        leading: Icon(
+                          selectedFilter == "probability"
+                              ? Icons.done
+                              : Icons.timelapse,
+                          color: Color(0xFF9EA700),
+                        ),
+                        title: Text('Probability'),
+                        onTap: () {
+                          applyFilter("probability", 'Probability');
+                        },
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        tileColor: Color(0x1B9EA700),
+                        contentPadding:
+                        EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      ),
+                    ),
+                  SizedBox(
+                    height: 5,
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border(
+                        left: BorderSide(
+                          color: selectedFilter ==
+                              "recurring_revenue_monthly_prorated"
+                              ? Color(0xFF656805)
+                              : Colors.transparent,
+                          width: 7, // Border thickness
+                        ),
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: Icon(
+                        selectedFilter == "recurring_revenue_monthly_prorated"
+                            ? Icons.done
+                            : Icons.timelapse,
+                        color: Color(0xFF9EA700),
+                      ),
+                      title: Text('Prorated MRR'),
+                      onTap: () {
+                        applyFilter("recurring_revenue_monthly_prorated",
+                            'Prorated MRR');
+                      },
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      tileColor: Color(0x1B9EA700),
+                      contentPadding:
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    ),
+                  ),
+                  SizedBox(
+                    height: 5,
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border(
+                        left: BorderSide(
+                          color: selectedFilter == "recurring_revenue_prorated"
+                              ? Color(0xFF656805)
+                              : Colors.transparent,
+                          width: 7, // Border thickness
+                        ),
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: Icon(
+                        selectedFilter == "recurring_revenue_prorated"
+                            ? Icons.done
+                            : Icons.timelapse,
+                        color: Color(0xFF9EA700),
+                      ),
+                      title: Text('Prorated Recurring Revenues'),
+                      onTap: () {
+                        applyFilter("recurring_revenue_prorated",
+                            'Prorated Recurring Revenues');
+                      },
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      tileColor: Color(0x1B9EA700),
+                      focusColor: Colors.red,
+                      contentPadding:
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    ),
+                  ),
+                  SizedBox(
+                    height: 5,
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border(
+                        left: BorderSide(
+                          color: selectedFilter == "prorated_revenue"
+                              ? Color(0xFF656805)
+                              : Colors.transparent,
+                          width: 7, // Border thickness
+                        ),
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: Icon(
+                        selectedFilter == "prorated_revenue"
+                            ? Icons.done
+                            : Icons.timelapse,
+                        color: Color(0xFF9EA700),
+                      ),
+                      title: Text('Prorated Revenue'),
+                      onTap: () {
+                        applyFilter("prorated_revenue", 'Prorated Revenue');
+                      },
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      tileColor: Color(0x1B9EA700),
+                      contentPadding:
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    ),
+                  ),
+                  SizedBox(
+                    height: 5,
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border(
+                        left: BorderSide(
+                          color: selectedFilter == "recurring_revenue"
+                              ? Color(0xFF656805)
+                              : Colors.transparent,
+                          width: 7, // Border thickness
+                        ),
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: Icon(
+                        selectedFilter == "recurring_revenue"
+                            ? Icons.done
+                            : Icons.timelapse,
+                        color: Color(0xFF9EA700),
+                      ),
+                      title: Text('Recurring Revenues'),
+                      onTap: () {
+                        applyFilter("recurring_revenue", 'Recurring Revenues');
+                      },
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      tileColor: Color(0x1B9EA700),
+                      contentPadding:
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+  void applyFilter(String filter, String showfilterName) {
+    setState(() {
+      selectedFilter = filter;
+      showVariable = showfilterName;
+      isLoading = true;
+    });
+    pipe();
+    Navigator.pop(context);
+  }
+
+  Widget buildChartSelection() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.only(left: 10, ),
+          child: Container(
+            width: 105,
+            height: 30,
+            child: ElevatedButton(
+              onPressed: () => filterOptions(),
+              style: ElevatedButton.styleFrom(
+                padding: EdgeInsets.zero,
+                backgroundColor: Color(0xFF9EA700),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(7),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(left: 12),
+                    child: Text('Measures'),
+                  ),
+                  Expanded(child: Icon(Icons.arrow_drop_down,color: Colors.white,)),
+                ],
+              ),
+            ),
+          ),
+        ),
+        SizedBox(width: 150,),
+        Container(
+          height: 37,
+          width: 37,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(7),
+            color: Color(0x279EA700)
+          ),
+          child: IconButton(
+              onPressed: () => changeChartType("bar"),
+              icon: Icon(Icons.bar_chart_rounded,
+                  color: selectedChart == 'bar'
+                      ? Color(0xFF9EA700)
+                      : Colors.black)),
+        ),
+        SizedBox(width: 5,),
+        Container(
+          height: 37,
+          width: 37,
+          decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(7),
+              color: Color(0x279EA700)
+          ),
+          child: IconButton(
+              onPressed: () => changeChartType("line"),
+              icon: Icon(Icons.stacked_line_chart_rounded,
+                  color: selectedChart == 'line'
+                      ? Color(0xFF9EA700)
+                      : Colors.black)),
+        ),
+        SizedBox(width: 5,),
+        Padding(
+          padding: EdgeInsets.only(right: 6),
+          child: Container(
+            height: 37,
+            width: 37,
+            decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(7),
+                color: Color(0x279EA700)
+            ),
+            child: IconButton(
+                onPressed: () => changeChartType("pie"),
+                icon: Icon(Icons.pie_chart_rounded,
+                    color: selectedChart == 'pie'
+                        ? Color(0xFF9EA700)
+                        : Colors.black)),
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget customCard(AppFlowyGroupItem item) {
     if (item is LeadItem) {
@@ -1279,10 +2063,6 @@ class _MypipelineState extends State<Mypipeline> {
 
   @override
   Widget build(BuildContext context) {
-    // final config = AppFlowyBoardConfig(
-    //   groupBackgroundColor: Colors.grey.shade100,
-    //   stretchGroupHeight: false,
-    // );
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Color(0xFF9EA700),
@@ -1333,9 +2113,9 @@ class _MypipelineState extends State<Mypipeline> {
           Divider(thickness: 1, color: Colors.grey.shade300),
           ChartSelection(),
           Divider(thickness: 1, color: Colors.grey.shade300),
-          SizedBox(
-            height: 25,
-          ),
+          selectedView == 4 ?
+          buildChartSelection():SizedBox(),
+          SizedBox(height: 7,),
           Expanded(child: iconSelectedView()),
         ],
       ),
@@ -1349,6 +2129,13 @@ class AppointmentDataSource extends CalendarDataSource {
   }
 }
 
+class ChartData {
+  ChartData(this.x, this.y);
+
+  final String x;
+  final double y;
+}
+
 class tableSource extends DataGridSource {
   List<DataGridRow> dataGridRows;
 
@@ -1359,11 +2146,13 @@ class tableSource extends DataGridSource {
 
   @override
   DataGridRowAdapter? buildRow(DataGridRow row) {
+    bool isTotalRow = row.getCells().first.value == "Total";
     return DataGridRowAdapter(
       cells: row.getCells().map((cell) {
         return Container(
           alignment: Alignment.center,
           padding: EdgeInsets.all(8.0),
+          color: isTotalRow ? Colors.grey[300] : null,
           child: Text(cell.value.toString()),
         );
       }).toList(),
