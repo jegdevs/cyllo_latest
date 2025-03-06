@@ -27,6 +27,7 @@ List<Map<String, dynamic>> opportunitiesList = [];
 
 class _MypipelineState extends State<Mypipeline> {
   List<ChartData> chartDatavalues = [];
+  List<String> activityTypes = [];
   Uint8List? profileImage;
   String? userName;
   bool showNoDataMessage = false;
@@ -56,7 +57,7 @@ class _MypipelineState extends State<Mypipeline> {
         await iconSelectedView();
         await fetchData();
         await buildChart();
-        await buildOpportunityTable(opportunitiesList);
+        await act();
 
       } catch (e) {
         print("Odoo Authentication Failed: $e");
@@ -87,6 +88,30 @@ class _MypipelineState extends State<Mypipeline> {
     } catch (e) {
       print("Failed to fetch tags: $e");
       return {};
+    }
+  }
+
+  Future<void> act() async {
+    try {
+      final response = await client?.callKw({
+        'model': 'mail.activity.type',
+        'method': 'search_read',
+        'args': [],
+        'kwargs': {
+          'fields': ['name',],
+        }
+      });
+
+      print('Tactttt: $response');
+
+      if (response != null && response is List) {
+        setState(() {
+          activityTypes = response.map((item) => item['name'].toString()).toList();
+        });
+      }
+
+    } catch (e) {
+      print("Failed to fetch tags: $e");
     }
   }
 
@@ -922,112 +947,31 @@ class _MypipelineState extends State<Mypipeline> {
         return buildChart();
 
       case 5:
-        return buildOpportunityTable(opportunitiesList);
+        return SalesDataGridWidget(
+          opportunitiesList: opportunitiesList,
+            activityTypes: activityTypes,
+        );
       default:
         return Container();
     }
   }
 
 
-  Widget buildOpportunityTable(List<Map<String, dynamic>>? opportunities) {
+  Widget activityView(){
 
-    final filteredOpportunities = opportunities?.where((opportunity) {
-      return opportunity['activity_ids'] != null &&
-          (opportunity['activity_ids'] as List).isNotEmpty;
-    }).toList() ?? [];
+    return Column(
+      children: [
+        Container(
+          color: Colors.red,
+          child: Text('data'),
+        )
 
-    Set<String> activityTypes = {};
-    for (var opportunity in filteredOpportunities) {
-      if (opportunity['activity_ids'] != null &&
-          opportunity['activity_ids'] is List) {
-        for (var activity in opportunity['activity_ids']) {
-          if (activity is Map<String, dynamic> &&
-              activity.containsKey('type') &&
-              activity['type'] is String) {
-            activityTypes.add(activity['type']);
-          }
-        }
-      }
-    }
-
-    List<String> activityColumns = activityTypes.toList();
-    activityColumns.sort();
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        columnSpacing: 20,
-        dataRowMaxHeight: 60,
-        headingRowColor: MaterialStateColor.resolveWith(
-                (states) => Colors.blue[100]!),
-        columns: [
-          DataColumn(
-            label: Expanded(
-              child: Text(
-                'Opportunity Name',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-            ),
-            tooltip: 'Opportunity Details',
-          ),
-          ...activityColumns.map(
-                (type) => DataColumn(
-              label: Text(
-                type,
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-              tooltip: 'Activity Type',
-            ),
-          ),
-        ],
-        rows: filteredOpportunities.isEmpty
-            ? [
-          DataRow(cells: [
-            DataCell(Text('No opportunities  found')),
-            ...activityColumns.map((_) => DataCell(Text(''))),
-          ])
-        ]
-            : filteredOpportunities.map((opportunity) {
-          return DataRow(
-            cells: [
-              DataCell(
-                Container(
-                  width: 250,
-                  child: Text(
-                    opportunity['name'] ?? '',
-                    style: TextStyle(fontSize: 15),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ),
-              ...activityColumns.map((type) {
-                List<String> matchingActivities = [];
-                if (opportunity['activity_ids'] != null &&
-                    opportunity['activity_ids'] is List) {
-                  for (var activity in opportunity['activity_ids']) {
-                    if (activity is Map<String, dynamic> &&
-                        activity.containsKey('type') &&
-                        activity['type'] == type) {
-                      matchingActivities.add(
-                          '${activity['name'] ?? ''} (${activity['state'] ?? ''})');
-                    }
-                  }
-                }
-                return DataCell(
-                  Text(
-                    matchingActivities.isNotEmpty
-                        ? matchingActivities.join(', ')
-                        : 'None',
-                    style: TextStyle(fontSize: 14),
-                  ),
-                );
-              }),
-            ],
-          );
-        }).toList(),
-      ),
+      ],
     );
   }
+
+
+
 
 
   Widget calendarView() {
@@ -1849,6 +1793,9 @@ class _MypipelineState extends State<Mypipeline> {
     Navigator.pop(context);
   }
 
+
+
+
   Widget buildChartSelection() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.start,
@@ -2122,6 +2069,289 @@ class _MypipelineState extends State<Mypipeline> {
     );
   }
 }
+
+class SalesDataGridWidget extends StatefulWidget {
+  final List<Map<String, dynamic>> opportunitiesList;
+  final List<String> activityTypes;
+
+
+  const SalesDataGridWidget({
+    Key? key,
+    required this.opportunitiesList,
+    required this.activityTypes,
+  }) : super(key: key);
+
+  @override
+  _SalesDataGridWidgetState createState() => _SalesDataGridWidgetState();
+}
+
+class _SalesDataGridWidgetState extends State<SalesDataGridWidget> {
+  late SalesDataSource salesDataSource;
+  bool isLoading = true;
+  bool processing = false;
+
+
+  @override
+  void initState() {
+    super.initState();
+    processData();
+  }
+
+  @override
+  void didUpdateWidget(SalesDataGridWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.opportunitiesList != widget.opportunitiesList ||
+        oldWidget.activityTypes != widget.activityTypes) {
+      processData();
+    }
+  }
+
+
+  void processData() {
+    setState(() {
+      isLoading = true;
+    });
+    List<Map<String, dynamic>> filteredOpportunities = widget.opportunitiesList
+        .where((opportunity) =>
+    opportunity['activity_type_id'] != null &&
+        opportunity['activity_type_id'] is List &&
+        opportunity['activity_type_id'].length > 1)
+        .toList();
+
+    salesDataSource = SalesDataSource(
+      processOpportunities(filteredOpportunities),
+      widget.activityTypes,
+    );
+
+    setState(() {
+      isLoading = false;
+    });
+  }
+
+  List<Map<String, dynamic>> processOpportunities(List<Map<String, dynamic>> opportunities) {
+    return opportunities.map((opportunity) {
+      Map<String, dynamic> salesData = {
+        'name': opportunity['name'] ?? 'None',
+        'expected_revenue': opportunity['expected_revenue'] != null
+            ? '\$${opportunity['expected_revenue'].toString()}'
+            : '\$0',
+        'stage_id': opportunity['stage_id'] != null && opportunity['stage_id'] is List
+            ? opportunity['stage_id'][1].toString()
+            : 'New',
+        'partner_id': opportunity['partner_id'] != null && opportunity['partner_id'] is List
+            ? opportunity['partner_id'][1].toString()
+            : '',
+        'imagePath': 'assets/user1.png',
+      };
+
+      for (var type in widget.activityTypes) {
+        salesData[type] = '';
+      }
+
+      if (opportunity['activity_type_id'] != null &&
+          opportunity['activity_type_id'] is List &&
+          opportunity['activity_type_id'].length > 1) {
+        String activityType = opportunity['activity_type_id'][1].toString();
+        if (widget.activityTypes.contains(activityType)) {
+          salesData[activityType] = opportunity['activity_date_deadline'] ?? '';
+        }
+      }
+
+      return salesData;
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (processing) {
+      processData();
+      processing = true;
+    }
+    if(isLoading)
+      {
+      return  Center(child: CircularProgressIndicator());
+    }
+
+    return SfDataGrid(
+      source: salesDataSource,
+      columns: getColumns(),
+      gridLinesVisibility: GridLinesVisibility.both,
+      headerGridLinesVisibility: GridLinesVisibility.both,
+    );
+  }
+
+  List<GridColumn> getColumns() {
+    List<GridColumn> columns = [
+      GridColumn(
+        columnName: 'opportunity',
+        label: Container(
+          padding: const EdgeInsets.all(8),
+          alignment: Alignment.center,
+          child: const Text(''),
+        ),
+        width: 300,
+      ),
+    ];
+
+    for (var activityType in widget.activityTypes) {
+      columns.add(
+        GridColumn(
+          columnName: activityType,
+          label: buildHeader(activityType),
+          width: 120,
+        ),
+      );
+    }
+
+    return columns;
+  }
+
+  Widget buildHeader(String text) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      alignment: Alignment.center,
+      child: Text(
+        text,
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+}
+
+class SalesDataSource extends DataGridSource {
+  List<DataGridRow> dataGridRows = [];
+  final List<String> activityTypes;
+
+  SalesDataSource(List<Map<String, dynamic>> salesList, this.activityTypes) {
+    dataGridRows = salesList.map<DataGridRow>((salesData) {
+      List<DataGridCell> cells = [];
+
+      cells.add(DataGridCell<Map<String, dynamic>>(
+        columnName: 'opportunity',
+        value: salesData,
+      ));
+
+
+      for (var activityType in activityTypes) {
+        cells.add(
+          DataGridCell<String>(
+            columnName: activityType,
+            value: salesData.containsKey(activityType) ? salesData[activityType] : '',
+          ),
+        );
+      }
+
+      return DataGridRow(cells: cells);
+    }).toList();
+  }
+
+  @override
+  List<DataGridRow> get rows => dataGridRows;
+
+  @override
+  DataGridRowAdapter buildRow(DataGridRow row) {
+    return DataGridRowAdapter(
+      cells: row.getCells().map<Widget>((dataCell) {
+        if (dataCell.columnName == 'opportunity') {
+          final salesData = dataCell.value as Map<String, dynamic>;
+          return buildOpportunityCell(salesData);
+        }
+        String activityDate = dataCell.value.toString();
+        DateTime? parsedDate = activityDate.isNotEmpty ? DateTime.tryParse(activityDate) : null;
+        DateTime today = DateTime.now();
+
+        Color cellColor = Colors.transparent;
+        if (parsedDate != null) {
+          if (parsedDate.isBefore(today)) {
+            cellColor = Colors.red;
+          } else {
+            cellColor = Colors.green;
+          }
+        }
+        return Container(
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.all(8),
+          color: cellColor,
+          child: Text(
+            dataCell.value.toString(),
+            style: const TextStyle(fontSize: 14, color: Colors.black),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget buildOpportunityCell(Map<String, dynamic> salesData) {
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 18,
+          backgroundImage: AssetImage(salesData['imagePath']),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    salesData['name'],
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 7),
+                    child: Text(
+                      salesData['expected_revenue'],
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    salesData['partner_id'],
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8.0, top: 2.0),
+                    child: Container(
+                      height: 25,
+                      width: 50,
+                      color: Colors.grey.shade300,
+                      child: Center(
+                        child: Text(
+                          salesData['stage_id'],
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF9EA700),
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+  }
 
 class AppointmentDataSource extends CalendarDataSource {
   AppointmentDataSource(List<Appointment> source) {
