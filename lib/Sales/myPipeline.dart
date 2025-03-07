@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:appflowy_board/appflowy_board.dart';
@@ -199,10 +200,11 @@ class _MypipelineState extends State<Mypipeline> {
             'recurring_revenue_prorated',
             'prorated_revenue',
             'recurring_revenue',
+            'activity_user_id'
           ],
         }
       });
-      print('ressss$response');
+      log('ressss$response');
       if (response != null) {
         leadsList = List<Map<String, dynamic>>.from(response);
         // calendarOppurtunity(leadsList);
@@ -2074,7 +2076,6 @@ class SalesDataGridWidget extends StatefulWidget {
   final List<Map<String, dynamic>> opportunitiesList;
   final List<String> activityTypes;
 
-
   const SalesDataGridWidget({
     Key? key,
     required this.opportunitiesList,
@@ -2089,11 +2090,20 @@ class _SalesDataGridWidgetState extends State<SalesDataGridWidget> {
   late SalesDataSource salesDataSource;
   bool isLoading = true;
   bool processing = false;
-
+  Map<int, Uint8List> userImages = {};
 
   @override
   void initState() {
     super.initState();
+    loadData();
+  }
+
+  Future<void> loadData() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    await fetchUserImages();
     processData();
   }
 
@@ -2107,10 +2117,60 @@ class _SalesDataGridWidgetState extends State<SalesDataGridWidget> {
   }
 
 
+  Future<void> fetchUserImages() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userIds = widget.opportunitiesList
+        .where((opp) => opp['activity_user_id'] != null && opp['activity_user_id'] is List)
+        .map((opp) => opp['activity_user_id'][0] as int)
+        .toSet()
+        .toList();
+
+    if (userIds.isEmpty) {
+      setState(() => isLoading = false);
+      return;
+    }
+
+    try {
+      final response = await client?.callKw({
+        'model': 'res.users',
+        'method': 'search_read',
+        'args': [
+          [
+            ['id', 'in', userIds],
+          ]
+        ],
+        'kwargs': {
+          'fields': ['image_1920', 'name'],
+        },
+      });
+
+      if (response == null || response.isEmpty || response is! List) {
+        print('No user data received or invalid format');
+        setState(() => isLoading = false);
+        return;
+      }
+
+      final List<Map<String, dynamic>> data = List<Map<String, dynamic>>.from(response);
+      setState(() {
+        for (var user in data) {
+          var imageData = user['image_1920'];
+          if (imageData != null && imageData is String) {
+            userImages[user['id']] = base64Decode(imageData);
+          }
+        }
+        isLoading = false;
+      });
+    } catch (e) {
+      print("Error fetching user images: $e");
+      setState(() => isLoading = false);
+    }
+  }
+
   void processData() {
     setState(() {
       isLoading = true;
     });
+
     List<Map<String, dynamic>> filteredOpportunities = widget.opportunitiesList
         .where((opportunity) =>
     opportunity['activity_type_id'] != null &&
@@ -2121,6 +2181,7 @@ class _SalesDataGridWidgetState extends State<SalesDataGridWidget> {
     salesDataSource = SalesDataSource(
       processOpportunities(filteredOpportunities),
       widget.activityTypes,
+      userImages,
     );
 
     setState(() {
@@ -2141,7 +2202,10 @@ class _SalesDataGridWidgetState extends State<SalesDataGridWidget> {
         'partner_id': opportunity['partner_id'] != null && opportunity['partner_id'] is List
             ? opportunity['partner_id'][1].toString()
             : '',
-        'imagePath': 'assets/user1.png',
+        'activity_user_id': opportunity['activity_user_id'] != null &&
+            opportunity['activity_user_id'] is List
+            ? opportunity['activity_user_id'][0] as int
+            : null,
       };
 
       for (var type in widget.activityTypes) {
@@ -2165,11 +2229,10 @@ class _SalesDataGridWidgetState extends State<SalesDataGridWidget> {
   Widget build(BuildContext context) {
     if (processing) {
       processData();
-      processing = true;
+      processing = false;
     }
-    if(isLoading)
-      {
-      return  Center(child: CircularProgressIndicator());
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
     }
 
     return SfDataGrid(
@@ -2219,11 +2282,14 @@ class _SalesDataGridWidgetState extends State<SalesDataGridWidget> {
   }
 }
 
+
 class SalesDataSource extends DataGridSource {
   List<DataGridRow> dataGridRows = [];
   final List<String> activityTypes;
+  final Map<int, Uint8List> userImages;
 
-  SalesDataSource(List<Map<String, dynamic>> salesList, this.activityTypes) {
+  SalesDataSource(List<Map<String, dynamic>> salesList, this.activityTypes,
+      this.userImages) {
     dataGridRows = salesList.map<DataGridRow>((salesData) {
       List<DataGridCell> cells = [];
 
@@ -2232,12 +2298,13 @@ class SalesDataSource extends DataGridSource {
         value: salesData,
       ));
 
-
       for (var activityType in activityTypes) {
         cells.add(
           DataGridCell<String>(
             columnName: activityType,
-            value: salesData.containsKey(activityType) ? salesData[activityType] : '',
+            value: salesData.containsKey(activityType)
+                ? salesData[activityType]
+                : '',
           ),
         );
       }
@@ -2255,10 +2322,16 @@ class SalesDataSource extends DataGridSource {
       cells: row.getCells().map<Widget>((dataCell) {
         if (dataCell.columnName == 'opportunity') {
           final salesData = dataCell.value as Map<String, dynamic>;
-          return buildOpportunityCell(salesData);
+          int? userId = salesData['activity_user_id'];
+          Uint8List? userImage = userId != null
+              ? userImages[userId]
+              : null;
+          return buildOpportunityCell(salesData, userImage);
         }
+
         String activityDate = dataCell.value.toString();
-        DateTime? parsedDate = activityDate.isNotEmpty ? DateTime.tryParse(activityDate) : null;
+        DateTime? parsedDate = activityDate.isNotEmpty ? DateTime.tryParse(
+            activityDate) : null;
         DateTime today = DateTime.now();
 
         Color cellColor = Colors.transparent;
@@ -2269,25 +2342,94 @@ class SalesDataSource extends DataGridSource {
             cellColor = Colors.green;
           }
         }
+
+        final opportunityCell = row.getCells().firstWhere((cell) =>
+        cell.columnName == 'opportunity');
+        final salesData = opportunityCell.value as Map<String, dynamic>;
+        int? userId = salesData['activity_user_id'];
+        Uint8List? userImage = userId != null ? userImages[userId] : null;
+        bool hasActivity = parsedDate != null && userImage != null;
+
         return Container(
           alignment: Alignment.centerLeft,
           padding: const EdgeInsets.all(8),
           color: cellColor,
-          child: Text(
-            dataCell.value.toString(),
-            style: const TextStyle(fontSize: 14, color: Colors.black),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                dataCell.value.toString(),
+                style: const TextStyle(fontSize: 14, color: Colors.black),
+              ),
+              if (hasActivity) ...[
+                const SizedBox(height: 4),
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(3),
+                    image: DecorationImage(
+                      image: MemoryImage(userImage!),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         );
       }).toList(),
     );
   }
 
-  Widget buildOpportunityCell(Map<String, dynamic> salesData) {
+
+
+  Widget buildOpportunityCell(Map<String, dynamic> salesData,
+      Uint8List? userImage) {
     return Row(
       children: [
-        CircleAvatar(
-          radius: 18,
-          backgroundImage: AssetImage(salesData['imagePath']),
+        const SizedBox(width: 5),
+        userImage != null
+            ? Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+            image: DecorationImage(
+              image: MemoryImage(userImage),
+              fit: BoxFit.cover,
+            ),
+          ),
+        )
+            : Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6),
+            gradient: LinearGradient(
+              colors: [
+                Colors.blue.shade700,
+                Colors.blue.shade500,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.blue.withOpacity(0.3),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: const Icon(Icons.person, size: 18, color: Colors.white),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -2299,14 +2441,15 @@ class SalesDataSource extends DataGridSource {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    salesData['name'],
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                    salesData['name'] ?? 'No Name',
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w500),
                     overflow: TextOverflow.ellipsis,
                   ),
                   Padding(
                     padding: const EdgeInsets.only(right: 7),
                     child: Text(
-                      salesData['expected_revenue'],
+                      salesData['expected_revenue'] ?? '\$0',
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -2320,7 +2463,7 @@ class SalesDataSource extends DataGridSource {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    salesData['partner_id'],
+                    salesData['partner_id'] ?? '',
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -2332,7 +2475,7 @@ class SalesDataSource extends DataGridSource {
                       color: Colors.grey.shade300,
                       child: Center(
                         child: Text(
-                          salesData['stage_id'],
+                          salesData['stage_id'] ?? 'New',
                           style: const TextStyle(
                             fontSize: 12,
                             color: Color(0xFF9EA700),
@@ -2351,7 +2494,8 @@ class SalesDataSource extends DataGridSource {
       ],
     );
   }
-  }
+}
+
 
 class AppointmentDataSource extends CalendarDataSource {
   AppointmentDataSource(List<Appointment> source) {
