@@ -36,12 +36,51 @@ class _MypipelineState extends State<Mypipeline> {
   String selectedFilter = "count";
   String showVariable = "count";
   String? selectedReport = "Pipeline";
+
+  List<dynamic> filterList = [];
+  String filterName = '';
+
+  Set<String> selectedFilters = {};
+  int? currentUserId;
+
+
+
+  Map<String, Map<String, dynamic>> getFilters() {
+    return {
+      'my_pipeline': {
+        'name': 'My Pipeline',
+        'domain': [
+          ['user_id', '=', currentUserId]
+        ]
+      },
+      'unassigned': {
+        'name': 'Unassigned',
+        'domain': [
+          ['user_id', '=', false]
+        ]
+      },
+      'my_assigned_partners': {
+        'name': 'My Assigned Partners',
+        'domain': [
+          ["partner_assigned_id.user_id", "=", currentUserId]
+        ]
+      },
+      'open_opportunties': {
+        'name': 'Open Opportunties',
+        'domain': [
+          ["&", "&", ("probability", "<", 100), ("type", "=", "opportunity"), ("active", "=", true)]
+        ]
+      },
+    };
+  }
+
   Future<void> initializeOdooClient() async {
     final prefs = await SharedPreferences.getInstance();
     final baseUrl = prefs.getString("urldata") ?? "";
     final dbName = prefs.getString("selectedDatabase") ?? "";
     final userLogin = prefs.getString("userLogin") ?? "";
     final userPassword = prefs.getString("password") ?? "";
+    currentUserId = prefs.getInt("userId");
 
     if (baseUrl.isNotEmpty &&
         dbName.isNotEmpty &&
@@ -58,6 +97,7 @@ class _MypipelineState extends State<Mypipeline> {
         await iconSelectedView();
         await fetchData();
         await buildChart();
+        await fetchFilteredData();
         await act();
 
       } catch (e) {
@@ -66,6 +106,103 @@ class _MypipelineState extends State<Mypipeline> {
     }
     setState(() => isLoading = false);
   }
+
+
+  void showFilterDialog(BuildContext context) {
+  final currentFilters = getFilters();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("Select Filters"),
+          content: StatefulBuilder(
+            builder: (context, setState) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: currentFilters.entries.map((entry) {
+                  return CheckboxListTile(
+                    title: Text(entry.value['name']),
+                    value: selectedFilters.contains(entry.key),
+                    onChanged: (bool? value) {
+                      setState(() {
+                        if (value == true) {
+                          selectedFilters.add(entry.key);
+                        } else {
+                          selectedFilters.remove(entry.key);
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                fetchFilteredData();
+              },
+              child: Text("Apply"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  Future<void> fetchFilteredData() async {
+    if (client == null) return;
+
+    final currentFilters = getFilters();
+    List<dynamic> finalFilter = [];
+
+
+    if (selectedFilters.isNotEmpty) {
+      finalFilter.add("|");
+      for (var filter in selectedFilters) {
+        if (currentFilters.containsKey(filter)) {
+          finalFilter.addAll(currentFilters[filter]!['domain']);
+        }
+      }
+    } else {
+      finalFilter = [["user_id", "=", currentUserId]];
+    }
+
+    try {
+      final response = await client!.callKw({
+        'model': 'crm.lead',
+        'method': 'search_read',
+        'args': [finalFilter],
+        'kwargs': {
+          'fields': [
+            'name',
+            'expected_revenue',
+            'stage_id',
+            'partner_id',
+            'tag_ids',
+            'priority',
+            'activity_state',
+            'activity_type_id',
+            'email_from',
+            'partner_assigned_id'
+          ],
+        },
+      });
+
+      if (response != null) {
+        setState(() {
+          leadsList = List<Map<String, dynamic>>.from(response);
+          opportunitiesList = leadsList
+              .where((lead) => lead['type'] == "opportunity")
+              .toList();
+        });
+        await pipe();
+      }
+    } catch (e) {
+      log("Error fetching filtered data: $e");
+    }
+  }
+
 
   Future<Map<int, String>> tag() async {
     Map<int, String> tagMap = {};
@@ -2021,7 +2158,9 @@ class _MypipelineState extends State<Mypipeline> {
           SizedBox(
             width: 4,
           ),
-          IconButton(onPressed: () {}, icon: Icon(Icons.filter_list_sharp)),
+          IconButton(onPressed: () {
+            showFilterDialog(context);
+          }, icon: Icon(Icons.filter_list_sharp)),
           SizedBox(
             width: 4,
           ),
@@ -2086,11 +2225,69 @@ class SalesDataGridWidget extends StatefulWidget {
   _SalesDataGridWidgetState createState() => _SalesDataGridWidgetState();
 }
 
+
 class _SalesDataGridWidgetState extends State<SalesDataGridWidget> {
   late SalesDataSource salesDataSource;
   bool isLoading = true;
   bool processing = false;
   Map<int, Uint8List> userImages = {};
+
+  Future<int?> getCurrentUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('user_id');
+  }
+
+
+  void processData() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    List<Map<String, dynamic>> filteredOpportunities = widget.opportunitiesList
+        .where((opportunity) =>
+    opportunity['activity_type_id'] != null &&
+        opportunity['activity_type_id'] is List &&
+        opportunity['activity_type_id'].length > 1)
+        .toList();
+
+    final currentUserId = await getCurrentUserId();
+    if (currentUserId != null && !userImages.containsKey(currentUserId)) {
+      try {
+        final response = await client?.callKw({
+          'model': 'res.users',
+          'method': 'search_read',
+          'args': [
+            [
+              ['id', '=', currentUserId],
+            ]
+          ],
+          'kwargs': {
+            'fields': ['image_1920'],
+          },
+        });
+
+        if (response != null && response is List && response.isNotEmpty) {
+          final userData = response[0];
+          var imageData = userData['image_1920'];
+          if (imageData != null && imageData is String) {
+            userImages[currentUserId] = base64Decode(imageData);
+          }
+        }
+      } catch (e) {
+        print("Error fetching current user image: $e");
+      }
+    }
+
+    salesDataSource = SalesDataSource(
+      processOpportunities(filteredOpportunities),
+      widget.activityTypes,
+      userImages,
+    );
+
+    setState(() {
+      isLoading = false;
+    });
+  }
 
   @override
   void initState() {
@@ -2143,7 +2340,7 @@ class _SalesDataGridWidgetState extends State<SalesDataGridWidget> {
           'fields': ['image_1920', 'name'],
         },
       });
-
+      print('opppoo$response');
       if (response == null || response.isEmpty || response is! List) {
         print('No user data received or invalid format');
         setState(() => isLoading = false);
@@ -2166,28 +2363,28 @@ class _SalesDataGridWidgetState extends State<SalesDataGridWidget> {
     }
   }
 
-  void processData() {
-    setState(() {
-      isLoading = true;
-    });
-
-    List<Map<String, dynamic>> filteredOpportunities = widget.opportunitiesList
-        .where((opportunity) =>
-    opportunity['activity_type_id'] != null &&
-        opportunity['activity_type_id'] is List &&
-        opportunity['activity_type_id'].length > 1)
-        .toList();
-
-    salesDataSource = SalesDataSource(
-      processOpportunities(filteredOpportunities),
-      widget.activityTypes,
-      userImages,
-    );
-
-    setState(() {
-      isLoading = false;
-    });
-  }
+  // void processData() {
+  //   setState(() {
+  //     isLoading = true;
+  //   });
+  //
+  //   List<Map<String, dynamic>> filteredOpportunities = widget.opportunitiesList
+  //       .where((opportunity) =>
+  //   opportunity['activity_type_id'] != null &&
+  //       opportunity['activity_type_id'] is List &&
+  //       opportunity['activity_type_id'].length > 1)
+  //       .toList();
+  //
+  //   salesDataSource = SalesDataSource(
+  //     processOpportunities(filteredOpportunities),
+  //     widget.activityTypes,
+  //     userImages,
+  //   );
+  //
+  //   setState(() {
+  //     isLoading = false;
+  //   });
+  // }
 
   List<Map<String, dynamic>> processOpportunities(List<Map<String, dynamic>> opportunities) {
     return opportunities.map((opportunity) {
@@ -2287,9 +2484,13 @@ class SalesDataSource extends DataGridSource {
   List<DataGridRow> dataGridRows = [];
   final List<String> activityTypes;
   final Map<int, Uint8List> userImages;
+  Uint8List? currentUserImage;
 
   SalesDataSource(List<Map<String, dynamic>> salesList, this.activityTypes,
       this.userImages) {
+    currentUserImage = null;
+    _getCurrentUserImage();
+
     dataGridRows = salesList.map<DataGridRow>((salesData) {
       List<DataGridCell> cells = [];
 
@@ -2313,6 +2514,40 @@ class SalesDataSource extends DataGridSource {
     }).toList();
   }
 
+  Future<void> _getCurrentUserImage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final currentUserId = prefs.getInt('userId');
+
+      if (currentUserId != null && userImages.containsKey(currentUserId)) {
+        currentUserImage = userImages[currentUserId];
+      } else if (currentUserId != null) {
+        final response = await client?.callKw({
+          'model': 'res.users',
+          'method': 'search_read',
+          'args': [
+            [
+              ['id', '=', currentUserId],
+            ]
+          ],
+          'kwargs': {
+            'fields': ['image_1920'],
+          },
+        });
+
+        if (response != null && response is List && response.isNotEmpty) {
+          final userData = response[0];
+          var imageData = userData['image_1920'];
+          if (imageData != null && imageData is String) {
+            currentUserImage = base64Decode(imageData);
+          }
+        }
+      }
+    } catch (e) {
+      print("Error fetching current user image: $e");
+    }
+  }
+
   @override
   List<DataGridRow> get rows => dataGridRows;
 
@@ -2322,11 +2557,7 @@ class SalesDataSource extends DataGridSource {
       cells: row.getCells().map<Widget>((dataCell) {
         if (dataCell.columnName == 'opportunity') {
           final salesData = dataCell.value as Map<String, dynamic>;
-          int? userId = salesData['activity_user_id'];
-          Uint8List? userImage = userId != null
-              ? userImages[userId]
-              : null;
-          return buildOpportunityCell(salesData, userImage);
+          return OpportunityColumn(salesData, currentUserImage);
         }
 
         String activityDate = dataCell.value.toString();
@@ -2382,9 +2613,7 @@ class SalesDataSource extends DataGridSource {
     );
   }
 
-
-
-  Widget buildOpportunityCell(Map<String, dynamic> salesData,
+  Widget OpportunityColumn(Map<String, dynamic> salesData,
       Uint8List? userImage) {
     return Row(
       children: [
