@@ -12,6 +12,8 @@ import 'package:shimmer/shimmer.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'dart:typed_data';
 
+import '../Sales/myActivities.dart';
+
 class Demo extends StatefulWidget {
   const Demo({super.key});
 
@@ -1179,6 +1181,9 @@ class _DemoState extends State<Demo> {
                           onTap: () {
                             if(item =="My Pipeline"){
                               Navigator.push(context, MaterialPageRoute(builder: (context)=>Mypipeline()));
+                            }
+                            else if(item == 'My Activities'){
+                              Navigator.push(context, MaterialPageRoute(builder: (context)=>Myactivity()));
                             }
                           },
                           shape: RoundedRectangleBorder(

@@ -42,7 +42,8 @@ class _MypipelineState extends State<Mypipeline> {
 
   Set<String> selectedFilters = {};
   int? currentUserId;
-
+  String? selectedCreationDate;
+  String? selectedClosedDate;
 
 
   Map<String, Map<String, dynamic>> getFilters() {
@@ -68,8 +69,43 @@ class _MypipelineState extends State<Mypipeline> {
       'open_opportunties': {
         'name': 'Open Opportunties',
         'domain': [
-          ["&", "&", ("probability", "<", 100), ("type", "=", "opportunity"), ("active", "=", true)]
+          '&',
+          '&',
+          ['probability', '<', 100],
+          ['type', '=', 'opportunity'],
+          ['active', '!=', false]
         ]
+      },
+      'won': {
+        'name': 'Won',
+        'domain': [
+          '&',
+          ['active', '!=', false],
+          ['stage_id.is_won', '=', true]
+        ]
+      },
+      'lost': {
+        'name': 'Lost',
+        'domain': [
+          '&',
+          ['active', '=', false],
+          ['probability', '=', 0]
+        ]
+      },
+      'archived': {
+        'name': 'Archived',
+        'domain': [
+          '&',
+          ['active', '=', false],
+        ]
+      },
+      'created_on': {
+        'name': 'Creation Date',
+        'domain': [],
+      },
+      'closed_on': {
+        'name': 'Closed Date',
+        'domain': [],
       },
     };
   }
@@ -89,7 +125,7 @@ class _MypipelineState extends State<Mypipeline> {
       client = OdooClient(baseUrl);
       try {
         final auth =
-            await client!.authenticate(dbName, userLogin, userPassword);
+        await client!.authenticate(dbName, userLogin, userPassword);
         print("Odoo Authenticated: $auth");
         await userImage();
         await pipe();
@@ -99,7 +135,6 @@ class _MypipelineState extends State<Mypipeline> {
         await buildChart();
         await fetchFilteredData();
         await act();
-
       } catch (e) {
         print("Odoo Authentication Failed: $e");
       }
@@ -109,97 +144,343 @@ class _MypipelineState extends State<Mypipeline> {
 
 
   void showFilterDialog(BuildContext context) {
-  final currentFilters = getFilters();
+    final currentFilters = getFilters();
+    Set<String> tempSelectedFilters = Set.from(selectedFilters);
+    String? tempSelectedCreationDate = selectedCreationDate;
+    String? tempSelectedClosedDate = selectedClosedDate;
+
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text("Select Filters"),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: Colors.white,
+          title: Text(
+            "Select Filters",
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.blueGrey[800],
+            ),
+          ),
           content: StatefulBuilder(
-            builder: (context, setState) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: currentFilters.entries.map((entry) {
-                  return CheckboxListTile(
-                    title: Text(entry.value['name']),
-                    value: selectedFilters.contains(entry.key),
-                    onChanged: (bool? value) {
-                      setState(() {
-                        if (value == true) {
-                          selectedFilters.add(entry.key);
-                        } else {
-                          selectedFilters.remove(entry.key);
-                        }
-                      });
-                    },
+            builder: (context, setDialogState) {
+              return FutureBuilder<Map<String, List<String>>>(
+                future: fetchAllDates(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return SizedBox(
+                      height: 100,
+                      child: Center(child: CircularProgressIndicator(color: Colors.blue)),
+                    );
+                  }
+
+                  List<String> creationDates = snapshot.data!['creationDates']!;
+                  List<String> closedDates = snapshot.data!['closedDates']!;
+
+                  if (!creationDates.contains("None")) {
+                    creationDates.insert(0, "None");
+                  }
+                  if (!closedDates.contains("None")) {
+                    closedDates.insert(0, "None");
+                  }
+
+                  return Container(
+                    width: double.maxFinite,
+                    constraints: BoxConstraints(maxHeight: 400),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (currentFilters.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Text(
+                                "No filters available",
+                                style: TextStyle(color: Colors.grey[600]),
+                              ),
+                            ),
+                          ...currentFilters.entries.map((entry) {
+                            if (entry.key == 'created_on') {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 12.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      entry.value['name'],
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.blueGrey[700],
+                                      ),
+                                    ),
+                                    SizedBox(height: 8),
+                                    Container(
+                                      padding: EdgeInsets.symmetric(horizontal: 12),
+                                      decoration: BoxDecoration(
+                                        border: Border.all(color: Colors.grey[300]!),
+                                        borderRadius: BorderRadius.circular(8),
+                                        color: Colors.grey[50],
+                                      ),
+                                      child: DropdownButton<String>(
+                                        value: tempSelectedCreationDate ?? "None",
+                                        hint: Text("Select a month"),
+                                        isExpanded: true,
+                                        underline: SizedBox(),
+                                        items: creationDates.map((String date) {
+                                          return DropdownMenuItem<String>(
+                                            value: date,
+                                            child: Text(date),
+                                          );
+                                        }).toList(),
+                                        onChanged: (String? newValue) {
+                                          setDialogState(() {
+                                            if (newValue == "None") {
+                                              tempSelectedCreationDate = null;
+                                              tempSelectedFilters.remove('created_on');
+                                            } else {
+                                              tempSelectedCreationDate = newValue;
+                                              tempSelectedFilters.add('created_on');
+                                            }
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            } else if (entry.key == 'closed_on') {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 12.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      entry.value['name'],
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.blueGrey[700],
+                                      ),
+                                    ),
+                                    SizedBox(height: 8),
+                                    Container(
+                                      padding: EdgeInsets.symmetric(horizontal: 12),
+                                      decoration: BoxDecoration(
+                                        border: Border.all(color: Colors.grey[300]!),
+                                        borderRadius: BorderRadius.circular(8),
+                                        color: Colors.grey[50],
+                                      ),
+                                      child: DropdownButton<String>(
+                                        value: tempSelectedClosedDate ?? "None",
+                                        hint: Text("Select a month"),
+                                        isExpanded: true,
+                                        underline: SizedBox(),
+                                        items: closedDates.map((String date) {
+                                          return DropdownMenuItem<String>(
+                                            value: date,
+                                            child: Text(date),
+                                          );
+                                        }).toList(),
+                                        onChanged: (String? newValue) {
+                                          setDialogState(() {
+                                            if (newValue == "None") {
+                                              tempSelectedClosedDate = null;
+                                              tempSelectedFilters.remove('closed_on');
+                                            } else {
+                                              tempSelectedClosedDate = newValue;
+                                              tempSelectedFilters.add('closed_on');
+                                            }
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+                            return Card(
+                              elevation: 0,
+                              color: Colors.grey[50],
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: CheckboxListTile(
+                                title: Text(
+                                  entry.value['name'],
+                                  style: TextStyle(color: Colors.blueGrey[800]),
+                                ),
+                                value: tempSelectedFilters.contains(entry.key),
+                                activeColor: Colors.blue,
+                                onChanged: (bool? value) {
+                                  setDialogState(() {
+                                    if (value == true) {
+                                      tempSelectedFilters.add(entry.key);
+                                    } else {
+                                      tempSelectedFilters.remove(entry.key);
+                                    }
+                                  });
+                                },
+                              ),
+                            );
+                          }).toList(),
+                        ],
+                      ),
+                    ),
                   );
-                }).toList(),
+                },
               );
             },
           ),
+          actionsPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           actions: [
             TextButton(
+              onPressed: () => Navigator.pop(context),
+              style: TextButton.styleFrom(foregroundColor: Colors.grey[600]),
+              child: Text("Cancel"),
+            ),
+            ElevatedButton(
               onPressed: () {
+                setState(() {
+                  selectedFilters = tempSelectedFilters;
+                  selectedCreationDate = tempSelectedCreationDate;
+                  selectedClosedDate = tempSelectedClosedDate;
+                });
                 Navigator.pop(context);
                 fetchFilteredData();
               },
-              child: Text("Apply"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF9EA700) ,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text("Apply", style: TextStyle(color: Colors.white)),
             ),
           ],
         );
       },
     );
   }
-  Future<void> fetchFilteredData() async {
-    if (client == null) return;
 
-    final currentFilters = getFilters();
-    List<dynamic> finalFilter = [];
+  Future<Map<String, List<String>>> fetchAllDates() async {
+    return {
+      'creationDates': await fetchCreationDates(),
+      'closedDates': await fetchClosedDates(),
+    };
+  }
 
-
-    if (selectedFilters.isNotEmpty) {
-      finalFilter.add("|");
-      for (var filter in selectedFilters) {
-        if (currentFilters.containsKey(filter)) {
-          finalFilter.addAll(currentFilters[filter]!['domain']);
-        }
-      }
-    } else {
-      finalFilter = [["user_id", "=", currentUserId]];
-    }
+  Future<List<String>> fetchClosedDates() async {
+    if (client == null) return [];
 
     try {
       final response = await client!.callKw({
         'model': 'crm.lead',
         'method': 'search_read',
-        'args': [finalFilter],
+        'args': [
+          []
+        ],
         'kwargs': {
-          'fields': [
-            'name',
-            'expected_revenue',
-            'stage_id',
-            'partner_id',
-            'tag_ids',
-            'priority',
-            'activity_state',
-            'activity_type_id',
-            'email_from',
-            'partner_assigned_id'
-          ],
+          'fields': ['date_closed'],
         },
       });
 
-      if (response != null) {
-        setState(() {
-          leadsList = List<Map<String, dynamic>>.from(response);
-          opportunitiesList = leadsList
-              .where((lead) => lead['type'] == "opportunity")
-              .toList();
-        });
-        await pipe();
+      print("Closed dates response: $response");
+
+      if (response == null || response.isEmpty) return [];
+
+      Set<String> uniqueDates = {};
+      for (var lead in response) {
+        if (lead['date_closed'] != null && lead['date_closed'] != false && lead['date_closed'] is String) {
+          print("Found date_closed value: ${lead['date_closed']}");
+          try {
+            DateTime date = DateTime.parse(lead['date_closed']);
+            String formattedDate = DateFormat('MMMM yyyy').format(date);
+            uniqueDates.add(formattedDate);
+          } catch (e) {
+            print("Error parsing date: ${lead['date_closed']} - $e");
+          }
+        }
       }
+
+      print("Unique closed dates: $uniqueDates");
+
+      if (uniqueDates.isEmpty) {
+        return [];
+      }
+
+      List<String> sortedDates = uniqueDates.toList()
+        ..sort((a, b) {
+          DateTime dateA = DateFormat('MMMM yyyy').parse(a);
+          DateTime dateB = DateFormat('MMMM yyyy').parse(b);
+          return dateA.compareTo(dateB);
+        });
+
+      return sortedDates;
+    } catch (e) {
+      print("Failed to fetch closed dates: $e");
+      return [];
+    }
+  }
+
+  Future<List<String>> fetchCreationDates() async {
+    if (client == null) return [];
+
+    try {
+      final response = await client!.callKw({
+        'model': 'crm.lead',
+        'method': 'search_read',
+        'args': [
+          []
+        ],
+        'kwargs': {
+          'fields': ['create_date'],
+        },
+      });
+
+      if (response == null || response.isEmpty) return [];
+
+      Set<String> uniqueDates = {};
+      for (var lead in response) {
+        if (lead['create_date'] != null) {
+          DateTime date = DateTime.parse(lead['create_date']);
+          String formattedDate = DateFormat('MMMM yyyy').format(date);
+          uniqueDates.add(formattedDate);
+        }
+      }
+
+
+      List<String> sortedDates = uniqueDates.toList()
+        ..sort((a, b) {
+          DateTime dateA = DateFormat('MMMM yyyy').parse(a);
+          DateTime dateB = DateFormat('MMMM yyyy').parse(b);
+          return dateA.compareTo(dateB);
+        });
+
+      return sortedDates;
+    } catch (e) {
+      print("Failed to fetch creation dates: $e");
+      return [];
+    }
+  }
+
+  Future<void> fetchFilteredData() async {
+    if (client == null) return;
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      await pipe();
+      await buildChart();
+
     } catch (e) {
       log("Error fetching filtered data: $e");
+      setState(() {
+        isLoading = false;
+        showNoDataMessage = true;
+      });
     }
   }
 
@@ -304,15 +585,55 @@ class _MypipelineState extends State<Mypipeline> {
     print('iddddd$userid');
     try {
       Map<int, String> tagMap = await tag();
+      final currentFilters = getFilters();
+      List<dynamic> finalFilter = [];
+
+      if (selectedFilters.isNotEmpty) {
+        if (selectedFilters.length > 1) {
+          finalFilter.add("|");
+        }
+
+
+        for (var filter in selectedFilters) {
+          if (currentFilters.containsKey(filter)) {
+            if (filter == 'created_on' && selectedCreationDate != null) {
+              DateTime parsedDate = DateFormat('MMMM yyyy').parse(selectedCreationDate!);
+              String year = parsedDate.year.toString();
+              String month = (parsedDate.month).toString().padLeft(2, '0');
+              finalFilter.add(['create_date', '=like', '$year-$month%']);
+            } else if (filter == 'closed_on' && selectedClosedDate != null) {
+              DateTime parsedDate = DateFormat('MMMM yyyy').parse(selectedClosedDate!);
+              String year = parsedDate.year.toString();
+              String month = (parsedDate.month).toString().padLeft(2, '0');
+              finalFilter.add(['date_closed', '=like', '$year-$month%']);
+            } else {
+              finalFilter.addAll(currentFilters[filter]!['domain']);
+            }
+          }
+        }
+      } else {
+        finalFilter = [
+          ["type", "=", "opportunity"],
+          ["user_id", "=", userid]
+        ];
+      }
+
+      bool hasTypeFilter = false;
+      for (var filter in finalFilter) {
+        if (filter is List && filter.length >= 3 && filter[0] == "type" && filter[1] == "=") {
+          hasTypeFilter = true;
+          break;
+        }
+      }
+
+      if (!hasTypeFilter) {
+        finalFilter.add(["type", "=", "opportunity"]);
+      }
+      log('aasas${finalFilter.toString()}');
       final response = await client?.callKw({
         'model': 'crm.lead',
         'method': 'search_read',
-        'args': [
-          [
-            ["type", "=", "opportunity"],
-            ["user_id", "=", userid],
-          ]
-        ],
+        'args': [finalFilter],
         'kwargs': {
           'fields': [
             'name',
@@ -337,19 +658,23 @@ class _MypipelineState extends State<Mypipeline> {
             'recurring_revenue_prorated',
             'prorated_revenue',
             'recurring_revenue',
-            'activity_user_id'
+            'activity_user_id',
+            'date_closed',
+            'type',
+            'user_id'
           ],
         }
       });
       log('ressss$response');
       if (response != null) {
         leadsList = List<Map<String, dynamic>>.from(response);
-        // calendarOppurtunity(leadsList);
+        opportunitiesList = leadsList
+            .where((lead) => lead['type'] == "opportunity")
+            .toList();
+
         Map<String, List<Map<String, dynamic>>> groupedLeads = {};
-        opportunitiesList = List<Map<String, dynamic>>.from(response);
 
-
-        for (var lead in response) {
+        for (var lead in opportunitiesList) {
           String stage = lead['stage_id'][1] ?? '';
           List<String> tagNames = [];
           if (lead['tag_ids'] != null && lead['tag_ids'] is List) {
@@ -384,7 +709,7 @@ class _MypipelineState extends State<Mypipeline> {
                     lead['partner_id'] is List &&
                     lead['partner_id'].length > 1
                     ? lead['partner_id'][1]
-                    : "",
+                    : "None",
                 priority: (lead['priority'] is int)
                     ? lead['priority']
                     : int.tryParse(lead['priority'].toString()) ?? 0,
@@ -416,10 +741,10 @@ class _MypipelineState extends State<Mypipeline> {
           controller.addGroup(groupData);
         }
 
-        if (response != null && response is List) {
+        if (opportunitiesList.isNotEmpty) {
           Map<String, double> stageValues = {};
 
-          for (var item in response) {
+          for (var item in opportunitiesList) {
             if (item['stage_id'] != null &&
                 item['stage_id'] is List &&
                 item['stage_id'].length > 1) {
@@ -468,15 +793,11 @@ class _MypipelineState extends State<Mypipeline> {
                 value = 0;
               }
               stageValues[stageName] = value;
-              //print('adadadad${stageName}');
             }
           }
 
-
           setState(() {
             chartDatavalues.clear();
-
-            // print(selectedReport);
 
             Set<String> stageOrderSet = stageValues.keys.toSet();
             List<String> stageOrder = stageOrderSet.toList();
@@ -495,13 +816,22 @@ class _MypipelineState extends State<Mypipeline> {
 
             isLoading = false;
           });
+        } else {
+          setState(() {
+            chartDatavalues.clear();
+            showNoDataMessage = true;
+            isLoading = false;
+          });
         }
       }
     } catch (e) {
       print("Odoo Fetch Failed: $e");
+      setState(() {
+        isLoading = false;
+        showNoDataMessage = true;
+      });
     }
   }
-
   Widget ChartSelection() {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 15),
@@ -2362,30 +2692,6 @@ class _SalesDataGridWidgetState extends State<SalesDataGridWidget> {
       setState(() => isLoading = false);
     }
   }
-
-  // void processData() {
-  //   setState(() {
-  //     isLoading = true;
-  //   });
-  //
-  //   List<Map<String, dynamic>> filteredOpportunities = widget.opportunitiesList
-  //       .where((opportunity) =>
-  //   opportunity['activity_type_id'] != null &&
-  //       opportunity['activity_type_id'] is List &&
-  //       opportunity['activity_type_id'].length > 1)
-  //       .toList();
-  //
-  //   salesDataSource = SalesDataSource(
-  //     processOpportunities(filteredOpportunities),
-  //     widget.activityTypes,
-  //     userImages,
-  //   );
-  //
-  //   setState(() {
-  //     isLoading = false;
-  //   });
-  // }
-
   List<Map<String, dynamic>> processOpportunities(List<Map<String, dynamic>> opportunities) {
     return opportunities.map((opportunity) {
       Map<String, dynamic> salesData = {
