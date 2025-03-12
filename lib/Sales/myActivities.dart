@@ -2103,5 +2103,3 @@ class _MyactivityState extends State<Myactivity> {
     );
   }
 }
-
-// Reuse the remaining classes (SalesDataGridWidget, SalesDataSource, etc.) as they are from the original code

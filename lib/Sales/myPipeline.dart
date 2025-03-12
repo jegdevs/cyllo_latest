@@ -2477,6 +2477,14 @@ class _MypipelineState extends State<Mypipeline> {
     boardController = AppFlowyBoardScrollController();
   }
 
+
+  Future<void> getSession()async{
+    final prefs = await SharedPreferences.getInstance();
+    final session = prefs.getString("sessionId") ?? "";
+
+
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
