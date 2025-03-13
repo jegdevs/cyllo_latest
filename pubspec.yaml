@@ -49,6 +49,9 @@ dependencies:
   syncfusion_flutter_calendar: ^28.2.7
   syncfusion_flutter_datagrid: ^28.2.9
   flutter_expandable_fab: ^2.3.0
+  fl_chart: ^0.70.2
+  flutter_bloc: ^8.1.2
+  json_annotation: ^4.8.1
 
 dev_dependencies:
   flutter_test:

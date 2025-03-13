@@ -1576,14 +1576,86 @@ class _MyquotationsState extends State<Myquotations> {
       case 4:
         return buildChart();
       case 5:
-        return SalesDataGridWidget(
-          opportunitiesList: leadsList,
-          activityTypes: activityTypes,
-        );
+        return buildDataGrid();
       default:
         return Container();
     }
   }
+
+  Widget buildDataGrid() {
+    if (isLoading) {
+      return Center(
+        child: LoadingAnimationWidget.fourRotatingDots(
+          color: Color(0xFF9EA700),
+          size: 100,
+        ),
+      );
+    }
+
+    if (leadsList.isEmpty) {
+      return Center(
+        child: Text(
+          "No quotations found",
+          style: TextStyle(fontSize: 16, color: Colors.grey),
+        ),
+      );
+    }
+
+    List<Map<String, dynamic>> filteredQuotations = leadsList
+        .where((quotation) =>
+    quotation['activity_type_id'] != null &&
+        quotation['activity_type_id'] is List &&
+        quotation['activity_type_id'].length > 1)
+        .toList();
+
+    return SfDataGrid(
+      rowHeight: 60,
+      source: QuotationsDataSource(filteredQuotations, activityTypes, profileImage),
+      columnWidthMode: ColumnWidthMode.fill,
+      gridLinesVisibility: GridLinesVisibility.both,
+      headerGridLinesVisibility: GridLinesVisibility.both,
+      columns: getColumns(),
+    );
+  }
+
+  List<GridColumn> getColumns() {
+    List<GridColumn> columns = [
+      GridColumn(
+        columnName: 'quotation',
+        label: Container(
+          padding: const EdgeInsets.all(8),
+          alignment: Alignment.center,
+          child: const Text(
+            'Quotation',
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+          ),
+        ),
+        width: 300,
+      ),
+    ];
+
+    for (var activityType in activityTypes) {
+      columns.add(
+        GridColumn(
+          columnName: activityType,
+          label: Container(
+            padding: const EdgeInsets.all(8),
+            alignment: Alignment.center,
+            child: Text(
+              activityType,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          width: 120,
+        ),
+      );
+    }
+
+    return columns;
+  }
+
+
 
 
 
@@ -1681,4 +1753,197 @@ class ChartData {
 
   final String x;
   final double y;
+}
+
+class QuotationsDataSource extends DataGridSource {
+  List<DataGridRow> dataGridRows = [];
+  final List<String> activityTypes;
+  final Uint8List? currentUserImage;
+
+  QuotationsDataSource(
+      List<Map<String, dynamic>> quotationsList, this.activityTypes, this.currentUserImage) {
+    dataGridRows = quotationsList.map<DataGridRow>((quotation) {
+      Map<String, dynamic> quotationData = {
+        'name': quotation['name'] ?? 'None',
+        'amount_total': quotation['amount_total'] != null
+            ? '\$${quotation['amount_total'].toString()}'
+            : '\$0',
+        'state': quotation['state']?.toString().toLowerCase() ?? 'draft',
+        'partner_id': quotation['partner_id'] != null && quotation['partner_id'] is List
+            ? quotation['partner_id'][1].toString()
+            : 'None',
+      };
+
+      for (var type in activityTypes) {
+        quotationData[type] = '';
+      }
+      if (quotation['activity_type_id'] != null &&
+          quotation['activity_type_id'] is List &&
+          quotation['activity_type_id'].length > 1) {
+        String activityType = quotation['activity_type_id'][1].toString();
+        if (activityTypes.contains(activityType)) {
+          quotationData[activityType] = quotation['activity_date_deadline'] ?? '';
+        }
+      }
+
+      List<DataGridCell> cells = [];
+      cells.add(DataGridCell<Map<String, dynamic>>(
+        columnName: 'quotation',
+        value: quotationData,
+      ));
+
+      for (var activityType in activityTypes) {
+        cells.add(
+          DataGridCell<String>(
+            columnName: activityType,
+            value: quotationData[activityType],
+          ),
+        );
+      }
+
+      return DataGridRow(cells: cells);
+    }).toList();
+  }
+
+  @override
+  List<DataGridRow> get rows => dataGridRows;
+
+  @override
+  DataGridRowAdapter buildRow(DataGridRow row) {
+    return DataGridRowAdapter(
+      cells: row.getCells().map<Widget>((dataCell) {
+        if (dataCell.columnName == 'quotation') {
+          final quotationData = dataCell.value as Map<String, dynamic>;
+          return buildQuotationColumn(quotationData);
+        }
+
+        String activityDate = dataCell.value.toString();
+        DateTime? parsedDate = activityDate.isNotEmpty ? DateTime.tryParse(activityDate) : null;
+        DateTime today = DateTime.now();
+
+        Color cellColor = Colors.transparent;
+        if (parsedDate != null) {
+          cellColor = parsedDate.isBefore(today) ? Colors.red : Colors.green;
+        }
+
+        bool hasActivity = parsedDate != null && currentUserImage != null;
+
+        return Container(
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.all(8),
+          color: cellColor,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                dataCell.value.toString(),
+                style: const TextStyle(fontSize: 14, color: Colors.black),
+              ),
+              if (hasActivity) ...[
+                const SizedBox(height: 4),
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(3),
+                    image: DecorationImage(
+                      image: MemoryImage(currentUserImage!),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget buildQuotationColumn(Map<String, dynamic> quotationData) {
+    String status;
+    Color statusColor;
+    switch (quotationData['state']) {
+      case 'sent':
+        status = 'Quotation Sent';
+        statusColor = Colors.yellow.shade700;
+        break;
+      case 'sale':
+        status = 'Sales Order';
+        statusColor = Colors.green.shade600;
+        break;
+      case 'draft':
+      default:
+        status = 'Quotation';
+        statusColor = Colors.grey.shade600;
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      quotationData['name'],
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 7),
+                      child: Text(
+                        quotationData['amount_total'],
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      quotationData['partner_id'],
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8.0, top: 2.0),
+                      child: Container(
+                        height: 25,
+                        width: 80,
+                        color: Colors.grey.shade300,
+                        padding: const EdgeInsets.all(5),
+                        child: Center(
+                          child: Text(
+                            status,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: statusColor,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

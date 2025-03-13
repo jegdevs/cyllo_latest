@@ -2,8 +2,10 @@ import 'dart:convert';
 import 'dart:developer';
 import 'package:animated_custom_dropdown/custom_dropdown.dart';
 import 'package:cyllo_mobile/Profile/profilePage.dart';
+import 'package:cyllo_mobile/Sales/customers.dart';
 import 'package:cyllo_mobile/Sales/myPipeline.dart';
 import 'package:cyllo_mobile/Sales/myQuotations.dart';
+import 'package:cyllo_mobile/Sales/teams.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
@@ -1188,6 +1190,12 @@ class _DemoState extends State<Demo> {
                             }
                             else if(item == 'My Quotations'){
                               Navigator.push(context, MaterialPageRoute(builder: (context)=>Myquotations()));
+                            }
+                            else if(item == 'Teams'){
+                              Navigator.push(context, MaterialPageRoute(builder: (context)=>SalesTeam()));
+                            }
+                            else if(item == 'Customers'){
+                              Navigator.push(context, MaterialPageRoute(builder: (context)=>Customers()));
                             }
                           },
                           shape: RoundedRectangleBorder(
