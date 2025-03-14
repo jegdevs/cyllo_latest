@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_flutter_calendar/calendar.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datagrid/datagrid.dart';
+import 'Views/activityView.dart';
 import 'myPipeline.dart';
 
 class Myactivity extends StatefulWidget {
@@ -635,6 +636,7 @@ class _MyactivityState extends State<Myactivity> {
                 }
               }
               return LeadItem(
+                leadId:lead['id'],
                 name: lead['name'],
                 revenue: lead['expected_revenue'].toString(),
                 customerName: lead['partner_id'] != null &&
@@ -841,7 +843,7 @@ class _MyactivityState extends State<Myactivity> {
       padding: EdgeInsets.all(8),
       itemBuilder: (context, index) {
         final lead = activitiesList[index];
-
+        final leadId = lead['id'];
         final name = lead['name'] ?? '';
         final revenue = lead['expected_revenue']?.toString() ?? '';
         final customerName = lead['contact_name'] == false
@@ -885,367 +887,377 @@ class _MyactivityState extends State<Myactivity> {
             size: 100,
           ),
         )
-            : Card(
-          color: Colors.white,
-          elevation: 4,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12)),
-          margin: EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade200),
-              color: Color(0x69EA700),
-            ),
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: stageColor,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                                color: stageColor.withOpacity(0.3),
-                                blurRadius: 4,
-                                offset: Offset(0, 2))
-                          ],
-                        ),
-                      ),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          name,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey.shade800,
-                          ),
-                        ),
-                      ),
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: stageColor.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                              color: stageColor, width: 1.5),
-                        ),
-                        child: Text(
-                          stageName,
-                          style: TextStyle(
-                            color: stageColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  Divider(
-                      height: 24,
-                      thickness: 1,
-                      color: Colors.grey.shade200),
-                  Container(
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border:
-                      Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            : GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => Activityview(leadId: leadId),
+              ),
+            );
+          },
+              child: Card(
+                        color: Colors.white,
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+                        margin: EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                        child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+                color: Color(0x69EA700),
+              ),
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Expanded(
-                          flex: 2,
-                          child: Column(
-                            crossAxisAlignment:
-                            CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Contact',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              SizedBox(height: 6),
-                              Text(
-                                customerName,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 15,
-                                  color: Colors.grey.shade900,
-                                ),
-                              ),
-                              SizedBox(height: 4),
-                              email.isNotEmpty
-                                  ? Row(
-                                children: [
-                                  Icon(Icons.email_outlined,
-                                      size: 14,
-                                      color: Colors.blue),
-                                  SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(
-                                      email,
-                                      style: TextStyle(
-                                        color: Colors.blue,
-                                        fontSize: 13,
-                                      ),
-                                      overflow: TextOverflow
-                                          .ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              )
-                                  : SizedBox(),
-                              SizedBox(height: 16),
-                              Text(
-                                'Assigned User',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              SizedBox(height: 6),
-                              Row(
-                                mainAxisAlignment:
-                                MainAxisAlignment.start,
-                                children: [
-                                  profileImage != null
-                                      ? Container(
-                                    width: 32,
-                                    height: 32,
-                                    decoration: BoxDecoration(
-                                      borderRadius:
-                                      BorderRadius
-                                          .circular(6),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black
-                                              .withOpacity(
-                                              0.1),
-                                          blurRadius: 4,
-                                          offset:
-                                          Offset(0, 2),
-                                        ),
-                                      ],
-                                      image: DecorationImage(
-                                        image: MemoryImage(
-                                            profileImage!),
-                                        fit: BoxFit.cover,
-                                      ),
-                                    ),
-                                  )
-                                      : Container(
-                                    width: 32,
-                                    height: 32,
-                                    decoration: BoxDecoration(
-                                      borderRadius:
-                                      BorderRadius
-                                          .circular(6),
-                                      gradient:
-                                      LinearGradient(
-                                        colors: [
-                                          Colors
-                                              .blue.shade700,
-                                          Colors.blue.shade500
-                                        ],
-                                        begin:
-                                        Alignment.topLeft,
-                                        end: Alignment
-                                            .bottomRight,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.blue
-                                              .withOpacity(
-                                              0.3),
-                                          blurRadius: 4,
-                                          offset:
-                                          Offset(0, 2),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Icon(Icons.person,
-                                        size: 18,
-                                        color: Colors.white),
-                                  ),
-                                  SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      userName ?? 'Loading...',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
-                                        color: Colors.grey.shade800,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: stageColor,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                  color: stageColor.withOpacity(0.3),
+                                  blurRadius: 4,
+                                  offset: Offset(0, 2))
                             ],
                           ),
                         ),
-                        SizedBox(width: 16),
+                        SizedBox(width: 10),
                         Expanded(
-                          flex: 2,
-                          child: Column(
-                            crossAxisAlignment:
-                            CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Expected Revenue',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              SizedBox(height: 6),
-                              Container(
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Color(0xFF9EA700)
-                                      .withOpacity(0.15),
-                                  borderRadius:
-                                  BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  '\$${revenue}',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF9EA700),
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ),
-                              SizedBox(height: 16),
-                              Text(
-                                'Expected MRR',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              SizedBox(height: 6),
-                              Container(
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Color(0xFF9EA700)
-                                      .withOpacity(0.15),
-                                  borderRadius:
-                                  BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  '\$${mrr}',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF9EA700),
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ),
-                            ],
+                          child: Text(
+                            name,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey.shade800,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: stageColor.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                                color: stageColor, width: 1.5),
+                          ),
+                          child: Text(
+                            stageName,
+                            style: TextStyle(
+                              color: stageColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      ElevatedButton.icon(
-                        icon: Icon(
-                          Icons.email_outlined,
-                          size: 16,
-                          color: Colors.black,
-                        ),
-                        label: Text('Email'),
-                        onPressed: () {},
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                          Color(0xFF9EA700).withOpacity(0.15),
-                          foregroundColor: Color(0xFF9EA700),
-                          elevation: 0,
-                          padding: EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                    Divider(
+                        height: 24,
+                        thickness: 1,
+                        color: Colors.grey.shade200),
+                    Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border:
+                        Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: Column(
+                              crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Contact',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                SizedBox(height: 6),
+                                Text(
+                                  customerName,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 15,
+                                    color: Colors.grey.shade900,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                email.isNotEmpty
+                                    ? Row(
+                                  children: [
+                                    Icon(Icons.email_outlined,
+                                        size: 14,
+                                        color: Colors.blue),
+                                    SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        email,
+                                        style: TextStyle(
+                                          color: Colors.blue,
+                                          fontSize: 13,
+                                        ),
+                                        overflow: TextOverflow
+                                            .ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                                    : SizedBox(),
+                                SizedBox(height: 16),
+                                Text(
+                                  'Assigned User',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                SizedBox(height: 6),
+                                Row(
+                                  mainAxisAlignment:
+                                  MainAxisAlignment.start,
+                                  children: [
+                                    profileImage != null
+                                        ? Container(
+                                      width: 32,
+                                      height: 32,
+                                      decoration: BoxDecoration(
+                                        borderRadius:
+                                        BorderRadius
+                                            .circular(6),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black
+                                                .withOpacity(
+                                                0.1),
+                                            blurRadius: 4,
+                                            offset:
+                                            Offset(0, 2),
+                                          ),
+                                        ],
+                                        image: DecorationImage(
+                                          image: MemoryImage(
+                                              profileImage!),
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                    )
+                                        : Container(
+                                      width: 32,
+                                      height: 32,
+                                      decoration: BoxDecoration(
+                                        borderRadius:
+                                        BorderRadius
+                                            .circular(6),
+                                        gradient:
+                                        LinearGradient(
+                                          colors: [
+                                            Colors
+                                                .blue.shade700,
+                                            Colors.blue.shade500
+                                          ],
+                                          begin:
+                                          Alignment.topLeft,
+                                          end: Alignment
+                                              .bottomRight,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.blue
+                                                .withOpacity(
+                                                0.3),
+                                            blurRadius: 4,
+                                            offset:
+                                            Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Icon(Icons.person,
+                                          size: 18,
+                                          color: Colors.white),
+                                    ),
+                                    SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        userName ?? 'Loading...',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                          color: Colors.grey.shade800,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(width: 16),
+                          Expanded(
+                            flex: 2,
+                            child: Column(
+                              crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Expected Revenue',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                SizedBox(height: 6),
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Color(0xFF9EA700)
+                                        .withOpacity(0.15),
+                                    borderRadius:
+                                    BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    '\$${revenue}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF9EA700),
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(height: 16),
+                                Text(
+                                  'Expected MRR',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                SizedBox(height: 6),
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Color(0xFF9EA700)
+                                        .withOpacity(0.15),
+                                    borderRadius:
+                                    BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    '\$${mrr}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF9EA700),
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        ElevatedButton.icon(
+                          icon: Icon(
+                            Icons.email_outlined,
+                            size: 16,
+                            color: Colors.black,
+                          ),
+                          label: Text('Email'),
+                          onPressed: () {},
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                            Color(0xFF9EA700).withOpacity(0.15),
+                            foregroundColor: Color(0xFF9EA700),
+                            elevation: 0,
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                           ),
                         ),
-                      ),
-                      SizedBox(width: 12),
-                      ElevatedButton.icon(
-                        icon: Icon(
-                          Icons.message_outlined,
-                          size: 16,
-                          color: Colors.black,
-                        ),
-                        label: Text('Message'),
-                        onPressed: () {},
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                          Color(0xFF9EA700).withOpacity(0.15),
-                          foregroundColor: Color(0xFF9EA700),
-                          elevation: 0,
-                          padding: EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                        SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          icon: Icon(
+                            Icons.message_outlined,
+                            size: 16,
+                            color: Colors.black,
+                          ),
+                          label: Text('Message'),
+                          onPressed: () {},
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                            Color(0xFF9EA700).withOpacity(0.15),
+                            foregroundColor: Color(0xFF9EA700),
+                            elevation: 0,
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                           ),
                         ),
-                      ),
-                      SizedBox(width: 12),
-                      if (hasActivity)
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            icon: Icon(
-                              Icons.snooze_rounded,
-                              size: 16,
-                              color: Colors.black,
-                            ),
-                            label: Text(
-                              'Snooze 7d',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            onPressed: () {},
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                              Colors.grey.withOpacity(0.15),
-                              foregroundColor: Colors.grey,
-                              elevation: 0,
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 8),
-                              shape: RoundedRectangleBorder(
-                                borderRadius:
-                                BorderRadius.circular(8),
+                        SizedBox(width: 12),
+                        if (hasActivity)
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              icon: Icon(
+                                Icons.snooze_rounded,
+                                size: 16,
+                                color: Colors.black,
+                              ),
+                              label: Text(
+                                'Snooze 7d',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              onPressed: () {},
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                Colors.grey.withOpacity(0.15),
+                                foregroundColor: Colors.grey,
+                                elevation: 0,
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                  BorderRadius.circular(8),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ),
-        );
+                        ),
+                      ),
+            );
       },
     );
   }
@@ -1927,112 +1939,122 @@ class _MyactivityState extends State<Myactivity> {
 
   Widget customCard(AppFlowyGroupItem item) {
     if (item is LeadItem) {
-      return Row(
-        children: [
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.name,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  SizedBox(height: 8),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Color(0xFF9EA700).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      '\$${item.revenue}',
+      return InkWell(
+        onTap: (){
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => Activityview(leadId: item.leadId),
+            ),
+          );
+        },
+        child: Row(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.name,
                       style: TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF9EA700),
-                        fontWeight: FontWeight.w500,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  Text(
-                    item.customerName,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.black87,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  SizedBox(height: 6),
-                  Wrap(
-                    spacing: 5,
-                    children: item.tags.map((tag) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade100,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(tag, style: const TextStyle(fontSize: 12)),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      ...List.generate(
-                        3,
-                            (index) => Icon(
-                          index < item.priority ? Icons.star : Icons.star_border,
-                          color: Colors.amber,
-                          size: 18,
+                    SizedBox(height: 8),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Color(0xFF9EA700).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '\$${item.revenue}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF9EA700),
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      ActivityIconDesign(item.activityState, item.activityType),
-                      SizedBox(width: 58),
-                      if (item.imageData != null && item.imageData!.isNotEmpty)
-                        Container(
-                          width: 24,
-                          height: 24,
-                          margin: EdgeInsets.only(left: 8),
+                    ),
+                    Text(
+                      item.customerName,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.black87,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: 6),
+                    Wrap(
+                      spacing: 5,
+                      children: item.tags.map((tag) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(4),
-                            image: DecorationImage(
-                              image: MemoryImage(base64Decode(item.imageData!)),
-                              fit: BoxFit.cover,
+                            color: Colors.blue.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(tag, style: const TextStyle(fontSize: 12)),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        ...List.generate(
+                          3,
+                              (index) => Icon(
+                            index < item.priority ? Icons.star : Icons.star_border,
+                            color: Colors.amber,
+                            size: 18,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ActivityIconDesign(item.activityState, item.activityType),
+                        SizedBox(width: 58),
+                        if (item.imageData != null && item.imageData!.isNotEmpty)
+                          Container(
+                            width: 24,
+                            height: 24,
+                            margin: EdgeInsets.only(left: 8),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(4),
+                              image: DecorationImage(
+                                image: MemoryImage(base64Decode(item.imageData!)),
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          )
+                        else
+                          Container(
+                            width: 24,
+                            height: 24,
+                            margin: EdgeInsets.only(left: 55),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.grey.shade300,
+                            ),
+                            child: Icon(
+                              Icons.person,
+                              size: 16,
+                              color: Colors.grey.shade700,
                             ),
                           ),
-                        )
-                      else
-                        Container(
-                          width: 24,
-                          height: 24,
-                          margin: EdgeInsets.only(left: 55),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.grey.shade300,
-                          ),
-                          child: Icon(
-                            Icons.person,
-                            size: 16,
-                            color: Colors.grey.shade700,
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       );
     }
     throw UnimplementedError();

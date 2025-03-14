@@ -11,7 +11,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
 import 'dart:typed_data';
 
-import '../erroDesign.dart';
 
 class Editprofile extends StatefulWidget {
   const Editprofile({super.key});

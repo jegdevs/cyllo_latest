@@ -5,17 +5,18 @@ import 'package:odoo_rpc/odoo_rpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:typed_data';
 import 'package:intl/intl.dart';
-
-class LeadDetailPage extends StatefulWidget {
+class Activityview extends StatefulWidget {
   final dynamic leadId;
 
-  const LeadDetailPage({Key? key, required this.leadId}) : super(key: key);
+  const Activityview({Key? key, required this.leadId}) : super(key: key);
 
   @override
-  _LeadDetailPageState createState() => _LeadDetailPageState();
+  State<Activityview> createState() => _ActivityviewState();
 }
 
-class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProviderStateMixin {
+class _ActivityviewState extends State<Activityview> with SingleTickerProviderStateMixin {
+
+
   bool isLoading = true;
   bool isEditing = false;
   Map<String, dynamic> leadData = {};
@@ -147,7 +148,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
     final userLogin = prefs.getString("userLogin") ?? "";
     final userPassword = prefs.getString("password") ?? "";
 
-    if (baseUrl.isNotEmpty && dbName.isNotEmpty && userLogin.isNotEmpty && userPassword.isNotEmpty) {
+    if (baseUrl.isNotEmpty && dbName.isNotEmpty && userLogin.isNotEmpty &&
+        userPassword.isNotEmpty) {
       client = OdooClient(baseUrl);
       try {
         await client!.authenticate(dbName, userLogin, userPassword);
@@ -431,28 +433,59 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
         setState(() {
           leadData = response[0];
 
-          nameController.text = leadData['name'] is String ? leadData['name'] : '';
-          expectedRevenueController.text = leadData['expected_revenue'] != null ? leadData['expected_revenue'].toString() : '0.0';
-          probabilityController.text = leadData['probability'] != null ? leadData['probability'].toString() : '0.0';
-          recurringRevenueController.text = leadData['recurring_revenue_monthly'] != null ? leadData['recurring_revenue_monthly'].toString() : '0.0';
-          emailController.text = leadData['email_from'] is String ? leadData['email_from'] : '';
-          phoneController.text = leadData['phone'] is String ? leadData['phone'] : '';
-          descriptionController.text = leadData['description'] is String ? leadData['description'] : '';
-          dateDeadlineController.text = leadData['date_deadline'] is String ? leadData['date_deadline'] : '';
+          nameController.text =
+          leadData['name'] is String ? leadData['name'] : '';
+          expectedRevenueController.text =
+          leadData['expected_revenue'] != null ? leadData['expected_revenue']
+              .toString() : '0.0';
+          probabilityController.text = leadData['probability'] != null
+              ? leadData['probability'].toString()
+              : '0.0';
+          recurringRevenueController.text =
+          leadData['recurring_revenue_monthly'] != null
+              ? leadData['recurring_revenue_monthly'].toString()
+              : '0.0';
+          emailController.text =
+          leadData['email_from'] is String ? leadData['email_from'] : '';
+          phoneController.text =
+          leadData['phone'] is String ? leadData['phone'] : '';
+          descriptionController.text =
+          leadData['description'] is String ? leadData['description'] : '';
+          dateDeadlineController.text =
+          leadData['date_deadline'] is String ? leadData['date_deadline'] : '';
           priority = int.tryParse(leadData['priority']?.toString() ?? '0') ?? 0;
-          selectedTags = leadData['tag_ids'] is List ? List.from(leadData['tag_ids']) : [];
-          selectedSalesperson = leadData['user_id'] is List && leadData['user_id'].length > 1 ? leadData['user_id'][1].toString() : null;
-          selectedPartner = leadData['partner_id'] is List && leadData['partner_id'].length > 1 ? leadData['partner_id'][1].toString() : null;
+          selectedTags =
+          leadData['tag_ids'] is List ? List.from(leadData['tag_ids']) : [];
+          selectedSalesperson =
+          leadData['user_id'] is List && leadData['user_id'].length > 1
+              ? leadData['user_id'][1].toString()
+              : null;
+          selectedPartner =
+          leadData['partner_id'] is List && leadData['partner_id'].length > 1
+              ? leadData['partner_id'][1].toString()
+              : null;
 
-          contactNameController.text = leadData['contact_name'] is String ? leadData['contact_name'] : 'No data';
-          companyNameController.text = leadData['partner_name'] is String ? leadData['partner_name'] : 'No data';
+          contactNameController.text = leadData['contact_name'] is String
+              ? leadData['contact_name']
+              : 'No data';
+          companyNameController.text = leadData['partner_name'] is String
+              ? leadData['partner_name']
+              : 'No data';
 
-          String street = leadData['street'] is String ? leadData['street'] : '';
+          String street = leadData['street'] is String
+              ? leadData['street']
+              : '';
           String city = leadData['city'] is String ? leadData['city'] : '';
-          String state = leadData['state_id'] is List && leadData['state_id'].length > 1 ? leadData['state_id'][1].toString() : '';
+          String state = leadData['state_id'] is List &&
+              leadData['state_id'].length > 1 ? leadData['state_id'][1]
+              .toString() : '';
           String zip = leadData['zip'] is String ? leadData['zip'] : '';
-          String country = leadData['country_id'] is List && leadData['country_id'].length > 1 ? leadData['country_id'][1].toString() : '';
-          addressController.text = [street, city, state, zip, country].where((e) => e.isNotEmpty).join(', ');
+          String country = leadData['country_id'] is List &&
+              leadData['country_id'].length > 1 ? leadData['country_id'][1]
+              .toString() : '';
+          addressController.text = [street, city, state, zip, country]
+              .where((e) => e.isNotEmpty)
+              .join(', ');
 
           streetController.text = street;
           cityController.text = city;
@@ -462,22 +495,43 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
           selectedState = state.isNotEmpty ? state : null;
           selectedCountry = country.isNotEmpty ? country : null;
 
-          websiteController.text = leadData['website'] is String ? leadData['website'] : 'No data';
+          websiteController.text =
+          leadData['website'] is String ? leadData['website'] : 'No data';
 
-          selectedCampaign = leadData['campaign_id'] is List && leadData['campaign_id'].length > 1 ? leadData['campaign_id'][1].toString() : null;
-          selectedMedium = leadData['medium_id'] is List && leadData['medium_id'].length > 1 ? leadData['medium_id'][1].toString() : null;
-          selectedSource = leadData['source_id'] is List && leadData['source_id'].length > 1 ? leadData['source_id'][1].toString() : null;
+          selectedCampaign =
+          leadData['campaign_id'] is List && leadData['campaign_id'].length > 1
+              ? leadData['campaign_id'][1].toString()
+              : null;
+          selectedMedium =
+          leadData['medium_id'] is List && leadData['medium_id'].length > 1
+              ? leadData['medium_id'][1].toString()
+              : null;
+          selectedSource =
+          leadData['source_id'] is List && leadData['source_id'].length > 1
+              ? leadData['source_id'][1].toString()
+              : null;
           campaignController.text = selectedCampaign ?? 'No data';
           mediumController.text = selectedMedium ?? 'No data';
           sourceController.text = selectedSource ?? 'No data';
-          referredByController.text = leadData['referred'] is String ? leadData['referred'] : 'No data';
+          referredByController.text =
+          leadData['referred'] is String ? leadData['referred'] : 'No data';
 
-          selectedCompany = leadData['company_id'] is List && leadData['company_id'].length > 1 ? leadData['company_id'][1].toString() : null;
-          selectedSalesTeam = leadData['team_id'] is List && leadData['team_id'].length > 1 ? leadData['team_id'][1].toString() : null;
+          selectedCompany =
+          leadData['company_id'] is List && leadData['company_id'].length > 1
+              ? leadData['company_id'][1].toString()
+              : null;
+          selectedSalesTeam =
+          leadData['team_id'] is List && leadData['team_id'].length > 1
+              ? leadData['team_id'][1].toString()
+              : null;
           trackingCompanyController.text = selectedCompany ?? 'No data';
           salesTeamController.text = selectedSalesTeam ?? 'No data';
-          daysToAssignController.text = leadData['day_open'] != null ? leadData['day_open'].toString() : 'No data';
-          daysToCloseController.text = leadData['day_close'] != null ? leadData['day_close'].toString() : 'No data';
+          daysToAssignController.text = leadData['day_open'] != null
+              ? leadData['day_open'].toString()
+              : 'No data';
+          daysToCloseController.text = leadData['day_close'] != null
+              ? leadData['day_close'].toString()
+              : 'No data';
 
           isLoading = false;
         });
@@ -504,7 +558,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
           daysToAssignController.text = 'No data';
           daysToCloseController.text = 'No data';
         });
-        print('No data returned or invalid response format for leadId ${widget.leadId}');
+        print('No data returned or invalid response format for leadId ${widget
+            .leadId}');
       }
     } catch (e) {
       print("Error fetching lead details for leadId ${widget.leadId}: $e");
@@ -523,46 +578,57 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
     setState(() => isLoading = true);
     try {
       final salespersonId = selectedSalesperson != null
-          ? salesPersons.firstWhere((data) => data['name'] == selectedSalesperson, orElse: () => {'id': false})['id']
+          ? salesPersons.firstWhere((data) =>
+      data['name'] == selectedSalesperson, orElse: () => {'id': false})['id']
           : false;
 
       final partnerId = selectedPartner != null
-          ? partners.firstWhere((data) => data['name'] == selectedPartner, orElse: () => {'id': false})['id']
+          ? partners.firstWhere((data) => data['name'] == selectedPartner,
+          orElse: () => {'id': false})['id']
           : false;
 
-      final stateId = selectedState != null && states.any((s) => s['name'] == selectedState)
+      final stateId = selectedState != null &&
+          states.any((s) => s['name'] == selectedState)
           ? states.firstWhere((s) => s['name'] == selectedState)['id']
           : false;
 
-      final countryId = selectedCountry != null && countries.any((c) => c['name'] == selectedCountry)
+      final countryId = selectedCountry != null &&
+          countries.any((c) => c['name'] == selectedCountry)
           ? countries.firstWhere((c) => c['name'] == selectedCountry)['id']
           : false;
 
-      final campaignId = selectedCampaign != null && campaigns.any((c) => c['name'] == selectedCampaign)
+      final campaignId = selectedCampaign != null &&
+          campaigns.any((c) => c['name'] == selectedCampaign)
           ? campaigns.firstWhere((c) => c['name'] == selectedCampaign)['id']
           : false;
 
-      final mediumId = selectedMedium != null && mediums.any((m) => m['name'] == selectedMedium)
+      final mediumId = selectedMedium != null &&
+          mediums.any((m) => m['name'] == selectedMedium)
           ? mediums.firstWhere((m) => m['name'] == selectedMedium)['id']
           : false;
 
-      final sourceId = selectedSource != null && sources.any((s) => s['name'] == selectedSource)
+      final sourceId = selectedSource != null &&
+          sources.any((s) => s['name'] == selectedSource)
           ? sources.firstWhere((s) => s['name'] == selectedSource)['id']
           : false;
 
-      final companyId = selectedCompany != null && companies.any((c) => c['name'] == selectedCompany)
+      final companyId = selectedCompany != null &&
+          companies.any((c) => c['name'] == selectedCompany)
           ? companies.firstWhere((c) => c['name'] == selectedCompany)['id']
           : false;
 
-      final teamId = selectedSalesTeam != null && salesTeams.any((t) => t['name'] == selectedSalesTeam)
+      final teamId = selectedSalesTeam != null &&
+          salesTeams.any((t) => t['name'] == selectedSalesTeam)
           ? salesTeams.firstWhere((t) => t['name'] == selectedSalesTeam)['id']
           : false;
 
       final updatedData = {
         'name': nameController.text,
-        'expected_revenue': double.tryParse(expectedRevenueController.text) ?? 0.0,
+        'expected_revenue': double.tryParse(expectedRevenueController.text) ??
+            0.0,
         'probability': double.tryParse(probabilityController.text) ?? 0.0,
-        'recurring_revenue_monthly': double.tryParse(recurringRevenueController.text) ?? 0.0,
+        'recurring_revenue_monthly': double.tryParse(
+            recurringRevenueController.text) ?? 0.0,
         'email_from': emailController.text,
         'phone': phoneController.text,
         'description': descriptionController.text,
@@ -723,7 +789,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               Text(' + '),
-              Text('\$ ${leadData['recurring_revenue_monthly']?.toString() ?? '0.00'}'),
+              Text('\$ ${leadData['recurring_revenue_monthly']?.toString() ??
+                  '0.00'}'),
               Text('  at  '),
               Text(
                 '${leadData['probability']?.toString() ?? '0.00'} %',
@@ -749,7 +816,10 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
                     ? _buildPartnerDropdown()
                     : _buildInfoField(
                   'Customer',
-                  leadData['partner_id'] is List && leadData['partner_id'].length > 1 ? leadData['partner_id'][1].toString() : 'None',
+                  leadData['partner_id'] is List &&
+                      leadData['partner_id'].length > 1
+                      ? leadData['partner_id'][1].toString()
+                      : 'None',
                 ),
               ),
               Expanded(
@@ -757,7 +827,9 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
                     ? _buildSalespersonDropdown()
                     : _buildInfoField(
                   'Salesperson',
-                  leadData['user_id'] is List && leadData['user_id'].length > 1 ? leadData['user_id'][1].toString() : 'N/A',
+                  leadData['user_id'] is List && leadData['user_id'].length > 1
+                      ? leadData['user_id'][1].toString()
+                      : 'N/A',
                   hasAvatar: true,
                 ),
               ),
@@ -777,7 +849,9 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
               Expanded(
                 child: _buildInfoField(
                   'Expected Closing',
-                  leadData['date_deadline'] is String ? leadData['date_deadline'] : 'N/A',
+                  leadData['date_deadline'] is String
+                      ? leadData['date_deadline']
+                      : 'N/A',
                   textController: dateDeadlineController,
                   isDateField: true,
                 ),
@@ -825,7 +899,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
         children: [
           Row(
             children: [
-              Text('Customer', style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w500)),
+              Text('Customer', style: TextStyle(
+                  color: Colors.grey.shade700, fontWeight: FontWeight.w500)),
               SizedBox(width: 4),
               Icon(Icons.help_outline, size: 12, color: Colors.grey),
             ],
@@ -837,7 +912,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
               closedBorderRadius: BorderRadius.circular(12),
             ),
             hintText: 'Select Customer',
-            items: partners.map<String>((data) => data['name'].toString()).toList(),
+            items: partners.map<String>((data) => data['name'].toString())
+                .toList(),
             initialItem: selectedPartner,
             onChanged: (value) {
               setState(() => selectedPartner = value);
@@ -856,7 +932,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
         children: [
           Row(
             children: [
-              Text('Salesperson', style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w500)),
+              Text('Salesperson', style: TextStyle(
+                  color: Colors.grey.shade700, fontWeight: FontWeight.w500)),
               SizedBox(width: 4),
               Icon(Icons.help_outline, size: 12, color: Colors.grey),
             ],
@@ -868,7 +945,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
               closedBorderRadius: BorderRadius.circular(12),
             ),
             hintText: 'Select Salesperson',
-            items: salesPersons.map<String>((data) => data['name'].toString()).toList(),
+            items: salesPersons.map<String>((data) => data['name'].toString())
+                .toList(),
             initialItem: selectedSalesperson,
             onChanged: (value) {
               setState(() => selectedSalesperson = value);
@@ -892,7 +970,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
         children: [
           Row(
             children: [
-              Text(label, style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w500)),
+              Text(label, style: TextStyle(
+                  color: Colors.grey.shade700, fontWeight: FontWeight.w500)),
               SizedBox(width: 4),
               Icon(Icons.help_outline, size: 12, color: Colors.grey),
             ],
@@ -905,7 +984,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
               readOnly: true,
               decoration: InputDecoration(
                 border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.calendar_today, color: Color(0xFF9EA700)),
+                prefixIcon: Icon(
+                    Icons.calendar_today, color: Color(0xFF9EA700)),
                 filled: true,
                 fillColor: Color(0x1B9EA700),
               ),
@@ -917,7 +997,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
                   lastDate: DateTime(2101),
                 );
                 if (pickedDate != null) {
-                  String formattedDate = DateFormat('yyyy-MM-dd').format(pickedDate);
+                  String formattedDate = DateFormat('yyyy-MM-dd').format(
+                      pickedDate);
                   textController.text = formattedDate;
                 }
               },
@@ -947,7 +1028,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
                 filled: true,
                 fillColor: Color(0x1B9EA700),
               ),
-              keyboardType: label.contains('Revenue') || label.contains('Probability') || label.contains('Days')
+              keyboardType: label.contains('Revenue') ||
+                  label.contains('Probability') || label.contains('Days')
                   ? TextInputType.numberWithOptions(decimal: true)
                   : label.contains('Phone')
                   ? TextInputType.phone
@@ -955,70 +1037,84 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
                   ? TextInputType.url
                   : TextInputType.text,
             )
-          else if (hasStarRating)
-            Row(
-              children: List.generate(
-                3,
-                    (index) => GestureDetector(
-                  onTap: isEditing ? () => setState(() => priority = index + 1) : null,
-                  child: Icon(
-                    index < priority ? Icons.star : Icons.star_border,
-                    color: Colors.amber,
-                    size: 20,
-                  ),
-                ),
-              ),
-            )
-          else if (hasAvatar)
+          else
+            if (hasStarRating)
               Row(
-                children: [
-                  Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: profileImage == null ? Colors.blue : null,
-                      image: profileImage != null ? DecorationImage(image: MemoryImage(profileImage!), fit: BoxFit.cover) : null,
-                    ),
-                    child: profileImage == null
-                        ? Center(
-                      child: Text(
-                        value.isNotEmpty ? value[0] : '?',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                children: List.generate(
+                  3,
+                      (index) =>
+                      GestureDetector(
+                        onTap: isEditing ? () =>
+                            setState(() => priority = index + 1) : null,
+                        child: Icon(
+                          index < priority ? Icons.star : Icons.star_border,
+                          color: Colors.amber,
+                          size: 20,
+                        ),
                       ),
-                    )
-                        : null,
-                  ),
-                  SizedBox(width: 8),
-                  Text(value, style: TextStyle(fontWeight: FontWeight.w500)),
-                ],
+                ),
               )
-            else if (hasTags && leadData['tag_ids']?.isNotEmpty == true)
-                Wrap(
-                  spacing: 8,
-                  children: (leadData['tag_ids'] as List).map((tagId) {
-                    final tag = tagsList.firstWhere((t) => t['id'] == tagId, orElse: () => {});
-                    return Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            else
+              if (hasAvatar)
+                Row(
+                  children: [
+                    Container(
+                      width: 24,
+                      height: 24,
                       decoration: BoxDecoration(
-                        color: Colors.red.shade100,
-                        borderRadius: BorderRadius.circular(12),
+                        shape: BoxShape.circle,
+                        color: profileImage == null ? Colors.blue : null,
+                        image: profileImage != null ? DecorationImage(
+                            image: MemoryImage(profileImage!),
+                            fit: BoxFit.cover) : null,
                       ),
-                      child: Text(
-                        tag['name'] ?? 'Unknown',
-                        style: TextStyle(color: Colors.red.shade800, fontSize: 12, fontWeight: FontWeight.w500),
-                      ),
-                    );
-                  }).toList(),
+                      child: profileImage == null
+                          ? Center(
+                        child: Text(
+                          value.isNotEmpty ? value[0] : '?',
+                          style: TextStyle(color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12),
+                        ),
+                      )
+                          : null,
+                    ),
+                    SizedBox(width: 8),
+                    Text(value, style: TextStyle(fontWeight: FontWeight.w500)),
+                  ],
                 )
               else
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w500,
-                    color: label.contains('Website') ? Colors.blue : Colors.black,
+                if (hasTags && leadData['tag_ids']?.isNotEmpty == true)
+                  Wrap(
+                    spacing: 8,
+                    children: (leadData['tag_ids'] as List).map((tagId) {
+                      final tag = tagsList.firstWhere((t) => t['id'] == tagId,
+                          orElse: () => {});
+                      return Container(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          tag['name'] ?? 'Unknown',
+                          style: TextStyle(color: Colors.red.shade800,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500),
+                        ),
+                      );
+                    }).toList(),
+                  )
+                else
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: label.contains('Website') ? Colors.blue : Colors
+                          .black,
+                    ),
                   ),
-                ),
         ],
       ),
     );
@@ -1039,7 +1135,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
             SizedBox(width: 24),
             Row(
               children: [
-                Text('New', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF9EA700))),
+                Text('New', style: TextStyle(
+                    fontWeight: FontWeight.bold, color: Color(0xFF9EA700))),
                 Text(' 2M '),
                 Icon(Icons.chevron_right, size: 16),
                 Text(' Qualified'),
@@ -1079,7 +1176,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
         children: [
           Row(
             children: [
-              Text('Tags', style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w500)),
+              Text('Tags', style: TextStyle(
+                  color: Colors.grey.shade700, fontWeight: FontWeight.w500)),
               SizedBox(width: 4),
               Icon(Icons.help_outline, size: 12, color: Colors.grey),
             ],
@@ -1113,7 +1211,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
     return Column(
       children: [
         Container(
-          decoration: BoxDecoration(border: Border(top: BorderSide(color: Colors.grey.shade300))),
+          decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: Colors.grey.shade300))),
           child: TabBar(
             controller: _tabController,
             labelColor: Color(0xFF9EA700),
@@ -1147,7 +1246,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Internal Notes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text('Internal Notes',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           SizedBox(height: 8),
           isEditing
               ? TextField(
@@ -1157,7 +1257,9 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
               border: OutlineInputBorder(),
             ),
           )
-              : Text(leadData['description'] is String ? leadData['description'] : 'No notes available'),
+              : Text(leadData['description'] is String
+              ? leadData['description']
+              : 'No notes available'),
         ],
       ),
     );
@@ -1172,7 +1274,9 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
           children: [
             Text(
               'CONTACT INFORMATION',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey.shade700),
+              style: TextStyle(fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Colors.grey.shade700),
             ),
             SizedBox(height: 16),
             Row(
@@ -1249,7 +1353,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
                             closedBorderRadius: BorderRadius.circular(12),
                           ),
                           hintText: 'Select State',
-                          items: states.map<String>((data) => data['name'].toString()).toList(),
+                          items: states.map<String>((data) =>
+                              data['name'].toString()).toList(),
                           initialItem: selectedState,
                           onChanged: (value) {
                             setState(() {
@@ -1276,7 +1381,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
                       closedBorderRadius: BorderRadius.circular(12),
                     ),
                     hintText: 'Select Country',
-                    items: countries.map<String>((data) => data['name'].toString()).toList(),
+                    items: countries.map<String>((data) =>
+                        data['name'].toString()).toList(),
                     initialItem: selectedCountry,
                     onChanged: (value) {
                       setState(() {
@@ -1296,7 +1402,9 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
             SizedBox(height: 16),
             Text(
               'MARKETING',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey.shade700),
+              style: TextStyle(fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Colors.grey.shade700),
             ),
             SizedBox(height: 16),
             Row(
@@ -1310,7 +1418,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
                       closedBorderRadius: BorderRadius.circular(12),
                     ),
                     hintText: 'Select Campaign',
-                    items: campaigns.map<String>((data) => data['name'].toString()).toList(),
+                    items: campaigns.map<String>((data) =>
+                        data['name'].toString()).toList(),
                     initialItem: selectedCampaign,
                     onChanged: (value) {
                       setState(() {
@@ -1333,7 +1442,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
                       closedBorderRadius: BorderRadius.circular(12),
                     ),
                     hintText: 'Select Medium',
-                    items: mediums.map<String>((data) => data['name'].toString()).toList(),
+                    items: mediums.map<String>((data) =>
+                        data['name'].toString()).toList(),
                     initialItem: selectedMedium,
                     onChanged: (value) {
                       setState(() {
@@ -1362,7 +1472,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
                       closedBorderRadius: BorderRadius.circular(12),
                     ),
                     hintText: 'Select Source',
-                    items: sources.map<String>((data) => data['name'].toString()).toList(),
+                    items: sources.map<String>((data) =>
+                        data['name'].toString()).toList(),
                     initialItem: selectedSource,
                     onChanged: (value) {
                       setState(() {
@@ -1389,7 +1500,9 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
             SizedBox(height: 16),
             Text(
               'TRACKING',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey.shade700),
+              style: TextStyle(fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Colors.grey.shade700),
             ),
             SizedBox(height: 16),
             Row(
@@ -1403,7 +1516,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
                       closedBorderRadius: BorderRadius.circular(12),
                     ),
                     hintText: 'Select Company',
-                    items: companies.map<String>((data) => data['name'].toString()).toList(),
+                    items: companies.map<String>((data) =>
+                        data['name'].toString()).toList(),
                     initialItem: selectedCompany,
                     onChanged: (value) {
                       setState(() {
@@ -1426,7 +1540,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
                       closedBorderRadius: BorderRadius.circular(12),
                     ),
                     hintText: 'Select Sales Team',
-                    items: salesTeams.map<String>((data) => data['name'].toString()).toList(),
+                    items: salesTeams.map<String>((data) =>
+                        data['name'].toString()).toList(),
                     initialItem: selectedSalesTeam,
                     onChanged: (value) {
                       setState(() {
@@ -1475,10 +1590,13 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Assigned Partner', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text('Assigned Partner',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           SizedBox(height: 8),
           Text(
-            leadData['partner_id'] is List && leadData['partner_id'].length > 1 ? leadData['partner_id'][1].toString() : 'No partner assigned',
+            leadData['partner_id'] is List && leadData['partner_id'].length > 1
+                ? leadData['partner_id'][1].toString()
+                : 'No partner assigned',
           ),
         ],
       ),

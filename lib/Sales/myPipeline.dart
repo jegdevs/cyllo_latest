@@ -705,6 +705,7 @@ class _MypipelineState extends State<Mypipeline> {
                 }
               }
               return LeadItem(
+                leadId : lead['id'],
                 name: lead['name'],
                 revenue: lead['expected_revenue'].toString(),
                 customerName: lead['partner_id'] != null &&
@@ -984,9 +985,7 @@ class _MypipelineState extends State<Mypipeline> {
                       size: 100,
                     ))
                   : GestureDetector(
-                  // Add GestureDetector to make the card clickable
                   onTap: () {
-                // Navigate to lead detail page with the lead ID
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -2365,121 +2364,130 @@ class _MypipelineState extends State<Mypipeline> {
 
   Widget customCard(AppFlowyGroupItem item) {
     if (item is LeadItem) {
-      return Row(
-        children: [
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.name,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  SizedBox(height: 8),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Color(0xFF9EA700).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      '\$${item.revenue}',
+      return InkWell( onTap: (){
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => LeadDetailPage(leadId: item.leadId),
+          ),
+        );
+      },
+        child: Row(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.name,
                       style: TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF9EA700),
-                        fontWeight: FontWeight.w500,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  Text(
-                    item.customerName,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.black87,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  SizedBox(
-                    height: 6,
-                  ),
-                  Wrap(
-                    spacing: 5,
-                    children: item.tags.map((tag) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade100,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(tag, style: const TextStyle(fontSize: 12)),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      ...List.generate(
-                        3,
-                        (index) => Icon(
-                          index < item.priority
-                              ? Icons.star
-                              : Icons.star_border,
-                          color: Colors.amber,
-                          size: 18,
+                    SizedBox(height: 8),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Color(0xFF9EA700).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '\$${item.revenue}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF9EA700),
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      ActivityIconDesign(item.activityState, item.activityType),
-                      SizedBox(
-                        width: 58,
+                    ),
+                    Text(
+                      item.customerName,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.black87,
                       ),
-                      if (item.imageData != null && item.imageData!.isNotEmpty)
-                        Container(
-                          width: 24,
-                          height: 24,
-                          margin: EdgeInsets.only(left: 8),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(
+                      height: 6,
+                    ),
+                    Wrap(
+                      spacing: 5,
+                      children: item.tags.map((tag) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(4),
-                            image: DecorationImage(
-                              image: MemoryImage(
-                                base64Decode(item.imageData!),
+                            color: Colors.blue.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(tag, style: const TextStyle(fontSize: 12)),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        ...List.generate(
+                          3,
+                          (index) => Icon(
+                            index < item.priority
+                                ? Icons.star
+                                : Icons.star_border,
+                            color: Colors.amber,
+                            size: 18,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ActivityIconDesign(item.activityState, item.activityType),
+                        SizedBox(
+                          width: 58,
+                        ),
+                        if (item.imageData != null && item.imageData!.isNotEmpty)
+                          Container(
+                            width: 24,
+                            height: 24,
+                            margin: EdgeInsets.only(left: 8),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(4),
+                              image: DecorationImage(
+                                image: MemoryImage(
+                                  base64Decode(item.imageData!),
+                                ),
+                                fit: BoxFit.cover,
                               ),
-                              fit: BoxFit.cover,
+                            ),
+                          )
+                        else
+                          Container(
+                            width: 24,
+                            height: 24,
+                            margin: EdgeInsets.only(left: 55),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.grey.shade300,
+                            ),
+                            child: Icon(
+                              Icons.person,
+                              size: 16,
+                              color: Colors.grey.shade700,
                             ),
                           ),
-                        )
-                      else
-                        Container(
-                          width: 24,
-                          height: 24,
-                          margin: EdgeInsets.only(left: 55),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.grey.shade300,
-                          ),
-                          child: Icon(
-                            Icons.person,
-                            size: 16,
-                            color: Colors.grey.shade700,
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       );
     }
     throw UnimplementedError();
@@ -2578,7 +2586,6 @@ class SalesDataGridWidget extends StatefulWidget {
   _SalesDataGridWidgetState createState() => _SalesDataGridWidgetState();
 }
 
-
 class _SalesDataGridWidgetState extends State<SalesDataGridWidget> {
   late SalesDataSource salesDataSource;
   bool isLoading = true;
@@ -2589,7 +2596,6 @@ class _SalesDataGridWidgetState extends State<SalesDataGridWidget> {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getInt('user_id');
   }
-
 
   void processData() async {
     setState(() {
@@ -2635,6 +2641,7 @@ class _SalesDataGridWidgetState extends State<SalesDataGridWidget> {
       processOpportunities(filteredOpportunities),
       widget.activityTypes,
       userImages,
+      context, // Pass the context here
     );
 
     setState(() {
@@ -2665,7 +2672,6 @@ class _SalesDataGridWidgetState extends State<SalesDataGridWidget> {
       processData();
     }
   }
-
 
   Future<void> fetchUserImages() async {
     final prefs = await SharedPreferences.getInstance();
@@ -2715,9 +2721,11 @@ class _SalesDataGridWidgetState extends State<SalesDataGridWidget> {
       setState(() => isLoading = false);
     }
   }
+
   List<Map<String, dynamic>> processOpportunities(List<Map<String, dynamic>> opportunities) {
     return opportunities.map((opportunity) {
       Map<String, dynamic> salesData = {
+        'id': opportunity['id'],
         'name': opportunity['name'] ?? 'None',
         'expected_revenue': opportunity['expected_revenue'] != null
             ? '\$${opportunity['expected_revenue'].toString()}'
@@ -2808,15 +2816,15 @@ class _SalesDataGridWidgetState extends State<SalesDataGridWidget> {
   }
 }
 
-
 class SalesDataSource extends DataGridSource {
   List<DataGridRow> dataGridRows = [];
   final List<String> activityTypes;
   final Map<int, Uint8List> userImages;
   Uint8List? currentUserImage;
+  final BuildContext context; // Add context here
 
   SalesDataSource(List<Map<String, dynamic>> salesList, this.activityTypes,
-      this.userImages) {
+      this.userImages, this.context) {
     currentUserImage = null;
     _getCurrentUserImage();
 
@@ -2886,12 +2894,11 @@ class SalesDataSource extends DataGridSource {
       cells: row.getCells().map<Widget>((dataCell) {
         if (dataCell.columnName == 'opportunity') {
           final salesData = dataCell.value as Map<String, dynamic>;
-          return OpportunityColumn(salesData, currentUserImage);
+          return OpportunityColumn(salesData, currentUserImage, context); // Pass context here
         }
 
         String activityDate = dataCell.value.toString();
-        DateTime? parsedDate = activityDate.isNotEmpty ? DateTime.tryParse(
-            activityDate) : null;
+        DateTime? parsedDate = activityDate.isNotEmpty ? DateTime.tryParse(activityDate) : null;
         DateTime today = DateTime.now();
 
         Color cellColor = Colors.transparent;
@@ -2903,8 +2910,7 @@ class SalesDataSource extends DataGridSource {
           }
         }
 
-        final opportunityCell = row.getCells().firstWhere((cell) =>
-        cell.columnName == 'opportunity');
+        final opportunityCell = row.getCells().firstWhere((cell) => cell.columnName == 'opportunity');
         final salesData = opportunityCell.value as Map<String, dynamic>;
         int? userId = salesData['activity_user_id'];
         Uint8List? userImage = userId != null ? userImages[userId] : null;
@@ -2942,114 +2948,123 @@ class SalesDataSource extends DataGridSource {
     );
   }
 
-  Widget OpportunityColumn(Map<String, dynamic> salesData,
-      Uint8List? userImage) {
-    return Row(
-      children: [
-        const SizedBox(width: 5),
-        userImage != null
-            ? Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(6),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-            image: DecorationImage(
-              image: MemoryImage(userImage),
-              fit: BoxFit.cover,
-            ),
+  Widget OpportunityColumn(Map<String, dynamic> salesData, Uint8List? userImage, BuildContext context) {
+    return InkWell(
+      onTap: () {
+        final leadId = salesData['id'];
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => LeadDetailPage(leadId: leadId),
           ),
-        )
-            : Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(6),
-            gradient: LinearGradient(
-              colors: [
-                Colors.blue.shade700,
-                Colors.blue.shade500,
+        );
+      },
+      child: Row(
+        children: [
+          const SizedBox(width: 5),
+          userImage != null
+              ? Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(6),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
               ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+              image: DecorationImage(
+                image: MemoryImage(userImage),
+                fit: BoxFit.cover,
+              ),
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.blue.withOpacity(0.3),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: const Icon(Icons.person, size: 18, color: Colors.white),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    salesData['name'] ?? 'No Name',
-                    style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w500),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 7),
-                    child: Text(
-                      salesData['expected_revenue'] ?? '\$0',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ),
+          )
+              : Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(6),
+              gradient: LinearGradient(
+                colors: [
+                  Colors.blue.shade700,
+                  Colors.blue.shade500,
                 ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    salesData['partner_id'] ?? '',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8.0, top: 2.0),
-                    child: Container(
-                      height: 25,
-                      width: 50,
-                      color: Colors.grey.shade300,
-                      child: Center(
-                        child: Text(
-                          salesData['stage_id'] ?? 'New',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF9EA700),
-                            fontWeight: FontWeight.bold,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.blue.withOpacity(0.3),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: const Icon(Icons.person, size: 18, color: Colors.white),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      salesData['name'] ?? 'No Name',
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 7),
+                      child: Text(
+                        salesData['expected_revenue'] ?? '\$0',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      salesData['partner_id'] ?? '',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8.0, top: 2.0),
+                      child: Container(
+                        height: 25,
+                        width: 50,
+                        color: Colors.grey.shade300,
+                        child: Center(
+                          child: Text(
+                            salesData['stage_id'] ?? 'New',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF9EA700),
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -3103,6 +3118,7 @@ String formatDate(String date) {
 
 
 class LeadItem extends AppFlowyGroupItem {
+  final int  leadId ;
   final String name;
   final String revenue;
   final String customerName;
@@ -3115,6 +3131,7 @@ class LeadItem extends AppFlowyGroupItem {
   final List<String> activityIds;
 
   LeadItem({
+    required this.leadId,
     required this.name,
     required this.revenue,
     required this.customerName,
