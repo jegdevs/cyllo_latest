@@ -10,12 +10,16 @@ import 'package:syncfusion_flutter_calendar/calendar.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datagrid/datagrid.dart';
 
-import 'Views/pipeLineView.dart';
 import 'Views/quotationsView.dart';
-import 'myPipeline.dart';
 
 class Myquotations extends StatefulWidget {
-  const Myquotations({super.key});
+
+  final int? teamId;
+  final List<List< Object>>? domain;
+  final String? title;
+  final bool applyUserFilter;
+
+  const Myquotations({super.key,  this.teamId , this.domain,this.title,this.applyUserFilter = true,});
 
   @override
   State<Myquotations> createState() => _MyquotationsState();
@@ -77,14 +81,26 @@ class _MyquotationsState extends State<Myquotations> {
     }
 
     try {
+      List<List<dynamic>> domainFilter = [];
+
+      if (widget.applyUserFilter && currentUserId != null) {
+        domainFilter.add(["user_id", "=", currentUserId]);
+      }
+
+      if (widget.teamId != null) {
+        domainFilter.add(["team_id", "=", widget.teamId]);
+      }
+
+      if (widget.domain != null && widget.domain!.isNotEmpty) {
+        domainFilter.addAll(widget.domain!);
+      }
+      log('www3222$domainFilter');
+
       final response = await client?.callKw({
         'model': 'sale.order',
         'method': 'search_read',
-        'args': [
-          [
-            ["user_id", "=", currentUserId]
-          ]
-        ],
+        'args':
+            [domainFilter],
         'kwargs': {
           'fields': [
             'name',

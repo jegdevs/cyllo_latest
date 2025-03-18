@@ -5,6 +5,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 
+import 'myPipeline.dart';
+import 'myQuotations.dart';
+
 class SalesTeam extends StatefulWidget {
   const SalesTeam({super.key});
 
@@ -273,7 +276,6 @@ class _SalesTeamState extends State<SalesTeam> {
 
       weeklyOpportunityData.removeWhere((key, value) => value == 0);
 
-
       final barGroups = prepareWeeklyOpportunityData(weeklyOpportunityData, dateRanges);
 
       return {
@@ -309,7 +311,6 @@ class _SalesTeamState extends State<SalesTeam> {
       final startDate = firstVisibleWeekStart.add(Duration(days: i * 7));
       final endDate = startDate.add(Duration(days: 6));
 
-
       final startDay = startDate.day;
       final endDay = endDate.day;
       final monthStart = DateFormat('MMM').format(startDate);
@@ -328,7 +329,6 @@ class _SalesTeamState extends State<SalesTeam> {
 
     return result;
   }
-
 
   List<BarChartGroupData> prepareWeeklyOpportunityData(
       Map<String, int> weeklyData, List<Map<String, dynamic>> dateRanges) {
@@ -360,8 +360,6 @@ class _SalesTeamState extends State<SalesTeam> {
       ],
     );
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -407,41 +405,159 @@ class _SalesTeamState extends State<SalesTeam> {
 
   Widget buildSalesCard(Map<String, dynamic> team) {
     final currencyFormat = NumberFormat.currency(symbol: '', decimalDigits: 2);
+    final today = DateTime.now().toIso8601String().split('T')[0];
+    final teamId = team['id'] as int;
 
     List<Widget> pipelineItems = [];
 
+    // Unassigned Leads
     if ((team['unassignedLeads'] ?? 0) > 0) {
+      final unassignedLeadsFilter = [
+        ["team_id", "=", teamId],
+        ["user_id", "=", false],
+        ["type", "=", "lead"]
+      ];
       pipelineItems.add(buildPipelineRow(
         '${team['unassignedLeads']} Unassigned Lead${(team['unassignedLeads'] ?? 0) != 1 ? 's' : ''}',
         '',
+        onTap: () {
+          if (client == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Odoo client not initialized')),
+            );
+            return;
+          }
+          // Navigator.push(
+          //   context,
+          //   MaterialPageRoute(
+          //     builder: (context) => UnassignedLeadsView(
+          //       teamId: teamId,
+          //       filter: unassignedLeadsFilter,
+          //       client: client!,
+          //     ),
+          //   ),
+          // );
+        },
       ));
     }
 
+    // Open Opportunities
     if ((team['openOpportunities'] ?? 0) > 0) {
+      final openOpportunitiesDomain = [
+        ['team_id', '=', teamId],
+        ['probability', '<', 100],
+        ['type', '=', 'opportunity'],
+      ];
       pipelineItems.add(buildPipelineRow(
         '${team['openOpportunities']} Open Opportunit${(team['openOpportunities'] ?? 0) != 1 ? 'ies' : 'y'}',
         currencyFormat.format(team['openOpportunitiesAmount'] ?? 0),
+        onTap: () {
+          if (client == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Odoo client not initialized')),
+            );
+            return;
+          }
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => Mypipeline(
+                teamId: teamId,
+                domain: openOpportunitiesDomain,
+                title: 'Open Opportunities',
+              ),
+            ),
+          );
+        },
       ));
     }
-
     if ((team['overdueOpportunities'] ?? 0) > 0) {
+      final overdueOpportunitiesFilter = [
+        ["team_id", "=", teamId],
+        ["type", "=", "opportunity"],
+        ["date_deadline", "<", today],
+        ["stage_id.is_won", "=", false]
+      ];
       pipelineItems.add(buildPipelineRow(
         '${team['overdueOpportunities']} Overdue Opportunit${(team['overdueOpportunities'] ?? 0) != 1 ? 'ies' : 'y'}',
         currencyFormat.format(team['overdueOpportunitiesAmount'] ?? 0),
+        onTap: () {
+          if (client == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Odoo client not initialized')),
+            );
+            return;
+          }
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => Mypipeline(
+                teamId: teamId,
+                domain: overdueOpportunitiesFilter,
+              ),
+            ),
+          );
+        },
       ));
     }
 
     if ((team['quotationsCount'] ?? 0) > 0) {
+      final quotationsFilter = [
+        ["team_id", "=", teamId],
+        ["state", "in", ["draft", "sent"]]
+      ];
       pipelineItems.add(buildPipelineRow(
         '${team['quotationsCount']} Quotation${(team['quotationsCount'] ?? 0) != 1 ? 's' : ''}',
         currencyFormat.format(team['quotationsAmount'] ?? 0),
+        onTap: () {
+          if (client == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Odoo client not initialized')),
+            );
+            return;
+          }
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => Myquotations(
+                teamId: teamId,
+                domain: quotationsFilter,
+                  applyUserFilter: false,
+              ),
+            ),
+          );
+        },
       ));
     }
 
+    // Orders to Invoice
     if ((team['ordersToInvoice'] ?? 0) > 0) {
+      final ordersToInvoiceFilter = [
+        ["team_id", "=", teamId],
+        ["state", "in", ["sale", "done"]],
+        ["invoice_status", "=", "to invoice"]
+      ];
       pipelineItems.add(buildPipelineRow(
         '${team['ordersToInvoice']} Order${(team['ordersToInvoice'] ?? 0) != 1 ? 's' : ''} to Invoice',
         '',
+        onTap: () {
+          if (client == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Odoo client not initialized')),
+            );
+            return;
+          }
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => Myquotations(
+                teamId: teamId,
+                domain: ordersToInvoiceFilter,
+
+              ),
+            ),
+          );
+        },
       ));
     }
 
@@ -479,7 +595,16 @@ class _SalesTeamState extends State<SalesTeam> {
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
-              onPressed: () {},
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => Mypipeline(
+                      teamId: team['id'] as int,
+                    ),
+                  ),
+                );
+              },
               child: const Text('Pipeline'),
             ),
           ),
@@ -498,6 +623,28 @@ class _SalesTeamState extends State<SalesTeam> {
             ),
           const SizedBox(height: 16),
         ],
+      ),
+    );
+  }
+
+  Widget buildPipelineRow(String title, String amount, {VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              title,
+              style: TextStyle(color: Colors.grey[700]),
+            ),
+            Text(
+              amount,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -585,7 +732,7 @@ class _SalesTeamState extends State<SalesTeam> {
             touchTooltipData: BarTouchTooltipData(
               getTooltipItem: (group, groupIndex, rod, rodIndex) {
                 return BarTooltipItem(
-                  '${rod.toY.toStringAsFixed(0)} opps', // Show only opportunity count
+                  '${rod.toY.toStringAsFixed(0)} opps',
                   TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -593,7 +740,7 @@ class _SalesTeamState extends State<SalesTeam> {
                 );
               },
             ),
-            handleBuiltInTouches: false, // Disable default tap handling
+            handleBuiltInTouches: false,
             touchCallback: (FlTouchEvent event, barTouchResponse) {
               if (event is FlLongPressStart && barTouchResponse?.spot != null) {
                 // Show tooltip only on long press
@@ -601,25 +748,6 @@ class _SalesTeamState extends State<SalesTeam> {
             },
           ),
         ),
-      ),
-    );
-  }
-
-  Widget buildPipelineRow(String title, String amount) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            title,
-            style: TextStyle(color: Colors.grey[700]),
-          ),
-          Text(
-            amount,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ],
       ),
     );
   }
@@ -651,7 +779,6 @@ class _SalesTeamState extends State<SalesTeam> {
               ],
             ),
             const SizedBox(height: 8),
-            // Progress indicator
             Stack(
               children: [
                 Container(

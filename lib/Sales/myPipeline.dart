@@ -14,7 +14,13 @@ import 'package:syncfusion_flutter_datagrid/datagrid.dart';
 import 'Views/pipeLineView.dart';
 
 class Mypipeline extends StatefulWidget {
-  const Mypipeline({super.key});
+
+  final int? teamId;
+  final List<List< Object>>? domain;
+  final String? title;
+
+
+  const Mypipeline({super.key,  this.teamId , this.domain,this.title});
 
   @override
   State<Mypipeline> createState() => _MypipelineState();
@@ -50,12 +56,12 @@ class _MypipelineState extends State<Mypipeline> {
 
   Map<String, Map<String, dynamic>> getFilters() {
     return {
-      'my_pipeline': {
-        'name': 'My Pipeline',
-        'domain': [
-          ['user_id', '=', currentUserId]
-        ]
-      },
+        'my_pipeline': {
+          'name': 'My Pipeline',
+          'domain': [
+            ['user_id', '=', currentUserId]
+          ]
+        },
       'unassigned': {
         'name': 'Unassigned',
         'domain': [
@@ -590,9 +596,18 @@ class _MypipelineState extends State<Mypipeline> {
       final currentFilters = getFilters();
       List<dynamic> finalFilter = [];
 
+
+      if (widget.domain != null && widget.domain!.isNotEmpty) {
+        finalFilter.addAll(widget.domain!);
+      } else if (widget.teamId != null) {
+        // Fallback to teamId filter if no domain is provided
+        finalFilter.add(['team_id', '=', widget.teamId]);
+      }
+
+      // Apply additional filters only if explicitly selected
       if (selectedFilters.isNotEmpty) {
-        if (selectedFilters.length > 1) {
-          finalFilter.add("|");
+        if (finalFilter.isNotEmpty && selectedFilters.length > 0) {
+          finalFilter.insert(0, "&"); // AND condition with domain/teamId and selected filters
         }
 
 
@@ -613,24 +628,10 @@ class _MypipelineState extends State<Mypipeline> {
             }
           }
         }
-      } else {
-        finalFilter = [
-          ["type", "=", "opportunity"],
-          ["user_id", "=", userid]
-        ];
       }
 
-      bool hasTypeFilter = false;
-      for (var filter in finalFilter) {
-        if (filter is List && filter.length >= 3 && filter[0] == "type" && filter[1] == "=") {
-          hasTypeFilter = true;
-          break;
-        }
-      }
+      finalFilter.add(["type", "=", "opportunity"]);
 
-      if (!hasTypeFilter) {
-        finalFilter.add(["type", "=", "opportunity"]);
-      }
       log('aasas${finalFilter.toString()}');
       final response = await client?.callKw({
         'model': 'crm.lead',
@@ -663,7 +664,8 @@ class _MypipelineState extends State<Mypipeline> {
             'activity_user_id',
             'date_closed',
             'type',
-            'user_id'
+            'user_id',
+              'team_id'
           ],
         }
       });

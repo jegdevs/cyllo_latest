@@ -27,7 +27,9 @@ class _QuotationPageState extends State<QuotationPage> {
   List<String> tagNames = [];
   String? selectedOptionalProductId;
   String? selectedProductId;
-int? selectedSalesPersonId;
+  int? selectedSalesPersonId;
+  String currentStatus = 'draft';
+
   late TextEditingController customerController;
   late TextEditingController streetController;
   late TextEditingController cityController;
@@ -51,7 +53,6 @@ int? selectedSalesPersonId;
   List<Map<String, dynamic>> mediums = [];
   List<Map<String, dynamic>> sources = [];
   List<Map<String, dynamic>> salesP = [];
-
 
   @override
   void initState() {
@@ -130,7 +131,7 @@ int? selectedSalesPersonId;
         'model': 'res.users',
         'method': 'search_read',
         'args': [],
-        'kwargs': {'fields': ['id', 'name'],},
+        'kwargs': {'fields': ['id', 'name']},
       });
       setState(() {
         salesP = List<Map<String, dynamic>>.from(salesper);
@@ -276,7 +277,7 @@ int? selectedSalesPersonId;
     quotationDateController.text = _toString(quotationData['date_order']);
     salespersonController.text = quotationData['user_id'] is List && quotationData['user_id'].length > 1
         ? quotationData['user_id'][1] as String
-        : ''; // Update salesperson controller
+        : '';
     setState(() {});
   }
 
@@ -340,7 +341,6 @@ int? selectedSalesPersonId;
 
       final cleanedData = updatedData.map((key, value) => MapEntry(key, value ?? false));
 
-      // Debugging: Log the data being sent to Odoo
       print("Saving data to Odoo: $cleanedData");
 
       await client!.callKw({
@@ -450,8 +450,9 @@ int? selectedSalesPersonId;
       if (response is List && response.isNotEmpty && mounted) {
         setState(() {
           quotationData = response[0];
-          selectedSalesPersonId=quotationData['user_id'][0];
-          log("aaaaaaaaaaaaaaaaaaaaaaa$selectedSalesPersonId");
+          selectedSalesPersonId = quotationData['user_id'] is List && quotationData['user_id'].isNotEmpty
+              ? quotationData['user_id'][0] as int?
+              : null;
           isLoading = false;
         });
         await fetchTagNames();
@@ -618,7 +619,7 @@ int? selectedSalesPersonId;
 
   void toggleEditMode() async {
     if (isEditMode) {
-      await saveChanges(); // Save changes to Odoo
+      await saveChanges();
       if (selectedProductId != null) {
         await addProductToOrderLine(selectedProductId!);
         setState(() => selectedProductId = null);
@@ -627,7 +628,6 @@ int? selectedSalesPersonId;
         await addOptionalProduct(selectedOptionalProductId!);
         setState(() => selectedOptionalProductId = null);
       }
-      // Refresh all data after saving
       await fetchQuotationDetails();
       await fetchOrderLines();
       await addressFetch();
@@ -661,6 +661,682 @@ int? selectedSalesPersonId;
     }
   }
 
+  Future<void> sendQuotationEmail(int saleId, BuildContext context) async {
+    try {
+      setState(() => isLoading = true);
+
+      final quotationResponse = await client?.callKw({
+        'model': 'sale.order',
+        'method': 'action_quotation_send',
+        'args': [
+          [saleId]
+        ],
+        'kwargs': {
+          'context': {
+            'validate_analytic': true,
+          },
+        },
+      });
+
+      final contextData = quotationResponse['context'];
+      int? templateId = contextData?['default_template_id'];
+
+      if (templateId == null) {
+        print("No default template ID found for Sale Order ID: $saleId");
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No email template found for this quotation')),
+        );
+        return;
+      }
+
+      final saleOrder = await client?.callKw({
+        'model': 'sale.order',
+        'method': 'read',
+        'args': [
+          [saleId]
+        ],
+        'kwargs': {
+          'fields': [
+            'partner_id',
+            'state',
+          ],
+        },
+      });
+
+      if (saleOrder.isEmpty || saleOrder[0]['partner_id'] == null) {
+        print("❌ No customer found for Sale Order ID: $saleId");
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No customer found for this quotation')),
+        );
+        return;
+      }
+
+      int partnerId = saleOrder[0]['partner_id'][0] as int;
+      String currentStatus = saleOrder[0]['state'] as String;
+
+      final mailComposeResponse = await client?.callKw({
+        'model': 'mail.compose.message',
+        'method': 'create',
+        'args': [
+          {
+            'model': 'sale.order',
+            'res_ids': [saleId],
+            'template_id': templateId,
+            'composition_mode': 'comment',
+            'force_send': true,
+            'email_layout_xmlid': 'mail.mail_notification_layout_with_responsible_signature',
+            'partner_ids': [partnerId],
+          }
+        ],
+        'kwargs': {},
+      });
+
+      int mailComposeId = mailComposeResponse;
+
+      final sendMailResponse = await client?.callKw({
+        'model': 'mail.compose.message',
+        'method': 'action_send_mail',
+        'args': [
+          [mailComposeId]
+        ],
+        'kwargs': {},
+      });
+
+      print("Email Sent Successfully: $sendMailResponse");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Email Sent Successfully'),
+            backgroundColor:Color(0xFF9EA700),
+          ),
+        );
+      }
+
+      if (currentStatus == 'draft') {
+        await client?.callKw({
+          'model': 'sale.order',
+          'method': 'action_quotation_sent',
+          'args': [
+            [saleId]
+          ],
+          'kwargs': {},
+        });
+      }
+
+      await fetchQuotationDetails();
+    } catch (e) {
+      print("Error sending email: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error sending email: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
+    }
+  }
+
+  List<Widget> _buildActionButtons() {
+    final state = _toString(quotationData['state'], defaultValue: 'draft');
+    List<Widget> buttons = [];
+
+    if (state == 'draft') {
+      buttons.addAll([
+        ElevatedButton(
+          onPressed: () async {
+            if (client != null) {
+              await sendQuotationEmail(widget.quotationId, context);
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Odoo client not initialized')),
+              );
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF9EA700),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          ),
+          child: const Text('SEND BY EMAIL'),
+        ),
+        const SizedBox(width: 8),
+        OutlinedButton(
+          onPressed: () async {
+            if (client != null) {
+              bool success = await confirmSaleOrder(client!, context);
+              if (success) {
+                await fetchQuotationDetails(); // Refresh the UI after confirmation
+              }
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Odoo client not initialized')),
+              );
+            }
+          },
+          child: const Text('CONFIRM'),
+        ),
+        const SizedBox(width: 8),
+        OutlinedButton(
+          onPressed: () {
+            // Add logic for preview
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Preview clicked')),
+            );
+          },
+          child: const Text('PREVIEW'),
+        ),
+        const SizedBox(width: 8),
+        OutlinedButton(
+          onPressed: () async {
+            if (client != null) {
+              bool success = await cancelSaleOrder(client!, context);
+              if (success) {
+                await fetchQuotationDetails(); // Refresh the UI after cancellation
+              }
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Odoo client not initialized')),
+              );
+            }
+          },
+          child: const Text('CANCEL'),
+        ),
+      ]);
+    } else if (state == 'sale') {
+      buttons.addAll([
+        ElevatedButton(
+          onPressed: () async {
+            // Show dialog for creating invoice
+            _showCreateInvoiceDialog(context);
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF9EA700),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          ),
+          child: const Text('CREATE INVOICE'),
+        ),
+        const SizedBox(width: 8),
+        OutlinedButton(
+          onPressed: () async {
+            if (client != null) {
+              await sendQuotationEmail(widget.quotationId, context);
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Odoo client not initialized')),
+              );
+            }
+          },
+          child: const Text('SEND BY EMAIL'),
+        ),
+        const SizedBox(width: 8),
+        OutlinedButton(
+          onPressed: () {
+            // Add logic for preview
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Preview clicked')),
+            );
+          },
+          child: const Text('PREVIEW'),
+        ),
+        const SizedBox(width: 8),
+        OutlinedButton(
+          onPressed: () async {
+            if (client != null) {
+              bool success = await cancelSaleOrder(client!, context);
+              if (success) {
+                await fetchQuotationDetails(); // Refresh the UI after cancellation
+              }
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Odoo client not initialized')),
+              );
+            }
+          },
+          child: const Text('CANCEL'),
+        ),
+      ]);
+    } else if (state == 'sent') {
+      buttons.addAll([
+        ElevatedButton(
+          onPressed: () async {
+            if (client != null) {
+              bool success = await confirmSaleOrder(client!, context);
+              if (success) {
+                await fetchQuotationDetails(); // Refresh the UI after confirmation
+              }
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Odoo client not initialized')),
+              );
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF9EA700),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          ),
+          child: const Text('CONFIRM'),
+        ),
+        const SizedBox(width: 8),
+        OutlinedButton(
+          onPressed: () async {
+            if (client != null) {
+              await sendQuotationEmail(widget.quotationId, context);
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Odoo client not initialized')),
+              );
+            }
+          },
+          child: const Text('SEND BY EMAIL'),
+        ),
+        const SizedBox(width: 8),
+        OutlinedButton(
+          onPressed: () {
+            // Add logic for preview
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Preview clicked')),
+            );
+          },
+          child: const Text('PREVIEW'),
+        ),
+        const SizedBox(width: 8),
+        OutlinedButton(
+          onPressed: () async {
+            if (client != null) {
+              bool success = await cancelSaleOrder(client!, context);
+              if (success) {
+                await fetchQuotationDetails(); // Refresh the UI after cancellation
+              }
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Odoo client not initialized')),
+              );
+            }
+          },
+          child: const Text('CANCEL'),
+        ),
+      ]);
+    } else if (state == 'cancel') {
+      buttons.addAll([
+        OutlinedButton(
+          onPressed: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Preview clicked')),
+            );
+          },
+          child: const Text('PREVIEW'),
+        ),
+        const SizedBox(width: 8),
+        OutlinedButton(
+          onPressed: () async {
+            if (client != null) {
+              bool success = await setToDraft(client!, context);
+              if (success) {
+                await fetchQuotationDetails();
+              }
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Odoo client not initialized')),
+              );
+            }
+          },
+          child: const Text('SET TO QUOTATION'),
+        ),
+      ]);
+    }
+
+    buttons.addAll([
+      const SizedBox(width: 16),
+      Text('Quotation',
+          style: TextStyle(
+              color: state == 'draft' ? const Color(0xFF9EA700) : Colors.black87,
+              fontWeight: state == 'draft' ? FontWeight.bold : FontWeight.normal)),
+      const SizedBox(width: 8),
+      const Text('>', style: TextStyle(color: Colors.black54)),
+      const SizedBox(width: 8),
+      Text('Quotation Sent',
+          style: TextStyle(
+              color: state == 'sent' ? const Color(0xFF9EA700) : Colors.black87,
+              fontWeight: state == 'sent' ? FontWeight.bold : FontWeight.normal)),
+      const SizedBox(width: 8),
+      const Text('>', style: TextStyle(color: Colors.black54)),
+      const SizedBox(width: 8),
+      Text('Sales Order',
+          style: TextStyle(
+              color: state == 'sale' ? const Color(0xFF9EA700) : Colors.black87,
+              fontWeight: state == 'sale' ? FontWeight.bold : FontWeight.normal)),
+    ]);
+
+    return buttons;
+  }
+
+  Future<bool> cancelSaleOrder(OdooClient client, BuildContext context) async {
+    try {
+      final cancelRecordResponse = await client.callKw({
+        'model': 'sale.order.cancel',
+        'method': 'create',
+        'args': [
+          {
+            'order_id': widget.quotationId,
+          }
+        ],
+        'kwargs': {},
+      });
+
+      log(" Sale Order Cancellation Record Created: $cancelRecordResponse");
+
+      await client.callKw({
+        'model': 'sale.order.cancel',
+        'method': 'action_send_mail_and_cancel',
+        'args': [
+          [cancelRecordResponse]
+        ],
+        'kwargs': {},
+      });
+
+      final quotaData = await client.callKw({
+        'model': 'sale.order',
+        'method': 'search_read',
+        'args': [
+          [
+            ['id', '=', widget.quotationId]
+          ]
+        ],
+        'kwargs': {
+          'fields': [
+            'state',
+          ],
+        },
+      });
+
+      log(quotaData.toString());
+
+      setState(() {
+        currentStatus = quotaData[0]['state'];
+      });
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Order Cancelled Successfully"),
+            backgroundColor: Color(0xFF9EA700),
+          ),
+        );
+      }
+      return true;
+    } catch (e) {
+      log(" Error in Cancel Order: $e");
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error cancelling sale order: $e')),
+        );
+      }
+      return false;
+    }
+  }
+
+  Future<bool> confirmSaleOrder(OdooClient client, BuildContext context) async {
+    try {
+      final response = await client.callKw({
+        'model': 'sale.order',
+        'method': 'action_confirm',
+        'args': [
+          [widget.quotationId]
+        ],
+        'kwargs': {},
+      });
+
+      if (response != null) {
+        final quotaData = await client.callKw({
+          'model': 'sale.order',
+          'method': 'search_read',
+          'args': [
+            [
+              ['id', '=', widget.quotationId]
+            ]
+          ],
+          'kwargs': {
+            'fields': [
+              'state',
+            ],
+          },
+        });
+
+        log(quotaData.toString());
+
+        setState(() {
+          currentStatus = quotaData[0]['state'];
+        });
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Sale Order ${widget.quotationId} Confirmed Successfully"),
+              backgroundColor: Color(0xFF9EA700),
+            ),
+          );
+        }
+        return true;
+      } else {
+        return false;
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error confirming sale order: $e')),
+        );
+      }
+      return false;
+    }
+  }
+  Future<bool> setToDraft(OdooClient client, BuildContext context) async {
+    try {
+
+      final response = await client.callKw({
+        'model': 'sale.order',
+        'method': 'action_draft',
+        'args': [
+          [widget.quotationId]
+        ],
+        'kwargs': {},
+      });
+
+      if (response != null) {
+        final quotaData = await client.callKw({
+          'model': 'sale.order',
+          'method': 'search_read',
+          'args': [
+            [
+              ['id', '=', widget.quotationId]
+            ]
+          ],
+          'kwargs': {
+            'fields': [
+              'state',
+            ],
+          },
+        });
+
+        log(quotaData.toString());
+
+        setState(() {
+          currentStatus = quotaData[0]['state'];
+        });
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Order ${widget.quotationId} set to Draft Successfully"),
+              backgroundColor: Color(0xFF9EA700),
+            ),
+          );
+        }
+        return true;
+      } else {
+        return false;
+      }
+    } catch (e) {
+      log(" Error setting order to draft: $e");
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error setting order to draft: $e')),
+        );
+      }
+      return false;
+    }
+  }
+
+  void _showCreateInvoiceDialog(BuildContext context) {
+    String? invoiceAction = 'delivered';
+    TextEditingController amountController = TextEditingController();
+    TextEditingController fixedAmountController = TextEditingController();
+    bool showAmountField = false;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Create Invoice'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '',
+                    style: TextStyle(color: Colors.black54, fontSize: 12),
+                  ),
+                  const SizedBox(height: 16),
+                  ListTile(
+                    title: const Text('Regular Invoice'),
+                    leading: Radio<String>(
+                      value: 'delivered',
+                      groupValue: invoiceAction,
+                      onChanged: (value) {
+                        setState(() {
+                          invoiceAction = value;
+                          showAmountField = false;
+                        });
+                      },
+                    ),
+                  ),
+                  ListTile(
+                    title: const Text('Down Payment (Percentage)'),
+                    leading: Radio<String>(
+                      value: 'percentage',
+                      groupValue: invoiceAction,
+                      onChanged: (value) {
+                        setState(() {
+                          invoiceAction = value;
+                          showAmountField = true;
+                        });
+                      },
+                    ),
+                  ),
+                  ListTile(
+                    title: const Text('Down Payment (Fixed Amount)'),
+                    leading: Radio<String>(
+                      value: 'fixed',
+                      groupValue: invoiceAction,
+                      onChanged: (value) {
+                        setState(() {
+                          invoiceAction = value;
+                          showAmountField = true;
+                        });
+                      },
+                    ),
+                  ),
+                  if (showAmountField)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16.0),
+                      child: TextField(
+                        controller: invoiceAction == 'percentage' ? amountController : fixedAmountController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: invoiceAction == 'percentage' ? 'Enter Percentage' : 'Enter Fixed Amount',
+                          border: const OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (client != null) {
+                      try {
+                        log("Creating invoice wizard...");
+                        final wizardId = await client!.callKw({
+                          'model': 'sale.advance.payment.inv',
+                          'method': 'create',
+                          'args': [
+                            {
+                              'amount': amountController.text.isNotEmpty ? double.parse(amountController.text) : null,
+                              'fixed_amount': fixedAmountController.text.isNotEmpty ? double.parse(fixedAmountController.text) : null,
+                              'advance_payment_method': invoiceAction,
+                              'sale_order_ids': [
+                                [6, 0, [widget.quotationId]]
+                              ],
+                            }
+                          ],
+                          'kwargs': {}
+                        });
+
+                        log("Invoice Wizard Created: ID $wizardId");
+
+                        final invoice = await client!.callKw({
+                          'model': 'sale.advance.payment.inv',
+                          'method': 'create_invoices',
+                          'args': [
+                            [wizardId]
+                          ],
+                          'kwargs': {}
+                        });
+
+                        log("Invoice Created Successfully: $invoice");
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Invoice created successfully'), backgroundColor: Color(0xFF9EA700)),
+                          );
+                        }
+                        await fetchQuotationDetails();
+                      } catch (e) {
+                        log("Error creating invoice: $e");
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error creating invoice: $e')),
+                          );
+                        }
+                      }
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Odoo client not initialized')),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9EA700), foregroundColor: Colors.white),
+                  child: const Text('Create'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -684,6 +1360,16 @@ int? selectedSalesPersonId;
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: _buildActionButtons(),
+                  ),
+                ),
+              ),
               const SizedBox(height: 16),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -855,91 +1541,6 @@ int? selectedSalesPersonId;
         ),
       ),
     );
-  }
-
-  List<Widget> _buildActionButtons() {
-    final state = _toString(quotationData['state'], defaultValue: 'draft');
-    List<Widget> buttons = [];
-
-    if (state == 'draft') {
-      buttons.addAll([
-        ElevatedButton(
-          onPressed: () {},
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF9EA700),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          ),
-          child: const Text('SEND BY EMAIL'),
-        ),
-        const SizedBox(width: 8),
-        OutlinedButton(onPressed: () {}, child: const Text('CONFIRM')),
-        const SizedBox(width: 8),
-        OutlinedButton(onPressed: () {}, child: const Text('PREVIEW')),
-        const SizedBox(width: 8),
-        OutlinedButton(onPressed: () {}, child: const Text('CANCEL')),
-      ]);
-    } else if (state == 'sale') {
-      buttons.addAll([
-        ElevatedButton(
-          onPressed: () {},
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF9EA700),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          ),
-          child: const Text('CREATE INVOICE'),
-        ),
-        const SizedBox(width: 8),
-        OutlinedButton(onPressed: () {}, child: const Text('SEND BY EMAIL')),
-        const SizedBox(width: 8),
-        OutlinedButton(onPressed: () {}, child: const Text('PREVIEW')),
-        const SizedBox(width: 8),
-        OutlinedButton(onPressed: () {}, child: const Text('CANCEL')),
-      ]);
-    } else if (state == 'sent') {
-      buttons.addAll([
-        ElevatedButton(
-          onPressed: () {},
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF9EA700),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          ),
-          child: const Text('CONFIRM'),
-        ),
-        const SizedBox(width: 8),
-        OutlinedButton(onPressed: () {}, child: const Text('SEND BY EMAIL')),
-        const SizedBox(width: 8),
-        OutlinedButton(onPressed: () {}, child: const Text('PREVIEW')),
-        const SizedBox(width: 8),
-        OutlinedButton(onPressed: () {}, child: const Text('CANCEL')),
-      ]);
-    }
-
-    buttons.addAll([
-      const SizedBox(width: 16),
-      Text('Quotation',
-          style: TextStyle(
-              color: state == 'draft' ? const Color(0xFF9EA700) : Colors.black87,
-              fontWeight: state == 'draft' ? FontWeight.bold : FontWeight.normal)),
-      const SizedBox(width: 8),
-      const Text('>', style: TextStyle(color: Colors.black54)),
-      const SizedBox(width: 8),
-      Text('Quotation Sent',
-          style: TextStyle(
-              color: state == 'sent' ? const Color(0xFF9EA700) : Colors.black87,
-              fontWeight: state == 'sent' ? FontWeight.bold : FontWeight.normal)),
-      const SizedBox(width: 8),
-      const Text('>', style: TextStyle(color: Colors.black54)),
-      const SizedBox(width: 8),
-      Text('Sales Order',
-          style: TextStyle(
-              color: state == 'sale' ? const Color(0xFF9EA700) : Colors.black87,
-              fontWeight: state == 'sale' ? FontWeight.bold : FontWeight.normal)),
-    ]);
-
-    return buttons;
   }
 
   Widget _buildOrderLinesTab() {
@@ -1177,7 +1778,7 @@ int? selectedSalesPersonId;
             const SizedBox(height: 16),
             _buildEditableInfoRow(
               'Salesperson',
-              salespersonController, // Use dedicated controller
+              salespersonController,
               isDropdown: isEditMode,
               items: salesP.map((p) => p['name'] as String).toList(),
               onDropdownChanged: (value) {
@@ -1186,7 +1787,7 @@ int? selectedSalesPersonId;
                   setState(() {
                     quotationData['user_id'] = [user['id'], user['name']];
                     salespersonController.text = user['name'];
-                    selectedSalesPersonId=user['id'];
+                    selectedSalesPersonId = user['id'];
                     log('kalalallalalalalal$selectedSalesPersonId');
                   });
                 }
@@ -1463,8 +2064,8 @@ int? selectedSalesPersonId;
           initialItem: items.contains(controller.text) ? controller.text : null,
           onChanged: (value) {
             if (value != null) {
-              controller.text = value; // Update controller text
-              if (onDropdownChanged != null) onDropdownChanged(value); // Update quotationData
+              controller.text = value;
+              if (onDropdownChanged != null) onDropdownChanged(value);
             }
           },
         )
@@ -1472,7 +2073,6 @@ int? selectedSalesPersonId;
           controller: controller,
           decoration: const InputDecoration(border: OutlineInputBorder()),
           onChanged: (value) {
-            // Update quotationData directly for text fields if needed
             if (label == 'Customer Reference') {
               setState(() {
                 quotationData['client_order_ref'] = value;
@@ -1497,8 +2097,7 @@ int? selectedSalesPersonId;
           children: [
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 95),
-              child:
-              Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87), overflow: TextOverflow.ellipsis),
+              child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87), overflow: TextOverflow.ellipsis),
             ),
             const SizedBox(width: 4),
           ],
@@ -1522,8 +2121,7 @@ int? selectedSalesPersonId;
           children: [
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 95),
-              child:
-              Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87), overflow: TextOverflow.ellipsis),
+              child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87), overflow: TextOverflow.ellipsis),
             ),
             const SizedBox(width: 4),
           ],
@@ -1547,8 +2145,7 @@ int? selectedSalesPersonId;
           children: [
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 95),
-              child:
-              Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87), overflow: TextOverflow.ellipsis),
+              child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87), overflow: TextOverflow.ellipsis),
             ),
             const SizedBox(width: 4),
           ],
