@@ -797,6 +797,9 @@ class _QuotationPageState extends State<QuotationPage> {
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF9EA700),
             foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           ),
           child: const Text('SEND BY EMAIL'),
@@ -815,6 +818,13 @@ class _QuotationPageState extends State<QuotationPage> {
               );
             }
           },
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.grey,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+
+          ),
           child: const Text('CONFIRM'),
         ),
         const SizedBox(width: 8),
@@ -825,6 +835,12 @@ class _QuotationPageState extends State<QuotationPage> {
               const SnackBar(content: Text('Preview clicked')),
             );
           },
+          style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.grey,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
           child: const Text('PREVIEW'),
         ),
         const SizedBox(width: 8),
@@ -841,6 +857,12 @@ class _QuotationPageState extends State<QuotationPage> {
               );
             }
           },
+          style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.grey,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
           child: const Text('CANCEL'),
         ),
       ]);
@@ -869,6 +891,9 @@ class _QuotationPageState extends State<QuotationPage> {
               );
             }
           },
+          style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.grey
+          ),
           child: const Text('SEND BY EMAIL'),
         ),
         const SizedBox(width: 8),
@@ -879,6 +904,9 @@ class _QuotationPageState extends State<QuotationPage> {
               const SnackBar(content: Text('Preview clicked')),
             );
           },
+          style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.grey
+          ),
           child: const Text('PREVIEW'),
         ),
         const SizedBox(width: 8),
@@ -895,6 +923,9 @@ class _QuotationPageState extends State<QuotationPage> {
               );
             }
           },
+          style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.grey
+          ),
           child: const Text('CANCEL'),
         ),
       ]);
@@ -931,6 +962,9 @@ class _QuotationPageState extends State<QuotationPage> {
               );
             }
           },
+          style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.grey
+          ),
           child: const Text('SEND BY EMAIL'),
         ),
         const SizedBox(width: 8),
@@ -941,6 +975,9 @@ class _QuotationPageState extends State<QuotationPage> {
               const SnackBar(content: Text('Preview clicked')),
             );
           },
+          style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.grey
+          ),
           child: const Text('PREVIEW'),
         ),
         const SizedBox(width: 8),
@@ -957,6 +994,9 @@ class _QuotationPageState extends State<QuotationPage> {
               );
             }
           },
+          style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.grey
+          ),
           child: const Text('CANCEL'),
         ),
       ]);
