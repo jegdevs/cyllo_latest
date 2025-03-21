@@ -3,8 +3,6 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-// Assuming Details page is in a separate file
 import 'Views/customerView.dart';
 
 class Customers extends StatefulWidget {
@@ -22,6 +20,10 @@ class _CustomersState extends State<Customers> {
   Map<int, String> categoryPathMap = {};
   Map<int, String> countryMap = {};
 
+  // Filter related variables
+  Set<String> selectedFilters = {};
+  String? selectedCountry;
+
   @override
   void initState() {
     super.initState();
@@ -36,16 +38,13 @@ class _CustomersState extends State<Customers> {
     final userLogin = prefs.getString("userLogin") ?? "";
     final userPassword = prefs.getString("password") ?? "";
 
-    if (baseUrl.isNotEmpty &&
-        dbName.isNotEmpty &&
-        userLogin.isNotEmpty &&
-        userPassword.isNotEmpty) {
+    if (baseUrl.isNotEmpty && dbName.isNotEmpty && userLogin.isNotEmpty && userPassword.isNotEmpty) {
       client = OdooClient(baseUrl);
       try {
         await client!.authenticate(dbName, userLogin, userPassword);
         await fetchCustomerData();
         await fetchCategoryData();
-        await fetchCountryData();
+        // await fetchCountryData(); // Uncomment if you need country data
       } catch (e) {
         log("Odoo Authentication Failed: $e");
         if (mounted) {
@@ -66,48 +65,9 @@ class _CustomersState extends State<Customers> {
     }
   }
 
-  Future<void> fetchCustomerData() async {
-    try {
-      final response = await client?.callKw({
-        'model': 'res.partner',
-        'method': 'search_read',
-        'args': [[]],
-        'kwargs': {
-          'fields': [
-            'id',
-            'name',
-            'email',
-            'phone',
-            'city',
-            'state_id',
-            'country_id',
-            'category_id',
-            'image_128',
-            'company_type',
-            'company_id',
-            'commercial_partner_id',
-            'function',
-          ],
-        },
-      });
-      if (mounted) {
-        setState(() {
-          customers = response ?? [];
-        });
-        log("Customers fetched: ${customers.length}");
-        log("Sample customer data: ${customers.isNotEmpty ? customers[0] : 'No customers'}");
-      }
-    } catch (e) {
-      log("Error fetching customers: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error fetching customers: $e")),
-        );
-      }
-    }
-  }
-
   Future<void> fetchCategoryData() async {
+    if (client == null) return;
+
     try {
       Set<int> categoryIds = {};
       for (var customer in customers) {
@@ -123,10 +83,8 @@ class _CustomersState extends State<Customers> {
         }
       }
 
-      log("Initial Category IDs from customers: $categoryIds");
-
       if (categoryIds.isNotEmpty) {
-        final initialResponse = await client?.callKw({
+        final initialResponse = await client!.callKw({
           'model': 'res.partner.category',
           'method': 'search_read',
           'args': [
@@ -147,9 +105,7 @@ class _CustomersState extends State<Customers> {
             }
           }
 
-          log("All Category IDs including parent_path: $allCategoryIds");
-
-          final fullResponse = await client?.callKw({
+          final fullResponse = await client!.callKw({
             'model': 'res.partner.category',
             'method': 'search_read',
             'args': [
@@ -179,61 +135,255 @@ class _CustomersState extends State<Customers> {
                 categoryPathMap[category['id']] = category['name'];
               }
             }
-
-            log("Category Map: $categoryMap");
-            log("Category Path Map: $categoryPathMap");
           }
         }
-      } else {
-        log("No category IDs found in customers");
       }
     } catch (e) {
       log("Error fetching categories: $e");
+    }
+  }
+
+  // Filter definitions
+  Map<String, Map<String, dynamic>> getFilters() {
+    return {
+      'individuals': {
+        'name': 'Individuals',
+        'domain': [['is_company', '=', false]]
+      },
+      'companies': {
+        'name': 'Companies',
+        'domain': [['is_company', '=', true]]
+      },
+      'customer_invoice': {
+        'name': 'Customer Invoices',
+        'domain': [['customer_rank', '>', 0]]
+      },
+      'vendor_bills': {
+        'name': 'Vendor Bills',
+        'domain': [['supplier_rank', '>', 0]]
+      },
+      'archived': {
+        'name': 'Archived',
+        'domain': [['active', '=', false]]
+      },
+    };
+  }
+
+  void showFilterDialog(BuildContext context) {
+    final currentFilters = getFilters();
+    Set<String> tempSelectedFilters = Set.from(selectedFilters);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: Colors.white,
+          title: Text(
+            "Select Filters",
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.blueGrey[800],
+            ),
+          ),
+          content: StatefulBuilder(
+            builder: (context, setDialogState) {
+              return Container(
+                width: double.maxFinite,
+                constraints: BoxConstraints(maxHeight: 300),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: currentFilters.entries.map((entry) {
+                      return Card(
+                        elevation: 0,
+                        color: Colors.grey[50],
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: CheckboxListTile(
+                          title: Text(
+                            entry.value['name'],
+                            style: TextStyle(color: Colors.blueGrey[800]),
+                          ),
+                          value: tempSelectedFilters.contains(entry.key),
+                          activeColor: Colors.blue,
+                          onChanged: (bool? value) {
+                            setDialogState(() {
+                              if (value == true) {
+                                tempSelectedFilters.add(entry.key);
+                              } else {
+                                tempSelectedFilters.remove(entry.key);
+                              }
+                            });
+                          },
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              );
+            },
+          ),
+          actionsPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              style: TextButton.styleFrom(foregroundColor: Colors.grey[600]),
+              child: Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  selectedFilters = tempSelectedFilters;
+                });
+                Navigator.pop(context);
+                applyFilters();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF9EA700),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text("Apply", style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> applyFilters() async {
+    if (client == null) return;
+
+    setState(() => isLoading = true);
+    List<dynamic> domain = [];
+
+    final filters = getFilters();
+    bool hasIndividuals = selectedFilters.contains('individuals');
+    bool hasCompanies = selectedFilters.contains('companies');
+    bool hasCustomerInvoice = selectedFilters.contains('customer_invoice');
+    bool hasVendorBills = selectedFilters.contains('vendor_bills');
+    bool hasArchived = selectedFilters.contains('archived');
+
+    if (hasIndividuals && hasCompanies) {
+      domain.add('|');
+      domain.addAll(filters['individuals']!['domain']);
+      domain.addAll(filters['companies']!['domain']);
+    } else if (hasIndividuals) {
+      domain.addAll(filters['individuals']!['domain']);
+    } else if (hasCompanies) {
+      domain.addAll(filters['companies']!['domain']);
+    }
+
+    if (hasCustomerInvoice && hasVendorBills) {
+      domain.add('|');
+      domain.addAll(filters['customer_invoice']!['domain']);
+      domain.addAll(filters['vendor_bills']!['domain']);
+    } else if (hasCustomerInvoice) {
+      domain.addAll(filters['customer_invoice']!['domain']);
+    } else if (hasVendorBills) {
+      domain.addAll(filters['vendor_bills']!['domain']);
+    }
+
+    if (hasArchived) {
+      domain.addAll(filters['archived']!['domain']);
+    }
+
+    log("Applying filters with domain: $domain");
+
+    try {
+      final response = await client!.callKw({
+        'model': 'res.partner',
+        'method': 'search_read',
+        'args': [domain],
+        'kwargs': {
+          'fields': [
+            'id',
+            'name',
+            'email',
+            'phone',
+            'city',
+            'state_id',
+            'country_id',
+            'category_id',
+            'image_128',
+            'company_type',
+            'company_id',
+            'commercial_partner_id',
+            'function',
+            'is_company',
+            'customer_rank',
+            'supplier_rank',
+            'active',
+          ],
+        },
+      });
+
+      if (mounted) {
+        setState(() {
+          customers = response ?? [];
+        });
+        await fetchCategoryData(); // Fetch updated category data after filtering
+        log("Filtered customers: ${customers.length}");
+        log("Sample customer data: ${customers.isNotEmpty ? customers[0] : 'No customers'}");
+      }
+    } catch (e) {
+      log("Error applying filters: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error fetching categories: $e")),
+          SnackBar(content: Text("Error applying filters: $e")),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
       }
     }
   }
 
-  Future<void> fetchCountryData() async {
+  Future<void> fetchCustomerData() async {
     try {
-      Set<int> countryIds = {};
-      for (var customer in customers) {
-        if (customer['country_id'] != null && customer['country_id'] is List && customer['country_id'].isNotEmpty) {
-          countryIds.add(customer['country_id'][0]);
-        }
-      }
-
-      log("Country IDs to fetch: $countryIds");
-
-      if (countryIds.isNotEmpty) {
-        final response = await client?.callKw({
-          'model': 'res.country',
-          'method': 'search_read',
-          'args': [
-            [['id', 'in', countryIds.toList()]]
+      final response = await client?.callKw({
+        'model': 'res.partner',
+        'method': 'search_read',
+        'args': [],
+        'kwargs': {
+          'fields': [
+            'id',
+            'name',
+            'email',
+            'phone',
+            'city',
+            'state_id',
+            'country_id',
+            'category_id',
+            'image_128',
+            'company_type',
+            'company_id',
+            'commercial_partner_id',
+            'function',
+            'is_company',
+            'customer_rank',
+            'supplier_rank',
+            'active',
           ],
-          'kwargs': {
-            'fields': ['id', 'name'],
-          },
+        },
+      });
+      if (mounted) {
+        setState(() {
+          customers = response ?? [];
         });
-
-        if (response != null && mounted) {
-          setState(() {
-            countryMap = {for (var country in response) country['id']: country['name']};
-          });
-          log("Country Map: $countryMap");
-        }
-      } else {
-        log("No country IDs found in customers");
+        await fetchCategoryData(); // Fetch category data after initial customer fetch
+        log("Customers fetched: ${customers.length}");
+        log("Sample customer data: ${customers.isNotEmpty ? customers[0] : 'No customers'}");
       }
     } catch (e) {
-      log("Error fetching countries: $e");
+      log("Error fetching customers: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error fetching countries: $e")),
+          SnackBar(content: Text("Error fetching customers: $e")),
         );
       }
     }
@@ -247,6 +397,12 @@ class _CustomersState extends State<Customers> {
         title: const Text("Customers"),
         elevation: 0,
         backgroundColor: const Color(0xFF9EA700),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.filter_list),
+            onPressed: () => showFilterDialog(context),
+          ),
+        ],
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -275,8 +431,6 @@ class _CustomersState extends State<Customers> {
           : RefreshIndicator(
         onRefresh: () async {
           await fetchCustomerData();
-          await fetchCategoryData();
-          await fetchCountryData();
         },
         child: Padding(
           padding: const EdgeInsets.all(12.0),
@@ -526,8 +680,8 @@ class _CustomersState extends State<Customers> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildStatItem(Icons.star_border, customer['rating_count']?.toString() ?? "0", Colors.amber),
-                  _buildStatItem(Icons.description_outlined, customer['doc_count']?.toString() ?? "0", Colors.blue),
+                  _buildStatItem(Icons.star_border, customer['customer_rank']?.toString() ?? "0", Colors.amber),
+                  _buildStatItem(Icons.description_outlined, customer['supplier_rank']?.toString() ?? "0", Colors.blue),
                   _buildStatItem(Icons.attach_money, customer['amount']?.toString() ?? "0", Colors.green),
                   IconButton(
                     padding: EdgeInsets.zero,

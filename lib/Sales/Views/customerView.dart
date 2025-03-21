@@ -26,7 +26,7 @@ class _CustomerViewState extends State<CustomerView> {
 
   String selectedTab = 'Contacts & Addresses';
 
-
+  // Basic controllers
   late TextEditingController nameController;
   late TextEditingController streetController;
   late TextEditingController cityController;
@@ -37,11 +37,70 @@ class _CustomerViewState extends State<CustomerView> {
   late TextEditingController websiteController;
   late TextEditingController vatController;
 
+  // Sales & Purchase controllers
+  late TextEditingController salespersonController;
+  late TextEditingController salesTeamController;
+  late TextEditingController paymentTermsSalesController;
+  late TextEditingController implementedByController;
+  late TextEditingController pricelistController;
+  late TextEditingController deliveryMethodController;
+  late TextEditingController buyerController;
+  late TextEditingController paymentTermsPurchaseController;
+  late TextEditingController paymentMethodController;
+  late TextEditingController fiscalPositionController;
+  late TextEditingController companyIdController;
+  late TextEditingController referenceController;
+  late TextEditingController companyController;
+  late TextEditingController industryController;
+  late TextEditingController customerLocationController;
+  late TextEditingController vendorLocationController;
+
+  // Partner Assignment controllers
+  late TextEditingController partnerLevelController;
+  late TextEditingController activationController;
+  late TextEditingController levelWeightController;
+  late TextEditingController latestReviewController;
+  late TextEditingController nextReviewController;
+  late TextEditingController partnershipDateController;
+
   // Dropdown data
   List<Map<String, dynamic>> countries = [];
   List<Map<String, dynamic>> states = [];
-  int? selectedCountryId;
-  int? selectedStateId;
+  List<Map<String, dynamic>> users = [];
+  List<Map<String, dynamic>> teams = [];
+  List<Map<String, dynamic>> paymentTerms = [];
+  List<Map<String, dynamic>> partners = [];
+  List<Map<String, dynamic>> pricelists = [];
+  List<Map<String, dynamic>> deliveryCarriers = [];
+  List<Map<String, dynamic>> paymentMethods = [];
+  List<Map<String, dynamic>> fiscalPositions = [];
+  List<Map<String, dynamic>> companies = [];
+  List<Map<String, dynamic>> industries = [];
+  List<Map<String, dynamic>> locations = [];
+  List<Map<String, dynamic>> grades = [];
+  List<Map<String, dynamic>> activations = [];
+  List<Map<String, dynamic>> websites = [];
+
+  // Selected indices (not IDs)
+  int? selectedCountryIndex;
+  int? selectedStateIndex;
+  int? selectedSalespersonIndex;
+  int? selectedSalesTeamIndex;
+  int? selectedPaymentTermsSalesIndex;
+  int? selectedImplementedByIndex;
+  int? selectedPricelistIndex;
+  int? selectedDeliveryMethodIndex;
+  int? selectedBuyerIndex;
+  int? selectedPaymentTermsPurchaseIndex;
+  int? selectedPaymentMethodIndex;
+  int? selectedFiscalPositionIndex;
+  int? selectedCompanyIndex;
+  int? selectedIndustryIndex;
+  int? selectedCustomerLocationIndex;
+  int? selectedVendorLocationIndex;
+  int? selectedPartnerLevelIndex;
+  int? selectedActivationIndex;
+  int? selectedWebsiteIndex;
 
   @override
   void initState() {
@@ -60,6 +119,30 @@ class _CustomerViewState extends State<CustomerView> {
     emailController = TextEditingController();
     websiteController = TextEditingController();
     vatController = TextEditingController();
+
+    salespersonController = TextEditingController();
+    salesTeamController = TextEditingController();
+    paymentTermsSalesController = TextEditingController();
+    implementedByController = TextEditingController();
+    pricelistController = TextEditingController();
+    deliveryMethodController = TextEditingController();
+    buyerController = TextEditingController();
+    paymentTermsPurchaseController = TextEditingController();
+    paymentMethodController = TextEditingController();
+    fiscalPositionController = TextEditingController();
+    companyIdController = TextEditingController();
+    referenceController = TextEditingController();
+    companyController = TextEditingController();
+    industryController = TextEditingController();
+    customerLocationController = TextEditingController();
+    vendorLocationController = TextEditingController();
+
+    partnerLevelController = TextEditingController();
+    activationController = TextEditingController();
+    levelWeightController = TextEditingController();
+    latestReviewController = TextEditingController();
+    nextReviewController = TextEditingController();
+    partnershipDateController = TextEditingController();
   }
 
   Future<void> initializeOdooClient() async {
@@ -71,24 +154,35 @@ class _CustomerViewState extends State<CustomerView> {
     final userPassword = prefs.getString("password") ?? "";
     currentUserId = prefs.getInt("userId");
 
-    if (baseUrl.isNotEmpty && dbName.isNotEmpty && userLogin.isNotEmpty && userPassword.isNotEmpty) {
-      client = OdooClient(baseUrl);
-      try {
-        final auth = await client!.authenticate(dbName, userLogin, userPassword);
-        developer.log("Odoo Authenticated: $auth");
-        await fetchCustomerData();
-        await fetchCategoryData();
-        await fetchDropdownData();
-      } catch (e) {
-        developer.log("Odoo Authentication Failed: $e");
-      }
+    if (baseUrl.isEmpty || dbName.isEmpty || userLogin.isEmpty || userPassword.isEmpty) {
+      developer.log("Missing required authentication details: URL: $baseUrl, DB: $dbName, Login: $userLogin");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Missing authentication details. Please check settings.')),
+      );
+      setState(() => isLoading = false);
+      return;
     }
-    setState(() => isLoading = false);
+
+    client = OdooClient(baseUrl);
+    try {
+      await client!.authenticate(dbName, userLogin, userPassword);
+      developer.log("Odoo Authenticated successfully");
+      await fetchCustomerData();
+      await fetchCategoryData();
+      await fetchDropdownData();
+    } catch (e) {
+      developer.log("Odoo Authentication Failed: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Authentication failed: $e')),
+      );
+    } finally {
+      setState(() => isLoading = false);
+    }
   }
 
   Future<void> fetchCustomerData() async {
     if (client == null) {
-      developer.log("Client is null");
+      developer.log("Odoo client is null");
       return;
     }
 
@@ -97,9 +191,7 @@ class _CustomerViewState extends State<CustomerView> {
         'model': 'res.partner',
         'method': 'search_read',
         'args': [
-          [
-            ['id', '=', widget.customerId]
-          ]
+          [['id', '=', widget.customerId]]
         ],
         'kwargs': {
           'fields': [
@@ -118,18 +210,21 @@ class _CustomerViewState extends State<CustomerView> {
             'category_id',
             'child_ids',
             'image_1920',
-            'assigned_partner_id',
-            'receipt_reminder_email',
+            'user_id',
+            'team_id',
             'property_payment_term_id',
-            'property_delivery_carrier_id',
+            'assigned_partner_id',
             'property_product_pricelist',
-            'property_account_position_id',
-            'property_stock_customer',
-            'property_stock_supplier',
+            'property_delivery_carrier_id',
             'property_supplier_payment_term_id',
+            'property_payment_method_id',
+            'receipt_reminder_email',
+            'property_account_position_id',
             'company_id',
             'ref',
             'industry_id',
+            'property_stock_customer',
+            'property_stock_supplier',
             'grade_id',
             'activation',
             'partner_weight',
@@ -141,9 +236,9 @@ class _CustomerViewState extends State<CustomerView> {
         }
       });
 
-      developer.log("Customer data fetched: $response");
+      developer.log("Customer data response for ID ${widget.customerId}: $response");
 
-      if (response != null && response.isNotEmpty) {
+      if (response != null && response.isNotEmpty && response[0] is Map) {
         setState(() {
           customerData = Map<String, dynamic>.from(response[0]);
           customerImageBase64 = customerData!['image_1920']?.toString();
@@ -152,9 +247,17 @@ class _CustomerViewState extends State<CustomerView> {
           }
           updateControllers();
         });
+      } else {
+        developer.log("No customer data found for ID: ${widget.customerId}");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No customer found with ID: ${widget.customerId}')),
+        );
       }
     } catch (e) {
-      developer.log("Failed to fetch customer data: $e");
+      developer.log("Failed to fetch customer data: $e", error: e, stackTrace: StackTrace.current);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error fetching customer data: $e')),
+      );
     }
   }
 
@@ -168,35 +271,265 @@ class _CustomerViewState extends State<CustomerView> {
     emailController.text = customerData!['email']?.toString() ?? '';
     websiteController.text = customerData!['website']?.toString() ?? '';
     vatController.text = customerData!['vat']?.toString() ?? '';
-    selectedCountryId = customerData!['country_id'] is List ? customerData!['country_id'][0] : null;
-    selectedStateId = customerData!['state_id'] is List ? customerData!['state_id'][0] : null;
+    selectedCountryIndex = customerData!['country_id'] is List
+        ? countries.indexWhere((c) => c['id'] == customerData!['country_id'][0])
+        : null;
+    selectedStateIndex = customerData!['state_id'] is List
+        ? states.indexWhere((s) => s['id'] == customerData!['state_id'][0])
+        : null;
+
+    selectedSalespersonIndex = customerData!['user_id'] is List
+        ? users.indexWhere((u) => u['id'] == customerData!['user_id'][0])
+        : null;
+    salespersonController.text = customerData!['user_id'] is List ? customerData!['user_id'][1].toString() : '';
+    selectedSalesTeamIndex = customerData!['team_id'] is List
+        ? teams.indexWhere((t) => t['id'] == customerData!['team_id'][0])
+        : null;
+    salesTeamController.text = customerData!['team_id'] is List ? customerData!['team_id'][1].toString() : '';
+    selectedPaymentTermsSalesIndex = customerData!['property_payment_term_id'] is List
+        ? paymentTerms.indexWhere((p) => p['id'] == customerData!['property_payment_term_id'][0])
+        : null;
+    paymentTermsSalesController.text = customerData!['property_payment_term_id'] is List
+        ? customerData!['property_payment_term_id'][1].toString()
+        : '';
+    selectedImplementedByIndex = customerData!['assigned_partner_id'] is List
+        ? partners.indexWhere((p) => p['id'] == customerData!['assigned_partner_id'][0])
+        : null;
+    implementedByController.text = customerData!['assigned_partner_id'] is List
+        ? customerData!['assigned_partner_id'][1].toString()
+        : '';
+    selectedPricelistIndex = customerData!['property_product_pricelist'] is List
+        ? pricelists.indexWhere((p) => p['id'] == customerData!['property_product_pricelist'][0])
+        : null;
+    pricelistController.text = customerData!['property_product_pricelist'] is List
+        ? customerData!['property_product_pricelist'][1].toString()
+        : '';
+    selectedDeliveryMethodIndex = customerData!['property_delivery_carrier_id'] is List
+        ? deliveryCarriers.indexWhere((d) => d['id'] == customerData!['property_delivery_carrier_id'][0])
+        : null;
+    deliveryMethodController.text = customerData!['property_delivery_carrier_id'] is List
+        ? customerData!['property_delivery_carrier_id'][1].toString()
+        : '';
+    selectedPaymentTermsPurchaseIndex = customerData!['property_supplier_payment_term_id'] is List
+        ? paymentTerms.indexWhere((p) => p['id'] == customerData!['property_supplier_payment_term_id'][0])
+        : null;
+    paymentTermsPurchaseController.text = customerData!['property_supplier_payment_term_id'] is List
+        ? customerData!['property_supplier_payment_term_id'][1].toString()
+        : '';
+    selectedPaymentMethodIndex = customerData!['property_payment_method_id'] is List
+        ? paymentMethods.indexWhere((p) => p['id'] == customerData!['property_payment_method_id'][0])
+        : null;
+    paymentMethodController.text = customerData!['property_payment_method_id'] is List
+        ? customerData!['property_payment_method_id'][1].toString()
+        : '';
+    selectedFiscalPositionIndex = customerData!['property_account_position_id'] is List
+        ? fiscalPositions.indexWhere((f) => f['id'] == customerData!['property_account_position_id'][0])
+        : null;
+    fiscalPositionController.text = customerData!['property_account_position_id'] is List
+        ? customerData!['property_account_position_id'][1].toString()
+        : '';
+    selectedCompanyIndex = customerData!['company_id'] is List
+        ? companies.indexWhere((c) => c['id'] == customerData!['company_id'][0])
+        : null;
+    companyIdController.text = customerData!['company_id'] is List ? customerData!['company_id'][1].toString() : '';
+    referenceController.text = customerData!['ref']?.toString() ?? '';
+    companyController.text = customerData!['company_id'] is List ? customerData!['company_id'][1].toString() : '';
+    selectedIndustryIndex = customerData!['industry_id'] is List
+        ? industries.indexWhere((i) => i['id'] == customerData!['industry_id'][0])
+        : null;
+    industryController.text = customerData!['industry_id'] is List ? customerData!['industry_id'][1].toString() : '';
+    selectedCustomerLocationIndex = customerData!['property_stock_customer'] is List
+        ? locations.indexWhere((l) => l['id'] == customerData!['property_stock_customer'][0])
+        : null;
+    customerLocationController.text = customerData!['property_stock_customer'] is List
+        ? customerData!['property_stock_customer'][1].toString()
+        : 'Partners/Customers';
+    selectedVendorLocationIndex = customerData!['property_stock_supplier'] is List
+        ? locations.indexWhere((l) => l['id'] == customerData!['property_stock_supplier'][0])
+        : null;
+    vendorLocationController.text = customerData!['property_stock_supplier'] is List
+        ? customerData!['property_stock_supplier'][1].toString()
+        : 'Partners/Vendors';
+
+    selectedPartnerLevelIndex = customerData!['grade_id'] is List
+        ? grades.indexWhere((g) => g['id'] == customerData!['grade_id'][0])
+        : null;
+    partnerLevelController.text = customerData!['grade_id'] is List ? customerData!['grade_id'][1].toString() : '';
+    selectedActivationIndex = customerData!['activation'] is List
+        ? activations.indexWhere((a) => a['id'] == customerData!['activation'][0])
+        : null;
+    activationController.text = customerData!['activation'] is List ? customerData!['activation'][1].toString() : '';
+    levelWeightController.text = customerData!['partner_weight']?.toString() ?? '0';
+    // latestReviewController.text = customerData!['date_review']?.toString() ?? '';
+    // nextReviewController.text = customerData!['date_review_next']?.toString() ?? '';
+    // partnershipDateController.text = customerData!['date_partnership']?.toString() ?? '';
+    latestReviewController.text = (customerData!['date_review'] != null && customerData!['date_review'] != false)
+        ? customerData!['date_review'].toString()
+        : '';
+    nextReviewController.text = (customerData!['date_review_next'] != null && customerData!['date_review_next'] != false)
+        ? customerData!['date_review_next'].toString()
+        : '';
+    partnershipDateController.text = (customerData!['date_partnership'] != null && customerData!['date_partnership'] != false)
+        ? customerData!['date_partnership'].toString()
+        : '';
+
+    selectedWebsiteIndex = customerData!['website'] != null
+        ? websites.indexWhere((w) => w['name'] == customerData!['website'])
+        : null;
   }
 
   Future<void> fetchDropdownData() async {
     if (client == null) return;
 
     try {
-      // Fetch countries
+      // Countries
       final countryResponse = await client!.callKw({
         'model': 'res.country',
         'method': 'search_read',
         'args': [[]],
         'kwargs': {'fields': ['id', 'name']},
       });
-      setState(() {
-        countries = List<Map<String, dynamic>>.from(countryResponse);
-      });
+      setState(() => countries = List<Map<String, dynamic>>.from(countryResponse));
 
-      // Fetch states
+      // States
       final stateResponse = await client!.callKw({
         'model': 'res.country.state',
         'method': 'search_read',
         'args': [[]],
         'kwargs': {'fields': ['id', 'name', 'country_id']},
       });
-      setState(() {
-        states = List<Map<String, dynamic>>.from(stateResponse);
+      setState(() => states = List<Map<String, dynamic>>.from(stateResponse));
+
+      // Users (for salesperson and buyer)
+      final userResponse = await client!.callKw({
+        'model': 'res.users',
+        'method': 'search_read',
+        'args': [[]],
+        'kwargs': {'fields': ['id', 'name']},
       });
+      setState(() => users = List<Map<String, dynamic>>.from(userResponse));
+
+      // Teams
+      final teamResponse = await client!.callKw({
+        'model': 'crm.team',
+        'method': 'search_read',
+        'args': [[]],
+        'kwargs': {'fields': ['id', 'name']},
+      });
+      setState(() => teams = List<Map<String, dynamic>>.from(teamResponse));
+
+      // Payment Terms
+      final paymentResponse = await client!.callKw({
+        'model': 'account.payment.term',
+        'method': 'search_read',
+        'args': [[]],
+        'kwargs': {'fields': ['id', 'name']},
+      });
+      setState(() => paymentTerms = List<Map<String, dynamic>>.from(paymentResponse));
+
+      // Partners
+      final partnerResponse = await client!.callKw({
+        'model': 'res.partner',
+        'method': 'search_read',
+        'args': [[]],
+        'kwargs': {'fields': ['id', 'name']},
+      });
+      setState(() => partners = List<Map<String, dynamic>>.from(partnerResponse));
+
+      // Pricelists
+      final pricelistResponse = await client!.callKw({
+        'model': 'product.pricelist',
+        'method': 'search_read',
+        'args': [[]],
+        'kwargs': {'fields': ['id', 'name']},
+      });
+      setState(() => pricelists = List<Map<String, dynamic>>.from(pricelistResponse));
+
+      // Delivery Carriers
+      final carrierResponse = await client!.callKw({
+        'model': 'delivery.carrier',
+        'method': 'search_read',
+        'args': [[]],
+        'kwargs': {'fields': ['id', 'name']},
+      });
+      setState(() => deliveryCarriers = List<Map<String, dynamic>>.from(carrierResponse));
+
+      // Payment Methods
+      final paymentMethodResponse = await client!.callKw({
+        'model': 'account.payment.method',
+        'method': 'search_read',
+        'args': [[]],
+        'kwargs': {'fields': ['id', 'name']},
+      });
+      setState(() => paymentMethods = List<Map<String, dynamic>>.from(paymentMethodResponse));
+
+      // Fiscal Positions
+      final fiscalResponse = await client!.callKw({
+        'model': 'account.fiscal.position',
+        'method': 'search_read',
+        'args': [[]],
+        'kwargs': {'fields': ['id', 'name']},
+      });
+      setState(() => fiscalPositions = List<Map<String, dynamic>>.from(fiscalResponse));
+
+      // Companies
+      final companyResponse = await client!.callKw({
+        'model': 'res.company',
+        'method': 'search_read',
+        'args': [[]],
+        'kwargs': {'fields': ['id', 'name']},
+      });
+      setState(() => companies = List<Map<String, dynamic>>.from(companyResponse));
+
+      // Industries
+      final industryResponse = await client!.callKw({
+        'model': 'res.partner.industry',
+        'method': 'search_read',
+        'args': [[]],
+        'kwargs': {'fields': ['id', 'name']},
+      });
+      setState(() => industries = List<Map<String, dynamic>>.from(industryResponse));
+
+      // Locations (using complete_name)
+      final locationResponse = await client!.callKw({
+        'model': 'stock.location',
+        'method': 'search_read',
+        'args': [[]],
+        'kwargs': {'fields': ['id', 'complete_name']},
+      });
+      setState(() => locations = List<Map<String, dynamic>>.from(locationResponse));
+
+      // Grades
+      final gradeResponse = await client!.callKw({
+        'model': 'res.partner.grade',
+        'method': 'search_read',
+        'args': [[]],
+        'kwargs': {'fields': ['id', 'name']},
+      });
+      setState(() => grades = List<Map<String, dynamic>>.from(gradeResponse));
+
+      // Activations
+      final activationResponse = await client!.callKw({
+        'model': 'res.partner.activation',
+        'method': 'search_read',
+        'args': [[]],
+        'kwargs': {'fields': ['id', 'name']},
+      });
+      setState(() => activations = List<Map<String, dynamic>>.from(activationResponse));
+
+      // Websites (fetching from website model for Sales & Purchase)
+      final websiteResponse = await client!.callKw({
+        'model': 'website',
+        'method': 'search_read',
+        'args': [[]],
+        'kwargs': {'fields': ['id', 'name']},
+      });
+      setState(() => websites = List<Map<String, dynamic>>.from(websiteResponse));
+
+      // Update controllers after fetching dropdown data
+      if (customerData != null) {
+        updateControllers();
+      }
     } catch (e) {
       developer.log("Failed to fetch dropdown data: $e");
     }
@@ -217,8 +550,6 @@ class _CustomerViewState extends State<CustomerView> {
           }
         }
       }
-
-      developer.log("Category IDs from customer: $categoryIds");
 
       if (categoryIds.isNotEmpty) {
         final initialResponse = await client!.callKw({
@@ -241,8 +572,6 @@ class _CustomerViewState extends State<CustomerView> {
               pathIds.forEach((id) => allCategoryIds.add(int.tryParse(id) ?? 0));
             }
           }
-
-          developer.log("All Category IDs including parent_path: $allCategoryIds");
 
           final fullResponse = await client!.callKw({
             'model': 'res.partner.category',
@@ -274,13 +603,8 @@ class _CustomerViewState extends State<CustomerView> {
                 categoryPathMap[category['id']] = category['name'];
               }
             }
-
-            developer.log("Category Map: $categoryMap");
-            developer.log("Category Path Map: $categoryPathMap");
           }
         }
-      } else {
-        developer.log("No category IDs found for this customer");
       }
     } catch (e) {
       developer.log("Error fetching categories: $e");
@@ -288,16 +612,14 @@ class _CustomerViewState extends State<CustomerView> {
   }
 
   Future<void> fetchContacts(List<int> contactIds) async {
-    if (contactIds.isEmpty) return;
+    if (contactIds.isEmpty || client == null) return;
 
     try {
-      final response = await client?.callKw({
+      final response = await client!.callKw({
         'model': 'res.partner',
         'method': 'search_read',
         'args': [
-          [
-            ['id', 'in', contactIds]
-          ]
+          [['id', 'in', contactIds]]
         ],
         'kwargs': {
           'fields': [
@@ -312,7 +634,7 @@ class _CustomerViewState extends State<CustomerView> {
 
       developer.log("Contacts data fetched: $response");
 
-      if (response != null) {
+      if (response != null && mounted) {
         setState(() {
           contactList = List<Map<String, dynamic>>.from(response);
         });
@@ -331,48 +653,109 @@ class _CustomerViewState extends State<CustomerView> {
     try {
       setState(() => isLoading = true);
 
+      final updateData = {
+        'name': nameController.text.isEmpty ? false : nameController.text,
+        'street': streetController.text.isEmpty ? false : streetController.text,
+        'city': cityController.text.isEmpty ? false : cityController.text,
+        'zip': zipController.text.isEmpty ? false : zipController.text,
+        'country_id': selectedCountryIndex != null && selectedCountryIndex! >= 0 ? countries[selectedCountryIndex!]['id'] : false,
+        'state_id': selectedStateIndex != null && selectedStateIndex! >= 0 ? states[selectedStateIndex!]['id'] : false,
+        'phone': phoneController.text.isEmpty ? false : phoneController.text,
+        'mobile': mobileController.text.isEmpty ? false : mobileController.text,
+        'email': emailController.text.isEmpty ? false : emailController.text,
+        'website': websiteController.text.isEmpty ? false : websiteController.text,
+        'vat': vatController.text.isEmpty ? false : vatController.text,
+        'user_id': selectedSalespersonIndex != null && selectedSalespersonIndex! >= 0 ? users[selectedSalespersonIndex!]['id'] : false,
+        'team_id': selectedSalesTeamIndex != null && selectedSalesTeamIndex! >= 0 ? teams[selectedSalesTeamIndex!]['id'] : false,
+        'property_payment_term_id': selectedPaymentTermsSalesIndex != null && selectedPaymentTermsSalesIndex! >= 0
+            ? paymentTerms[selectedPaymentTermsSalesIndex!]['id']
+            : false,
+        'assigned_partner_id': selectedImplementedByIndex != null && selectedImplementedByIndex! >= 0
+            ? partners[selectedImplementedByIndex!]['id']
+            : false,
+        'property_product_pricelist': selectedPricelistIndex != null && selectedPricelistIndex! >= 0
+            ? pricelists[selectedPricelistIndex!]['id']
+            : false,
+        'property_delivery_carrier_id': selectedDeliveryMethodIndex != null && selectedDeliveryMethodIndex! >= 0
+            ? deliveryCarriers[selectedDeliveryMethodIndex!]['id']
+            : false,
+        'property_supplier_payment_term_id': selectedPaymentTermsPurchaseIndex != null && selectedPaymentTermsPurchaseIndex! >= 0
+            ? paymentTerms[selectedPaymentTermsPurchaseIndex!]['id']
+            : false,
+        'property_payment_method_id': selectedPaymentMethodIndex != null && selectedPaymentMethodIndex! >= 0
+            ? paymentMethods[selectedPaymentMethodIndex!]['id']
+            : false,
+        'property_account_position_id': selectedFiscalPositionIndex != null && selectedFiscalPositionIndex! >= 0
+            ? fiscalPositions[selectedFiscalPositionIndex!]['id']
+            : false,
+        'company_id': selectedCompanyIndex != null && selectedCompanyIndex! >= 0 ? companies[selectedCompanyIndex!]['id'] : false,
+        'ref': referenceController.text.isEmpty ? false : referenceController.text,
+        'industry_id': selectedIndustryIndex != null && selectedIndustryIndex! >= 0 ? industries[selectedIndustryIndex!]['id'] : false,
+        'property_stock_customer': selectedCustomerLocationIndex != null && selectedCustomerLocationIndex! >= 0
+            ? locations[selectedCustomerLocationIndex!]['id']
+            : false,
+        'property_stock_supplier': selectedVendorLocationIndex != null && selectedVendorLocationIndex! >= 0
+            ? locations[selectedVendorLocationIndex!]['id']
+            : false,
+        'grade_id': selectedPartnerLevelIndex != null && selectedPartnerLevelIndex! >= 0 ? grades[selectedPartnerLevelIndex!]['id'] : false,
+        'activation': selectedActivationIndex != null && selectedActivationIndex! >= 0 ? activations[selectedActivationIndex!]['id'] : false,
+        'partner_weight': int.tryParse(levelWeightController.text) ?? 0,
+        'date_review': latestReviewController.text.isEmpty ? null : latestReviewController.text,
+        'date_review_next': nextReviewController.text.isEmpty ? null : nextReviewController.text,
+        'date_partnership': partnershipDateController.text.isEmpty ? null : partnershipDateController.text,
+      };
+
       final payload = {
         'model': 'res.partner',
         'method': 'write',
         'args': [
           [widget.customerId],
-          {
-            'name': nameController.text,
-            // 'street': streetController.text,
-            // 'city': cityController.text,
-            // 'zip': zipController.text,
-            // 'country_id': selectedCountryId ?? false, // Handle null as false for Odoo
-            // 'state_id': selectedStateId ?? false, // Handle null as false for Odoo
-            // 'phone': phoneController.text,
-            // 'mobile': mobileController.text,
-            // 'email': emailController.text,
-            // 'website': websiteController.text,
-            // 'vat': vatController.text,
-          }
+          updateData,
         ],
+        'kwargs': {},
       };
-      developer.log("Saving changes for customer ID: ${widget.customerId}");
-      developer.log("Payload: $payload");
 
-      // Verify session
+      developer.log("Saving data with payload: $payload");
+
       await client!.checkSession();
-      developer.log("Session is active");
-
-      // Perform the write operation
       final response = await client!.callKw(payload);
       developer.log("Write response: $response");
 
-      // Refresh data
       await fetchCustomerData();
-      developer.log("Refreshed customer data: $customerData");
-
       setState(() => isEditing = false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Changes saved successfully')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Changes saved successfully')),
+      );
     } catch (e) {
       developer.log("Failed to save changes: $e", error: e, stackTrace: StackTrace.current);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to save changes')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save changes: $e')),
+      );
     } finally {
       setState(() => isLoading = false);
+    }
+  }
+
+  // Date picker helper method
+  Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
+    DateTime? initialDate;
+    try {
+      initialDate = DateTime.parse(controller.text);
+    } catch (e) {
+      initialDate = DateTime.now();
+    }
+
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2101),
+    );
+
+    if (picked != null && mounted) {
+      setState(() {
+        controller.text = picked.toString().split(' ')[0]; // Format as YYYY-MM-DD
+      });
     }
   }
 
@@ -400,7 +783,19 @@ class _CustomerViewState extends State<CustomerView> {
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : customerData == null
-          ? const Center(child: Text('No customer data available'))
+          ? Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('No customer data available'),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => fetchCustomerData(),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      )
           : SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -513,45 +908,70 @@ class _CustomerViewState extends State<CustomerView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 isEditing
-                    ? TextField(controller: streetController, decoration: const InputDecoration(labelText: 'Street'))
+                    ? TextField(
+                  controller: streetController,
+                  decoration: const InputDecoration(labelText: 'Street'),
+                )
                     : Text(customerData!['street']?.toString() ?? ''),
                 isEditing
-                    ? TextField(controller: cityController, decoration: const InputDecoration(labelText: 'City'))
+                    ? TextField(
+                  controller: cityController,
+                  decoration: const InputDecoration(labelText: 'City'),
+                )
                     : Text(customerData!['city']?.toString() ?? ''),
                 isEditing && states.isNotEmpty
-                    ? DropdownButton<int>(
-                  value: selectedStateId,
-                  hint: const Text('Select State'),
-                  items: states
-                      .where((state) =>
-                  selectedCountryId == null || state['country_id'][0] == selectedCountryId)
-                      .map((state) => DropdownMenuItem<int>(
-                    value: state['id'],
-                    child: Text(state['name']),
-                  ))
-                      .toList(),
-                  onChanged: (value) => setState(() => selectedStateId = value),
+                    ? Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.only(top: 8),
+                  child: DropdownButtonFormField<int>(
+                    value: selectedStateIndex,
+                    decoration: const InputDecoration(
+                      labelText: 'State',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: states
+                        .where((state) =>
+                    selectedCountryIndex == null || state['country_id'][0] == countries[selectedCountryIndex!]['id'])
+                        .map((state) => DropdownMenuItem<int>(
+                      value: states.indexOf(state),
+                      child: Text(state['name']),
+                    ))
+                        .toList(),
+                    onChanged: (value) => setState(() => selectedStateIndex = value),
+                    isExpanded: true,
+                  ),
                 )
                     : Text(customerData!['state_id'] is List && customerData!['state_id'].length > 1
                     ? customerData!['state_id'][1].toString()
                     : ''),
                 isEditing
-                    ? TextField(controller: zipController, decoration: const InputDecoration(labelText: 'Zip'))
+                    ? TextField(
+                  controller: zipController,
+                  decoration: const InputDecoration(labelText: 'Zip'),
+                )
                     : Text(customerData!['zip']?.toString() ?? ''),
                 isEditing && countries.isNotEmpty
-                    ? DropdownButton<int>(
-                  value: selectedCountryId,
-                  hint: const Text('Select Country'),
-                  items: countries
-                      .map((country) => DropdownMenuItem<int>(
-                    value: country['id'],
-                    child: Text(country['name']),
-                  ))
-                      .toList(),
-                  onChanged: (value) => setState(() {
-                    selectedCountryId = value;
-                    selectedStateId = null; // Reset state when country changes
-                  }),
+                    ? Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.only(top: 8),
+                  child: DropdownButtonFormField<int>(
+                    value: selectedCountryIndex,
+                    decoration: const InputDecoration(
+                      labelText: 'Country',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: countries
+                        .map((country) => DropdownMenuItem<int>(
+                      value: countries.indexOf(country),
+                      child: Text(country['name']),
+                    ))
+                        .toList(),
+                    onChanged: (value) => setState(() {
+                      selectedCountryIndex = value;
+                      selectedStateIndex = null;
+                    }),
+                    isExpanded: true,
+                  ),
                 )
                     : Text(customerData!['country_id'] is List && customerData!['country_id'].length > 1
                     ? customerData!['country_id'][1].toString()
@@ -583,7 +1003,10 @@ class _CustomerViewState extends State<CustomerView> {
                 ),
                 const SizedBox(height: 4),
                 isEditing
-                    ? TextField(controller: vatController, decoration: const InputDecoration(labelText: 'Tax ID'))
+                    ? TextField(
+                  controller: vatController,
+                  decoration: const InputDecoration(labelText: 'Tax ID'),
+                )
                     : Text(customerData!['vat']?.toString() ?? 'N/A'),
               ],
             ),
@@ -628,7 +1051,10 @@ class _CustomerViewState extends State<CustomerView> {
           ),
           Expanded(
             child: isEditing
-                ? TextField(controller: controller, decoration: InputDecoration(labelText: label))
+                ? TextField(
+              controller: controller,
+              decoration: InputDecoration(labelText: label),
+            )
                 : Text(
               value,
               style: TextStyle(color: isLink ? const Color(0xFF9EA700) : Colors.black),
@@ -862,20 +1288,15 @@ class _CustomerViewState extends State<CustomerView> {
     String implementedBy = _getDisplayName(customerData!['assigned_partner_id'], defaultValue: '');
     String pricelist = _getDisplayName(customerData!['property_product_pricelist']);
     String deliveryMethod = _getDisplayName(customerData!['property_delivery_carrier_id']);
-
-    String buyer = _getDisplayName(customerData!['purchase_user_id'], defaultValue: '');
     String paymentTermsPurchase = _getDisplayName(customerData!['property_supplier_payment_term_id']);
-    String paymentMethod = _getDisplayName(customerData!['property_supplier_payment_method_id'], defaultValue: '');
+    String paymentMethod = _getDisplayName(customerData!['property_payment_method_id'], defaultValue: '');
     String receiptReminder = customerData!['receipt_reminder_email']?.toString() ?? '';
-
     String fiscalPosition = _getDisplayName(customerData!['property_account_position_id']);
-
     String companyId = _getDisplayName(customerData!['company_id']);
     String reference = _getDisplayName(customerData!['ref']);
     String company = _getDisplayName(customerData!['company_id']);
-    String website = _getDisplayName(customerData!['website']);
+    String website = customerData!['website']?.toString() ?? '';
     String industry = _getDisplayName(customerData!['industry_id']);
-
     String customerLocation = _getDisplayName(customerData!['property_stock_customer'], defaultValue: 'Partners/Customers');
     String vendorLocation = _getDisplayName(customerData!['property_stock_supplier'], defaultValue: 'Partners/Vendors');
 
@@ -889,9 +1310,7 @@ class _CustomerViewState extends State<CustomerView> {
               width: double.infinity,
               padding: const EdgeInsets.all(8.0),
               decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: Colors.grey.shade300),
-                ),
+                border: Border.all(color: Colors.grey.shade300),
               ),
               child: const Text(
                 'SALES',
@@ -903,24 +1322,39 @@ class _CustomerViewState extends State<CustomerView> {
               ),
             ),
             const SizedBox(height: 16),
-            _buildSalesPurchaseRow('Salesperson', salesperson),
+            isEditing && users.isNotEmpty
+                ? _buildDropdownRow('Salesperson', users, selectedSalespersonIndex, (value) => selectedSalespersonIndex = value)
+                : _buildSalesPurchaseRow('Salesperson', salesperson),
             const SizedBox(height: 16),
-            _buildSalesPurchaseRow('Sales Team', salesTeam),
+            isEditing && teams.isNotEmpty
+                ? _buildDropdownRow('Sales Team', teams, selectedSalesTeamIndex, (value) => selectedSalesTeamIndex = value)
+                : _buildSalesPurchaseRow('Sales Team', salesTeam),
             const SizedBox(height: 16),
-            _buildSalesPurchaseRow('PAYMENT TERMS', paymentTermsSales),
+            isEditing && paymentTerms.isNotEmpty
+                ? _buildDropdownRow(
+                'PAYMENT TERMS', paymentTerms, selectedPaymentTermsSalesIndex, (value) => selectedPaymentTermsSalesIndex = value)
+                : _buildSalesPurchaseRow('PAYMENT TERMS', paymentTermsSales),
             const SizedBox(height: 16),
-            _buildSalesPurchaseRow('IMPLEMENTED BY', implementedBy, isHighlighted: true),
+            isEditing && partners.isNotEmpty
+                ? _buildDropdownRow(
+                'IMPLEMENTED BY', partners, selectedImplementedByIndex, (value) => selectedImplementedByIndex = value, isHighlighted: true)
+                : _buildSalesPurchaseRow('IMPLEMENTED BY', implementedBy, isHighlighted: true),
             const SizedBox(height: 16),
-            _buildSalesPurchaseRow('DELIVERY METHOD', deliveryMethod, isHighlighted: true),
+            isEditing && pricelists.isNotEmpty
+                ? _buildDropdownRow('PRICELIST', pricelists, selectedPricelistIndex, (value) => selectedPricelistIndex = value)
+                : _buildSalesPurchaseRow('PRICELIST', pricelist),
+            const SizedBox(height: 16),
+            isEditing && deliveryCarriers.isNotEmpty
+                ? _buildDropdownRow(
+                'DELIVERY METHOD', deliveryCarriers, selectedDeliveryMethodIndex, (value) => selectedDeliveryMethodIndex = value,
+                isHighlighted: true)
+                : _buildSalesPurchaseRow('DELIVERY METHOD', deliveryMethod, isHighlighted: true),
             const SizedBox(height: 32),
-
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(8.0),
               decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: Colors.grey.shade300),
-                ),
+                border: Border.all(color: Colors.grey.shade300),
               ),
               child: const Text(
                 'PURCHASE',
@@ -932,22 +1366,23 @@ class _CustomerViewState extends State<CustomerView> {
               ),
             ),
             const SizedBox(height: 16),
-            _buildSalesPurchaseRow('Buyer', buyer),
+            isEditing && paymentTerms.isNotEmpty
+                ? _buildDropdownRow(
+                'Payment Terms', paymentTerms, selectedPaymentTermsPurchaseIndex, (value) => selectedPaymentTermsPurchaseIndex = value)
+                : _buildSalesPurchaseRow('Payment Terms', paymentTermsPurchase),
             const SizedBox(height: 16),
-            _buildSalesPurchaseRow('Payment Terms', paymentTermsPurchase),
-            const SizedBox(height: 16),
-            _buildSalesPurchaseRow('PAYMENT METHOD', paymentMethod),
+            isEditing && paymentMethods.isNotEmpty
+                ? _buildDropdownRow(
+                'PAYMENT METHOD', paymentMethods, selectedPaymentMethodIndex, (value) => selectedPaymentMethodIndex = value)
+                : _buildSalesPurchaseRow('PAYMENT METHOD', paymentMethod),
             const SizedBox(height: 16),
             _buildSalesPurchaseRowWithIcon('Receipt Reminder', receiptReminder, true),
             const SizedBox(height: 32),
-
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(8.0),
               decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: Colors.grey.shade300),
-                ),
+                border: Border.all(color: Colors.grey.shade300),
               ),
               child: const Text(
                 'FISCAL INFORMATION',
@@ -959,16 +1394,16 @@ class _CustomerViewState extends State<CustomerView> {
               ),
             ),
             const SizedBox(height: 16),
-            _buildSalesPurchaseRow('Fiscal Position', fiscalPosition),
+            isEditing && fiscalPositions.isNotEmpty
+                ? _buildDropdownRow(
+                'Fiscal Position', fiscalPositions, selectedFiscalPositionIndex, (value) => selectedFiscalPositionIndex = value)
+                : _buildSalesPurchaseRow('Fiscal Position', fiscalPosition),
             const SizedBox(height: 32),
-
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(8.0),
               decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: Colors.grey.shade300),
-                ),
+                border: Border.all(color: Colors.grey.shade300),
               ),
               child: const Text(
                 'MISC',
@@ -980,24 +1415,36 @@ class _CustomerViewState extends State<CustomerView> {
               ),
             ),
             const SizedBox(height: 16),
-            _buildSalesPurchaseRow('COMPANY ID', companyId),
+            isEditing
+                ? _buildEditableRow('COMPANY ID', companyIdController)
+                : _buildSalesPurchaseRow('COMPANY ID', companyId),
             const SizedBox(height: 16),
-            _buildSalesPurchaseRow('Reference', reference),
+            isEditing
+                ? _buildEditableRow('Reference', referenceController)
+                : _buildSalesPurchaseRow('Reference', reference),
             const SizedBox(height: 16),
-            _buildSalesPurchaseRow('COMPANY', company),
+            isEditing && companies.isNotEmpty
+                ? _buildDropdownRow('COMPANY', companies, selectedCompanyIndex, (value) => selectedCompanyIndex = value)
+                : _buildSalesPurchaseRow('COMPANY', company),
             const SizedBox(height: 16),
-            _buildSalesPurchaseRow('Website', website),
+            isEditing && websites.isNotEmpty
+                ? _buildDropdownRow('Website', websites, selectedWebsiteIndex, (value) {
+              setState(() {
+                selectedWebsiteIndex = value;
+                websiteController.text = value != null && value >= 0 ? websites[value]['name'] : '';
+              });
+            })
+                : _buildSalesPurchaseRow('Website', website),
             const SizedBox(height: 16),
-            _buildSalesPurchaseRow('Industry', industry),
+            isEditing && industries.isNotEmpty
+                ? _buildDropdownRow('Industry', industries, selectedIndustryIndex, (value) => selectedIndustryIndex = value)
+                : _buildSalesPurchaseRow('Industry', industry),
             const SizedBox(height: 32),
-
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(8.0),
               decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: Colors.grey.shade300),
-                ),
+                border: Border.all(color: Colors.grey.shade300),
               ),
               child: const Text(
                 'INVENTORY',
@@ -1009,9 +1456,14 @@ class _CustomerViewState extends State<CustomerView> {
               ),
             ),
             const SizedBox(height: 16),
-            _buildSalesPurchaseRow('CUSTOMER LOCATION', customerLocation),
+            isEditing && locations.isNotEmpty
+                ? _buildDropdownRow(
+                'CUSTOMER LOCATION', locations, selectedCustomerLocationIndex, (value) => selectedCustomerLocationIndex = value)
+                : _buildSalesPurchaseRow('CUSTOMER LOCATION', customerLocation),
             const SizedBox(height: 16),
-            _buildSalesPurchaseRow('VENDOR LOCATION', vendorLocation),
+            isEditing && locations.isNotEmpty
+                ? _buildDropdownRow('VENDOR LOCATION', locations, selectedVendorLocationIndex, (value) => selectedVendorLocationIndex = value)
+                : _buildSalesPurchaseRow('VENDOR LOCATION', vendorLocation),
             const SizedBox(height: 32),
           ],
         ),
@@ -1046,9 +1498,7 @@ class _CustomerViewState extends State<CustomerView> {
               width: double.infinity,
               padding: const EdgeInsets.all(8.0),
               decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: Colors.grey.shade300),
-                ),
+                border: Border.all(color: Colors.grey.shade300),
               ),
               child: const Text(
                 'PARTNER ACTIVATION',
@@ -1060,20 +1510,23 @@ class _CustomerViewState extends State<CustomerView> {
               ),
             ),
             const SizedBox(height: 16),
-            _buildSalesPurchaseRow('Partner Level', partnerLevel),
+            isEditing && grades.isNotEmpty
+                ? _buildDropdownRow('Partner Level', grades, selectedPartnerLevelIndex, (value) => selectedPartnerLevelIndex = value)
+                : _buildSalesPurchaseRow('Partner Level', partnerLevel),
             const SizedBox(height: 16),
-            _buildSalesPurchaseRow('Activation', activation),
+            isEditing && activations.isNotEmpty
+                ? _buildDropdownRow('Activation', activations, selectedActivationIndex, (value) => selectedActivationIndex = value)
+                : _buildSalesPurchaseRow('Activation', activation),
             const SizedBox(height: 16),
-            _buildSalesPurchaseRow('Level Weight', levelWeight),
+            isEditing
+                ? _buildEditableRow('Level Weight', levelWeightController)
+                : _buildSalesPurchaseRow('Level Weight', levelWeight),
             const SizedBox(height: 32),
-
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(8.0),
               decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: Colors.grey.shade300),
-                ),
+                border: Border.all(color: Colors.grey.shade300),
               ),
               child: const Text(
                 'PARTNER REVIEW',
@@ -1085,20 +1538,98 @@ class _CustomerViewState extends State<CustomerView> {
               ),
             ),
             const SizedBox(height: 16),
-            _buildSalesPurchaseRow('Latest Partner Review', latestPartnerReview),
+            isEditing
+                ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 150,
+                    child: Text(
+                      'Latest Partner Review',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: latestReviewController,
+                      decoration: const InputDecoration(
+                        labelText: 'Latest Partner Review',
+                        suffixIcon: Icon(Icons.calendar_today),
+                      ),
+                      readOnly: true,
+                      onTap: () => _selectDate(context, latestReviewController),
+                    ),
+                  ),
+                ],
+              ),
+            )
+                : _buildSalesPurchaseRow('Latest Partner Review', latestPartnerReview),
             const SizedBox(height: 16),
-            _buildSalesPurchaseRow('Next Partner Review', nextPartnerReview),
+            isEditing
+                ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 150,
+                    child: Text(
+                      'Next Partner Review',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: nextReviewController,
+                      decoration: const InputDecoration(
+                        labelText: 'Next Partner Review',
+                        suffixIcon: Icon(Icons.calendar_today),
+                      ),
+                      readOnly: true,
+                      onTap: () => _selectDate(context, nextReviewController),
+                    ),
+                  ),
+                ],
+              ),
+            )
+                : _buildSalesPurchaseRow('Next Partner Review', nextPartnerReview),
             const SizedBox(height: 16),
-            _buildSalesPurchaseRow('Partnership Date', partnershipDate),
+            isEditing
+                ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 150,
+                    child: Text(
+                      'Partnership Date',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: partnershipDateController,
+                      decoration: const InputDecoration(
+                        labelText: 'Partnership Date',
+                        suffixIcon: Icon(Icons.calendar_today),
+                      ),
+                      readOnly: true,
+                      onTap: () => _selectDate(context, partnershipDateController),
+                    ),
+                  ),
+                ],
+              ),
+            )
+                : _buildSalesPurchaseRow('Partnership Date', partnershipDate),
             const SizedBox(height: 32),
-
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(8.0),
               decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: Colors.grey.shade300),
-                ),
+                border: Border.all(color: Colors.grey.shade300),
               ),
               child: const Text(
                 'GEOLOCATION',
@@ -1138,6 +1669,72 @@ class _CustomerViewState extends State<CustomerView> {
               value.isNotEmpty ? value : '',
               style: TextStyle(
                 color: isHighlighted ? const Color(0xFF9EA700) : Colors.black,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEditableRow(String label, TextEditingController controller) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 150,
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              decoration: InputDecoration(labelText: label),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDropdownRow(String label, List<Map<String, dynamic>> items, int? selectedValue,
+      Function(int?) onChanged, {bool isHighlighted = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 150,
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          Expanded(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 300),
+              child: DropdownButtonFormField<int>(
+                value: selectedValue != null && selectedValue >= 0 && selectedValue < items.length ? selectedValue : null,
+                decoration: InputDecoration(
+                  labelText: label,
+                  border: const OutlineInputBorder(),
+                ),
+                items: items
+                    .map((item) => DropdownMenuItem<int>(
+                  value: items.indexOf(item),
+                  child: Text(
+                    item['name'] ?? item['complete_name'] ?? 'Unknown',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ))
+                    .toList(),
+                onChanged: onChanged,
+                isExpanded: true,
               ),
             ),
           ),
@@ -1198,6 +1795,31 @@ class _CustomerViewState extends State<CustomerView> {
     emailController.dispose();
     websiteController.dispose();
     vatController.dispose();
+
+    salespersonController.dispose();
+    salesTeamController.dispose();
+    paymentTermsSalesController.dispose();
+    implementedByController.dispose();
+    pricelistController.dispose();
+    deliveryMethodController.dispose();
+    buyerController.dispose();
+    paymentTermsPurchaseController.dispose();
+    paymentMethodController.dispose();
+    fiscalPositionController.dispose();
+    companyIdController.dispose();
+    referenceController.dispose();
+    companyController.dispose();
+    industryController.dispose();
+    customerLocationController.dispose();
+    vendorLocationController.dispose();
+
+    partnerLevelController.dispose();
+    activationController.dispose();
+    levelWeightController.dispose();
+    latestReviewController.dispose();
+    nextReviewController.dispose();
+    partnershipDateController.dispose();
+
     super.dispose();
   }
 }
