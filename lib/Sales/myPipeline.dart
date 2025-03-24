@@ -2823,7 +2823,7 @@ class SalesDataSource extends DataGridSource {
   final List<String> activityTypes;
   final Map<int, Uint8List> userImages;
   Uint8List? currentUserImage;
-  final BuildContext context; // Add context here
+  final BuildContext context;
 
   SalesDataSource(List<Map<String, dynamic>> salesList, this.activityTypes,
       this.userImages, this.context) {

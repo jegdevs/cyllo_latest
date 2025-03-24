@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:developer';
 import 'package:animated_custom_dropdown/custom_dropdown.dart';
+import 'package:cyllo_mobile/Leads/leads.dart';
 import 'package:cyllo_mobile/Profile/profilePage.dart';
 import 'package:cyllo_mobile/Sales/customers.dart';
 import 'package:cyllo_mobile/Sales/myPipeline.dart';
@@ -1221,6 +1222,7 @@ class _DemoState extends State<Demo> {
                 padding: const EdgeInsets.all(8.0),
                 child: ListTile(
                   onTap: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context)=>Leads()));
                     setState(() {
                       selectedIndex = 2;
                       expand = false;
