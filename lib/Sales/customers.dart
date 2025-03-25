@@ -136,7 +136,7 @@ class _CustomersState extends State<Customers> {
       final response = await client!.callKw({
         'model': 'mail.activity.type',
         'method': 'search_read',
-        'args': [[]], // Fetch all activity types
+        'args': [[]],
         'kwargs': {
           'fields': ['id', 'name'],
         },

@@ -561,6 +561,7 @@ class _LeadsState extends State<Leads> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Color(0xFF9EA700),
         title: Text('Leads'),
