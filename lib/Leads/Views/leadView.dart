@@ -5,6 +5,8 @@ import 'package:odoo_rpc/odoo_rpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:animated_custom_dropdown/custom_dropdown.dart';
 
+import '../../Sales/Views/pipeLineView.dart';
+
 class Leadview extends StatefulWidget {
   final int leadId;
 
@@ -20,6 +22,9 @@ class _LeadviewState extends State<Leadview> {
   bool isEditing = false;
   int? currentUserId;
   List<Map<String, dynamic>> leadsList = [];
+  String conversionAction = 'Convert to opportunity'; // Default radio button value
+  String customerAction = 'Link to an existing customer'; // Default customer action
+  int? selectedCustomerId;
 
   // Dropdown data
   List<Map<String, dynamic>> salesPersons = [];
@@ -351,6 +356,855 @@ class _LeadviewState extends State<Leadview> {
     }
   }
 
+
+
+  void _showConvertToOpportunityDialog(BuildContext context) {
+    setState(() {
+      conversionAction = 'Convert to opportunity';
+      customerAction = 'Link to an existing customer';
+      selectedCustomerId = selectedPartnerId;
+    });
+
+    List<int> selectedOpportunityIds = [];
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: Colors.white,
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Convert to Opportunity'),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Conversion Action',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    Row(
+                      children: [
+                        Radio<String>(
+                          value: 'Convert to opportunity',
+                          groupValue: conversionAction,
+                          onChanged: (value) {
+                            setDialogState(() {
+                              conversionAction = value!;
+                            });
+                          },
+                        ),
+                        const Text('Convert to opportunity'),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        Radio<String>(
+                          value: 'Merge with existing opportunities',
+                          groupValue: conversionAction,
+                          onChanged: (value) {
+                            setDialogState(() {
+                              conversionAction = value!;
+                            });
+                          },
+                        ),
+                        const Text('Merge with existing opportunities'),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Assign This Opportunity To',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildLabeledField(
+                      context,
+                      'Salesperson',
+                      CustomDropdown<String>(
+                        hintText: 'Select Salesperson',
+                        items: salesPersons.map((sp) => sp['name'].toString()).toList(),
+                        initialItem: _getNameFromId(selectedSalespersonId, salesPersons),
+                        onChanged: (value) {
+                          setState(() {
+                            selectedSalespersonId = salesPersons.firstWhere((sp) => sp['name'] == value)['id'];
+                          });
+                        },
+                      ),
+                    ),
+                    _buildLabeledField(
+                      context,
+                      'Sales Team',
+                      CustomDropdown<String>(
+                        hintText: 'Select Sales Team',
+                        items: salesTeams.map((st) => st['name'].toString()).toList(),
+                        initialItem: _getNameFromId(selectedSalesTeamId, salesTeams),
+                        onChanged: (value) {
+                          setState(() {
+                            selectedSalesTeamId = salesTeams.firstWhere((st) => st['name'] == value)['id'];
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'OPPORTUNITIES',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    if (conversionAction == 'Merge with existing opportunities') ...[
+                      _buildOpportunitiesTable(context, setDialogState, (ids) {
+                        setDialogState(() {
+                          selectedOpportunityIds = ids;
+                        });
+                      }),
+                    ] else ...[
+                      const Text(
+                        'Customer',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Row(
+                        children: [
+                          Radio<String>(
+                            value: 'Create a new customer',
+                            groupValue: customerAction,
+                            onChanged: (value) {
+                              setDialogState(() {
+                                customerAction = value!;
+                              });
+                            },
+                          ),
+                          const Text('Create a new customer'),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          Radio<String>(
+                            value: 'Link to an existing customer',
+                            groupValue: customerAction,
+                            onChanged: (value) {
+                              setDialogState(() {
+                                customerAction = value!;
+                              });
+                            },
+                          ),
+                          const Text('Link to an existing customer'),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          Radio<String>(
+                            value: 'Do not link to a customer',
+                            groupValue: customerAction,
+                            onChanged: (value) {
+                              setDialogState(() {
+                                customerAction = value!;
+                              });
+                            },
+                          ),
+                          const Text('Do not link to a customer'),
+                        ],
+                      ),
+                      if (customerAction == 'Link to an existing customer')
+                        _buildLabeledField(
+                          context,
+                          'Customer',
+                          CustomDropdown<String>(
+                            hintText: 'Select Customer',
+                            items: partners.map((p) => p['name'].toString()).toList(),
+                            initialItem: _getNameFromId(selectedCustomerId, partners),
+                            onChanged: (value) {
+                              setDialogState(() {
+                                selectedCustomerId = partners.firstWhere((p) => p['name'] == value)['id'];
+                              });
+                            },
+                          ),
+                        ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF9EA700),
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () async {
+                    bool success;
+                    if (conversionAction == 'Convert to opportunity') {
+                      success = await _convertToOpportunity(context);
+                    } else {
+                      success = await _mergeWithExistingOpportunity(context, selectedOpportunityIds);
+                    }
+                    if (success) {
+                      Navigator.of(context).pop();
+                      setState(() {});
+                    }
+                  },
+                  child: const Text('Create Opportunity'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Cancel'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Widget _buildOpportunitiesTable(BuildContext context, StateSetter setDialogState, Function(List<int>) onSelectionChanged) {
+  //   List<int> selectedOpportunityIds = [];
+  //
+  //   return FutureBuilder<List<Map<String, dynamic>>>(
+  //     future: fetchOpportunitiesForMerge(),
+  //     builder: (context, snapshot) {
+  //       if (snapshot.connectionState == ConnectionState.waiting) {
+  //         return const Center(child: CircularProgressIndicator());
+  //       }
+  //       if (snapshot.hasError) {
+  //         return const Center(child: Text('Error loading duplicate opportunities'));
+  //       }
+  //
+  //       List<Map<String, dynamic>> opportunitiesToMerge = snapshot.data ?? [];
+  //
+  //       if (opportunitiesToMerge.isEmpty) {
+  //         return const Center(child: Text('No duplicate opportunities found'));
+  //       }
+  //
+  //       return SingleChildScrollView(
+  //         scrollDirection: Axis.horizontal,
+  //         child: Container(
+  //           decoration: BoxDecoration(
+  //             border: Border.all(color: Colors.grey[300]!),
+  //             borderRadius: BorderRadius.circular(8),
+  //           ),
+  //           child: DataTable(
+  //             columnSpacing: 16,
+  //             dataRowHeight: 56,
+  //             headingRowHeight: 56,
+  //             headingRowColor: MaterialStateProperty.resolveWith((states) => Colors.grey[100]),
+  //             columns: [
+  //               DataColumn(
+  //                 label: Checkbox(
+  //                   value: selectedOpportunityIds.length == opportunitiesToMerge.length,
+  //                   onChanged: (bool? value) {
+  //                     setDialogState(() {
+  //                       if (value == true) {
+  //                         selectedOpportunityIds = opportunitiesToMerge.map((opp) => opp['id'] as int).toList();
+  //                       } else {
+  //                         selectedOpportunityIds = [];
+  //                       }
+  //                       onSelectionChanged(selectedOpportunityIds);
+  //                     });
+  //                   },
+  //                 ),
+  //               ),
+  //               DataColumn(label: Text('Created on', style: TextStyle(fontWeight: FontWeight.bold))),
+  //               DataColumn(label: Text('Opportunity', style: TextStyle(fontWeight: FontWeight.bold))),
+  //               DataColumn(label: Text('Type', style: TextStyle(fontWeight: FontWeight.bold))),
+  //               DataColumn(label: Text('Contact Name', style: TextStyle(fontWeight: FontWeight.bold))),
+  //               DataColumn(label: Text('Email', style: TextStyle(fontWeight: FontWeight.bold))),
+  //               DataColumn(label: Text('Stage', style: TextStyle(fontWeight: FontWeight.bold))),
+  //               DataColumn(label: Text('Salesperson', style: TextStyle(fontWeight: FontWeight.bold))),
+  //               DataColumn(label: Text('Sales Team', style: TextStyle(fontWeight: FontWeight.bold))),
+  //               DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
+  //             ],
+  //             rows: opportunitiesToMerge.map((opp) {
+  //               return DataRow(
+  //                 cells: [
+  //                   DataCell(
+  //                     Checkbox(
+  //                       value: selectedOpportunityIds.contains(opp['id']),
+  //                       onChanged: (bool? value) {
+  //                         setDialogState(() {
+  //                           if (value == true) {
+  //                             selectedOpportunityIds.add(opp['id']);
+  //                           } else {
+  //                             selectedOpportunityIds.remove(opp['id']);
+  //                           }
+  //                           onSelectionChanged(selectedOpportunityIds);
+  //                         });
+  //                       },
+  //                     ),
+  //                   ),
+  //                   DataCell(Text(_handleFalseValue(opp['date_open']))),
+  //                   DataCell(Text(_handleFalseValue(opp['name']))),
+  //                   DataCell(Text(_handleFalseValue(opp['type']))),
+  //                   DataCell(Text(_handleFalseValue(opp['contact_name']))),
+  //                   DataCell(Text(_handleFalseValue(opp['email_from']))),
+  //                   DataCell(Text(_handleFalseValue(opp['stage_id'] is List ? opp['stage_id'][1] : 'None'))),
+  //                   DataCell(Text(_handleRelationalField(opp['user_id']))),
+  //                   DataCell(Text(_handleRelationalField(opp['team_id']))),
+  //                   DataCell(
+  //                     IconButton(
+  //                       icon: Icon(Icons.close, color: Colors.grey[600]),
+  //                       onPressed: () {
+  //                         setDialogState(() {
+  //                           opportunitiesToMerge.removeWhere((item) => item['id'] == opp['id']);
+  //                           selectedOpportunityIds.remove(opp['id']);
+  //                           onSelectionChanged(selectedOpportunityIds);
+  //                         });
+  //                       },
+  //                     ),
+  //                   ),
+  //                 ],
+  //               );
+  //             }).toList(),
+  //           ),
+  //         ),
+  //       );
+  //     },
+  //   );
+  // }
+  Widget _buildOpportunitiesTable(BuildContext context, StateSetter setDialogState, Function(List<int>) onSelectionChanged) {
+    List<int> selectedOpportunityIds = [];
+
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: fetchOpportunitiesForMerge(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return const Center(child: Text('Error loading duplicate opportunities'));
+        }
+
+        List<Map<String, dynamic>> opportunitiesToMerge = snapshot.data ?? [];
+
+        if (opportunitiesToMerge.isEmpty) {
+          return const Center(child: Text('No duplicate opportunities found'));
+        }
+
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: DataTable(
+              columnSpacing: 16,
+              dataRowHeight: 56,
+              headingRowHeight: 56,
+              headingRowColor: MaterialStateProperty.resolveWith((states) => Colors.grey[100]),
+              columns: [
+                DataColumn(
+                  label: Checkbox(
+                    value: selectedOpportunityIds.length == opportunitiesToMerge.length,
+                    onChanged: (bool? value) {
+                      setDialogState(() {
+                        if (value == true) {
+                          selectedOpportunityIds = opportunitiesToMerge.map((opp) => opp['id'] as int).toList();
+                        } else {
+                          selectedOpportunityIds = [];
+                        }
+                        onSelectionChanged(selectedOpportunityIds);
+                      });
+                    },
+                  ),
+                ),
+                DataColumn(label: Text('Opportunity', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Contact Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Email', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Salesperson', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Expected Revenue', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Expected Closing', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Stage', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
+              ],
+              rows: [
+                ...opportunitiesToMerge.map((opp) {
+                  return DataRow(
+                    cells: [
+                      DataCell(
+                        Checkbox(
+                          value: selectedOpportunityIds.contains(opp['id']),
+                          onChanged: (bool? value) {
+                            setDialogState(() {
+                              if (value == true) {
+                                selectedOpportunityIds.add(opp['id']);
+                              } else {
+                                selectedOpportunityIds.remove(opp['id']);
+                              }
+                              onSelectionChanged(selectedOpportunityIds);
+                            });
+                          },
+                        ),
+                      ),
+                      DataCell(Text(_handleFalseValue(opp['name']))),
+                      DataCell(Text(_handleFalseValue(opp['contact_name']))),
+                      DataCell(Text(_handleFalseValue(opp['email_from']))),
+                      DataCell(Text(_handleRelationalField(opp['user_id']))),
+                      DataCell(Text(_handleFalseValue(opp['planned_revenue']))),
+                      DataCell(Text(_handleFalseValue(opp['date_deadline']))),
+                      DataCell(Text(_handleFalseValue(opp['stage_id'] is List ? opp['stage_id'][1] : 'None'))),
+                      DataCell(
+                        IconButton(
+                          icon: Icon(Icons.close, color: Colors.grey[600]),
+                          onPressed: () {
+                            setDialogState(() {
+                              opportunitiesToMerge.removeWhere((item) => item['id'] == opp['id']);
+                              selectedOpportunityIds.remove(opp['id']);
+                              onSelectionChanged(selectedOpportunityIds);
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+                // Add Line Row
+                DataRow(
+                  cells: [
+                    DataCell(Container()), // Empty cell for checkbox column
+                    DataCell(
+                      TextButton(
+                        onPressed: () {
+                          _showAddOpportunityDialog(context, setDialogState, opportunitiesToMerge, (newOpportunities) {
+                            setDialogState(() {
+                              opportunitiesToMerge.addAll(newOpportunities);
+                              onSelectionChanged(selectedOpportunityIds);
+                            });
+                          });
+                        },
+                        child: const Text(
+                          'Add Line',
+                          style: TextStyle(color: Colors.blue),
+                        ),
+                      ),
+                    ),
+                    DataCell(Container()),
+                    DataCell(Container()),
+                    DataCell(Container()),
+                    DataCell(Container()),
+                    DataCell(Container()),
+                    DataCell(Container()),
+                    DataCell(Container()),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+  void _showAddOpportunityDialog(
+      BuildContext context,
+      StateSetter parentSetState,
+      List<Map<String, dynamic>> opportunitiesToMerge,
+      Function(List<Map<String, dynamic>>) onAddOpportunities) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        // Define state variables outside the FutureBuilder
+        List<Map<String, dynamic>> allOpportunities = [];
+        List<int> selectedNewOpportunityIds = [];
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: Colors.white,
+              title: const Text('Add Opportunities'),
+              content: FutureBuilder<List<Map<String, dynamic>>>(
+                future: fetchAllOpportunities(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return const Center(child: Text('Error loading opportunities'));
+                  }
+
+                  // Update the state variable with the fetched data
+                  allOpportunities = snapshot.data ?? [];
+                  // Filter out opportunities already in the merge list
+                  allOpportunities = allOpportunities
+                      .where((opp) => !opportunitiesToMerge.any((existing) => existing['id'] == opp['id']))
+                      .toList();
+
+                  if (allOpportunities.isEmpty) {
+                    return const Center(child: Text('No additional opportunities available'));
+                  }
+
+                  return SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Container(
+                      width: MediaQuery.of(context).size.width * 0.8,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey[300]!),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: DataTable(
+                        columnSpacing: 16,
+                        dataRowHeight: 56,
+                        headingRowHeight: 56,
+                        headingRowColor: MaterialStateProperty.resolveWith((states) => Colors.grey[100]),
+                        columns: const [
+                          DataColumn(label: Text('')),
+                          DataColumn(label: Text('Opportunity', style: TextStyle(fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text('Contact Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text('Email', style: TextStyle(fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text('Salesperson', style: TextStyle(fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text('Expected Revenue', style: TextStyle(fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text('Expected Closing', style: TextStyle(fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text('Stage', style: TextStyle(fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
+                        ],
+                        rows: allOpportunities.map((opp) {
+                          return DataRow(
+                            cells: [
+                              DataCell(
+                                Checkbox(
+                                  value: selectedNewOpportunityIds.contains(opp['id']),
+                                  onChanged: (bool? value) {
+                                    setDialogState(() {
+                                      if (value == true) {
+                                        selectedNewOpportunityIds.add(opp['id']);
+                                      } else {
+                                        selectedNewOpportunityIds.remove(opp['id']);
+                                      }
+                                    });
+                                  },
+                                ),
+                              ),
+                              DataCell(Text(_handleFalseValue(opp['name']))),
+                              DataCell(Text(_handleFalseValue(opp['contact_name']))),
+                              DataCell(Text(_handleFalseValue(opp['email_from']))),
+                              DataCell(Text(_handleRelationalField(opp['user_id']))),
+                              DataCell(Text(_handleFalseValue(opp['planned_revenue']))),
+                              DataCell(Text(_handleFalseValue(opp['date_deadline']))),
+                              DataCell(Text(_handleFalseValue(opp['stage_id'] is List ? opp['stage_id'][1] : 'None'))),
+                              DataCell(
+                                Row(
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.email, color: Colors.grey),
+                                      onPressed: () {},
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.sms, color: Colors.grey),
+                                      onPressed: () {},
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              actions: [
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF9EA700),
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () {
+                    // Add selected opportunities to the merge list
+                    List<Map<String, dynamic>> newOpportunities = allOpportunities
+                        .where((opp) => selectedNewOpportunityIds.contains(opp['id']))
+                        .toList();
+                    onAddOpportunities(newOpportunities);
+                    Navigator.of(dialogContext).pop();
+                  },
+                  child: const Text('Add Selected'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                  },
+                  child: const Text('Cancel'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+  Future<List<Map<String, dynamic>>> fetchAllOpportunities() async {
+    try {
+      if (client == null) {
+        log("Odoo client is not initialized");
+        return [];
+      }
+
+      final response = await client!.callKw({
+        'model': 'crm.lead',
+        'method': 'search_read',
+        'args': [
+          []
+        ],
+        'kwargs': {
+          'fields': [
+
+          ],
+        },
+      });
+
+      if (response is List) {
+        return List<Map<String, dynamic>>.from(response);
+      }
+      return [];
+    } catch (e) {
+      log("Error fetching all opportunities: $e");
+      return [];
+    }
+  }
+  Future<bool> _convertToOpportunity(BuildContext context) async {
+    try {
+      if (client == null) {
+        throw Exception("Odoo client is not initialized");
+      }
+
+      // Prepare the conversion parameters
+      final conversionData = {
+        'lead_id': widget.leadId,
+        'name': conversionAction == 'Convert to opportunity' ? 'convert' : 'merge',
+        'action': customerAction == 'Create a new customer'
+            ? 'create'
+            : (customerAction == 'Link to an existing customer' ? 'exist' : 'nothing'),
+        'user_id': selectedSalespersonId ?? false,
+        'team_id': selectedSalesTeamId ?? false,
+        'partner_id': customerAction == 'Link to an existing customer'
+            ? (selectedCustomerId ?? false)
+            : false,
+        'duplicated_lead_ids': conversionAction == 'Merge with existing opportunities'
+            ? leadsList.map((lead) => lead['id']).toList()
+            : [],
+      };
+
+      log("Starting conversion process for lead ID: ${widget.leadId}");
+      log("Conversion data: $conversionData");
+
+      final responseWrite = await client!.callKw({
+        'model': 'crm.lead2opportunity.partner',
+        'method': 'create',
+        'args': [conversionData],
+        'kwargs': {},
+      });
+
+      log("Response from create: $responseWrite");
+
+      if (responseWrite == null) {
+        throw Exception("Failed to create conversion record");
+      }
+
+      final response = await client!.callKw({
+        'model': 'crm.lead2opportunity.partner',
+        'method': 'action_apply',
+        'args': [responseWrite],
+        'kwargs': {
+          'context': {
+            'active_ids': [widget.leadId],
+          },
+        },
+      });
+
+      log("Response from action_apply: $response");
+
+      if (response != null) {
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Lead converted to opportunity successfully')),
+        );
+
+        await leadData();
+        log("Refreshed lead data: $leadsList");
+
+        int opportunityId = widget.leadId; // Default to lead ID
+        if (response is Map && response.containsKey('opportunity_id')) {
+          opportunityId = response['opportunity_id'];
+          log("Opportunity ID from response: $opportunityId");
+        } else if (leadsList.isNotEmpty && leadsList[0]['type'] == 'opportunity') {
+          opportunityId = leadsList[0]['id'];
+          log("Opportunity ID from leadsList: $opportunityId");
+        } else {
+          log("Warning: Could not determine opportunity ID, using lead ID: $opportunityId");
+        }
+
+        Navigator.of(context).pop();
+        log("Dialog closed, attempting navigation to LeadDetailPage");
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          log("Navigating to LeadDetailPage with ID: $opportunityId");
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => LeadDetailPage(leadId: opportunityId),
+            ),
+          );
+        });
+
+        return true;
+      } else {
+        throw Exception("Failed to apply conversion - response is null");
+      }
+    } catch (e) {
+      log("Error converting lead to opportunity: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error converting lead: $e')),
+      );
+      return false;
+    }
+  }
+
+  Future<bool> _mergeWithExistingOpportunity(BuildContext context, List<int> selectedOpportunityIds) async {
+    try {
+      if (client == null) {
+        throw Exception("Odoo client is not initialized");
+      }
+
+      if (selectedOpportunityIds.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select at least one opportunity to merge')),
+        );
+        return false;
+      }
+
+      // Prepare merge data using crm.lead2opportunity.partner
+      final mergeData = {
+        'lead_id': widget.leadId,
+        'name': 'merge',
+        'user_id': selectedSalespersonId ?? false,
+        'team_id': selectedSalesTeamId ?? false,
+        'duplicated_lead_ids': selectedOpportunityIds, // Pass selected IDs
+      };
+
+      // Step 1: Create the merge record
+      final responseWrite = await client!.callKw({
+        'model': 'crm.lead2opportunity.partner',
+        'method': 'create',
+        'args': [mergeData],
+        'kwargs': {},
+      });
+
+      if (responseWrite == null) {
+        throw Exception("Failed to create merge record");
+      }
+
+
+      final response = await client!.callKw({
+        'model': 'crm.lead2opportunity.partner',
+        'method': 'action_apply',
+        'args': [responseWrite],
+        'kwargs': {
+          'context': {
+            'active_ids': [widget.leadId, ...selectedOpportunityIds],
+          },
+        },
+      });
+
+      if (response != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Opportunities merged successfully')),
+        );
+        await leadData();
+        return true;
+      } else {
+        throw Exception("Failed to merge opportunities");
+      }
+    } catch (e) {
+      log("Error merging with existing opportunity: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error merging opportunity: $e')),
+      );
+      return false;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchOpportunitiesForMerge() async {
+    try {
+      if (client == null) {
+        log("Odoo client is not initialized");
+        return [];
+      }
+
+      final responseWrite = await client!.callKw({
+        'model': 'crm.lead2opportunity.partner',
+        'method': 'create',
+        'args': [
+          {
+            'lead_id': widget.leadId,
+            'name': 'merge',
+          }
+        ],
+        'kwargs': {},
+      });
+
+      if (responseWrite == null) {
+        log("Failed to create crm.lead2opportunity.partner record");
+        return [];
+      }
+      final duplicateResponse = await client!.callKw({
+        'model': 'crm.lead2opportunity.partner',
+        'method': 'read',
+        'args': [responseWrite],
+        'kwargs': {
+          'fields': ['duplicated_lead_ids'],
+        },
+      });
+
+      if (duplicateResponse == null || duplicateResponse.isEmpty || duplicateResponse[0]['duplicated_lead_ids'] == false) {
+        log("No duplicate lead IDs found");
+        return [];
+      }
+
+      final duplicatedLeadIds = List<int>.from(duplicateResponse[0]['duplicated_lead_ids'] as List);
+
+      if (duplicatedLeadIds.isEmpty) {
+        log("Duplicated lead IDs list is empty");
+        return [];
+      }
+
+      final response = await client!.callKw({
+        'model': 'crm.lead',
+        'method': 'search_read',
+        'args': [
+          [
+            ['id', 'in', duplicatedLeadIds],
+          ]
+        ],
+        'kwargs': {
+          'fields': [
+            'id',
+            'name',
+            'date_open',
+            'type',
+            'contact_name',
+            'email_from',
+            'stage_id',
+            'user_id',
+            'team_id',
+          ],
+        }
+      });
+
+      if (response is List) {
+        return List<Map<String, dynamic>>.from(response);
+      }
+      return [];
+    } catch (e) {
+      log("Error fetching duplicate opportunities: $e");
+      return [];
+    }
+  }
+
+
   void setControllers() {
     if (leadsList.isNotEmpty) {
       final lead = leadsList[0];
@@ -426,6 +1280,7 @@ class _LeadviewState extends State<Leadview> {
             'partner_latitude',
             'partner_id',
             'tag_ids',
+            'active',
           ],
         }
       });
@@ -436,7 +1291,7 @@ class _LeadviewState extends State<Leadview> {
         });
       }
     } catch (e) {
-      print("error loading data$e");
+      log("error loading data$e");
     }
   }
 
@@ -578,13 +1433,16 @@ class _LeadviewState extends State<Leadview> {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(6)),
                   ),
-                  onPressed: () {},
+                  onPressed: () {
+                    _showConvertToOpportunityDialog(context);
+                  },
                   child: const Text('Convert to Opportunity'),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.grey[300],
+                    foregroundColor: Colors.black,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(6)),
                   ),

@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:developer';
 import 'package:animated_custom_dropdown/custom_dropdown.dart';
+import 'package:cyllo_mobile/Sales/Views/quotationsView.dart';
 import 'package:flutter/material.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -1037,30 +1039,204 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
             SizedBox(width: 8),
             _buildStatusButton('Lost', Colors.red.shade300, false),
             SizedBox(width: 24),
-            Row(
-              children: [
-                Text('New', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF9EA700))),
-                Text(' 2M '),
-                Icon(Icons.chevron_right, size: 16),
-                Text(' Qualified'),
-                Text(' 1m '),
-                Icon(Icons.chevron_right, size: 16),
-                Text(' Proposition '),
-                Icon(Icons.chevron_right, size: 16),
-                Text(' Won '),
-                Icon(Icons.chevron_right, size: 16),
-                Text(' double won'),
-              ],
-            ),
           ],
         ),
       ),
     );
   }
 
+  // Widget _buildStatusButton(String text, Color color, bool isActive) {
+  //   return ElevatedButton(
+  //     onPressed: () async {
+  //       if (text == 'New Quotation') {
+  //         if (client == null) {
+  //           ScaffoldMessenger.of(context).showSnackBar(
+  //             SnackBar(content: Text('Odoo client not initialized')),
+  //           );
+  //           return;
+  //         }
+  //
+  //         try {
+  //           // Call the action_quotation_new method on the crm.lead
+  //           final response = await client!.callKw({
+  //             'model': 'crm.lead',
+  //             'method': 'action_sale_quotations_new',
+  //             'args': [widget.leadId],
+  //             'kwargs': {},
+  //           });
+  //           log('qtaaaa$response');
+  //
+  //           // The response should contain the action to open the new quotation
+  //           if (response != null && response['res_id'] != null) {
+  //             final quotationId = response['res_id'];
+  //             // Navigate to QuotationPage with the new quotation ID
+  //             Navigator.push(
+  //               context,
+  //               MaterialPageRoute(
+  //                 builder: (context) => QuotationPage(quotationId: quotationId,customerName: leadData['partner_id'][1].toString(),),
+  //               ),
+  //             );
+  //           } else {
+  //             throw Exception('Failed to create new quotation');
+  //           }
+  //         } catch (e) {
+  //             log('Error creating quotation: $e');
+  //         }
+  //       }
+  //       // Add logic for other buttons (Won, Lost) if needed
+  //     },
+  //     style: ElevatedButton.styleFrom(
+  //       backgroundColor: isActive ? color : Colors.grey.shade200,
+  //       foregroundColor: isActive ? Colors.white : Colors.black87,
+  //       elevation: isActive ? 2 : 0,
+  //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+  //     ),
+  //     child: Text(text),
+  //   );
+  // }
+
   Widget _buildStatusButton(String text, Color color, bool isActive) {
     return ElevatedButton(
-      onPressed: () {},
+      onPressed: () async {
+        if (client == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Odoo client not initialized')),
+          );
+          return;
+        }
+
+        try {
+          if (text == 'New Quotation') {
+            // Fetch opportunity data to ensure partner_id exists
+            final leadResponse = await client!.callKw({
+              'model': 'crm.lead',
+              'method': 'read',
+              'args': [
+                [widget.leadId],
+                ['partner_id', 'name'], // Fetch partner_id and name for validation
+              ],
+              'kwargs': {},
+            });
+
+            if (leadResponse == null || leadResponse.isEmpty) {
+              throw Exception('Opportunity not found');
+            }
+
+            final leadData = leadResponse[0];
+            final partnerId = leadData['partner_id'] is List && leadData['partner_id'].isNotEmpty
+                ? leadData['partner_id'][0] as int
+                : null;
+            final customerName = leadData['partner_id'] is List && leadData['partner_id'].length > 1
+                ? leadData['partner_id'][1].toString()
+                : leadData['name']?.toString() ?? 'Unknown';
+
+            if (partnerId == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Cannot create quotation: Opportunity has no customer (partner_id) set.'),
+                ),
+              );
+              return;
+            }
+
+            // Create a new sale.order linked to the opportunity
+            final createResponse = await client!.callKw({
+              'model': 'sale.order',
+              'method': 'create',
+              'args': [
+                {
+                  'opportunity_id': widget.leadId, // Link to the opportunity
+                  'partner_id': partnerId, // Mandatory customer field
+                  'state': 'draft', // Set initial state as draft
+                }
+              ],
+              'kwargs': {},
+            });
+
+            log('New Quotation Created: $createResponse');
+
+            if (createResponse != null) {
+              final quotationId = createResponse as int;
+              // Navigate to QuotationPage with the new quotation ID
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => QuotationPage(
+                    quotationId: quotationId,
+                    customerName: customerName,
+                    partnerId: partnerId,
+                  ),
+                ),
+              );
+            } else {
+              throw Exception('Failed to create new quotation');
+            }
+          } else if (text == 'Won') {
+            // Call action_set_won_rainbowman to mark the opportunity as won
+            final wonResponse = await client!.callKw({
+              'model': 'crm.lead',
+              'method': 'action_set_won_rainbowman',
+              'args': [
+                [widget.leadId]
+              ],
+              'kwargs': {},
+            });
+
+            log('Mark as Won Response: $wonResponse');
+
+            // Refresh lead details to reflect the updated state
+            await fetchLeadDetails();
+
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Opportunity marked as Won!'),
+                  backgroundColor: Color(0xFF9EA700),
+                ),
+              );
+            }
+          } else if (text == 'Lost') {
+            // Since the Lost button triggers a wizard (action ID 415), we can either:
+            // 1. Directly call action_set_lost (if no reason is required)
+            // 2. Create a wizard and call action_set_lost on it (if a reason is needed)
+
+            // For simplicity, let's directly call action_set_lost
+            // If you need to specify a reason, we can implement the wizard flow instead
+
+            final lostResponse = await client!.callKw({
+              'model': 'crm.lead',
+              'method': 'action_set_lost',
+              'args': [
+                [widget.leadId]
+              ],
+              'kwargs': {
+                'context': {
+                  'default_lead_ids': [widget.leadId],
+                },
+              },
+            });
+
+            log('Mark as Lost Response: $lostResponse');
+
+            // Refresh lead details to reflect the updated state
+            await fetchLeadDetails();
+
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Opportunity marked as Lost!'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
+        } catch (e) {
+          log('Error for $text action: $e');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error for $text action: $e')),
+          );
+        }
+      },
       style: ElevatedButton.styleFrom(
         backgroundColor: isActive ? color : Colors.grey.shade200,
         foregroundColor: isActive ? Colors.white : Colors.black87,

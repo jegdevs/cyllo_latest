@@ -7,8 +7,10 @@ import 'package:animated_custom_dropdown/custom_dropdown.dart';
 
 class QuotationPage extends StatefulWidget {
   final int quotationId;
+  final String customerName;
+  final int? partnerId;
 
-  const QuotationPage({Key? key, required this.quotationId}) : super(key: key);
+  const QuotationPage({Key? key, required this.quotationId,this.customerName="",this.partnerId}) : super(key: key);
 
   @override
   _QuotationPageState createState() => _QuotationPageState();
@@ -65,6 +67,9 @@ class _QuotationPageState extends State<QuotationPage> {
     expirationController = TextEditingController();
     quotationDateController = TextEditingController();
     salespersonController = TextEditingController();
+    if(widget.customerName!=''){
+      customerController.text=widget.customerName;
+    }
     initializeOdooClient();
   }
 
@@ -262,9 +267,11 @@ class _QuotationPageState extends State<QuotationPage> {
   }
 
   void _updateControllers() {
-    customerController.text = quotationData['partner_id'] is List && quotationData['partner_id'].length > 1
-        ? quotationData['partner_id'][1] as String
-        : '';
+ if(widget.customerName==''){
+   customerController.text = quotationData['partner_id'] is List && quotationData['partner_id'].length > 1
+       ? quotationData['partner_id'][1] as String
+       : '';
+ }
     streetController.text = newAddress.isNotEmpty ? _toString(newAddress[0]['street']) : '';
     cityController.text = newAddress.isNotEmpty ? _toString(newAddress[0]['city']) : '';
     invoiceAddressController.text = quotationData['partner_invoice_id'] is List && quotationData['partner_invoice_id'].length > 1
@@ -661,10 +668,153 @@ class _QuotationPageState extends State<QuotationPage> {
     }
   }
 
+  // Future<void> sendQuotationEmail(int saleId, BuildContext context) async {
+  //   try {
+  //     setState(() => isLoading = true);
+  //
+  //     final quotationResponse = await client?.callKw({
+  //       'model': 'sale.order',
+  //       'method': 'action_quotation_send',
+  //       'args': [
+  //         [saleId]
+  //       ],
+  //       'kwargs': {
+  //         'context': {
+  //           'validate_analytic': true,
+  //         },
+  //       },
+  //     });
+  //
+  //     final contextData = quotationResponse['context'];
+  //     int? templateId = contextData?['default_template_id'];
+  //
+  //     if (templateId == null) {
+  //       print("No default template ID found for Sale Order ID: $saleId");
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(content: Text('No email template found for this quotation')),
+  //       );
+  //       return;
+  //     }
+  //
+  //     final saleOrder = await client?.callKw({
+  //       'model': 'sale.order',
+  //       'method': 'read',
+  //       'args': [
+  //         [saleId]
+  //       ],
+  //       'kwargs': {
+  //         'fields': [
+  //           'partner_id',
+  //           'state',
+  //         ],
+  //       },
+  //     });
+  //
+  //     if (saleOrder.isEmpty || saleOrder[0]['partner_id'] == null) {
+  //       print("❌ No customer found for Sale Order ID: $saleId");
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(content: Text('No customer found for this quotation')),
+  //       );
+  //       return;
+  //     }
+  //
+  //     int partnerId = saleOrder[0]['partner_id'][0] as int;
+  //     String currentStatus = saleOrder[0]['state'] as String;
+  //
+  //     final mailComposeResponse = await client?.callKw({
+  //       'model': 'mail.compose.message',
+  //       'method': 'create',
+  //       'args': [
+  //         {
+  //           'model': 'sale.order',
+  //           'res_ids': [saleId],
+  //           'template_id': templateId,
+  //           'composition_mode': 'comment',
+  //           'force_send': true,
+  //           'email_layout_xmlid': 'mail.mail_notification_layout_with_responsible_signature',
+  //           'partner_ids': [partnerId],
+  //         }
+  //       ],
+  //       'kwargs': {},
+  //     });
+  //
+  //     int mailComposeId = mailComposeResponse;
+  //
+  //     final sendMailResponse = await client?.callKw({
+  //       'model': 'mail.compose.message',
+  //       'method': 'action_send_mail',
+  //       'args': [
+  //         [mailComposeId]
+  //       ],
+  //       'kwargs': {},
+  //     });
+  //
+  //     print("Email Sent Successfully: $sendMailResponse");
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(
+  //           content: Text('Email Sent Successfully'),
+  //           backgroundColor:Color(0xFF9EA700),
+  //         ),
+  //       );
+  //     }
+  //
+  //     if (currentStatus == 'draft') {
+  //       await client?.callKw({
+  //         'model': 'sale.order',
+  //         'method': 'action_quotation_sent',
+  //         'args': [
+  //           [saleId]
+  //         ],
+  //         'kwargs': {},
+  //       });
+  //     }
+  //
+  //     await fetchQuotationDetails();
+  //   } catch (e) {
+  //     log("Error sending email: $e");
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(content: Text('Error sending email: $e')),
+  //       );
+  //     }
+  //   } finally {
+  //     if (mounted) {
+  //       setState(() => isLoading = false);
+  //     }
+  //   }
+  // }
+
   Future<void> sendQuotationEmail(int saleId, BuildContext context) async {
     try {
       setState(() => isLoading = true);
 
+      // Ensure the quotation exists and is in draft state
+      final quotationCheck = await client?.callKw({
+        'model': 'sale.order',
+        'method': 'read',
+        'args': [
+          [saleId]
+        ],
+        'kwargs': {
+          'fields': ['state', 'partner_id'],
+        },
+      });
+
+      if (quotationCheck == null || quotationCheck.isEmpty) {
+        throw Exception('Quotation not found');
+      }
+
+      String currentState = quotationCheck[0]['state'] as String;
+      int partnerId = quotationCheck[0]['partner_id'] is List && quotationCheck[0]['partner_id'].isNotEmpty
+          ? quotationCheck[0]['partner_id'][0] as int
+          : throw Exception('No customer associated with this quotation');
+
+      if (currentState != 'draft' && currentState != 'sent') {
+        throw Exception('Quotation must be in draft or sent state to send an email');
+      }
+
+      // Trigger the email sending action
       final quotationResponse = await client?.callKw({
         'model': 'sale.order',
         'method': 'action_quotation_send',
@@ -682,38 +832,10 @@ class _QuotationPageState extends State<QuotationPage> {
       int? templateId = contextData?['default_template_id'];
 
       if (templateId == null) {
-        print("No default template ID found for Sale Order ID: $saleId");
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No email template found for this quotation')),
-        );
-        return;
+        throw Exception('No email template found for this quotation');
       }
 
-      final saleOrder = await client?.callKw({
-        'model': 'sale.order',
-        'method': 'read',
-        'args': [
-          [saleId]
-        ],
-        'kwargs': {
-          'fields': [
-            'partner_id',
-            'state',
-          ],
-        },
-      });
-
-      if (saleOrder.isEmpty || saleOrder[0]['partner_id'] == null) {
-        print("❌ No customer found for Sale Order ID: $saleId");
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No customer found for this quotation')),
-        );
-        return;
-      }
-
-      int partnerId = saleOrder[0]['partner_id'][0] as int;
-      String currentStatus = saleOrder[0]['state'] as String;
-
+      // Create and send the email
       final mailComposeResponse = await client?.callKw({
         'model': 'mail.compose.message',
         'method': 'create',
@@ -725,7 +847,7 @@ class _QuotationPageState extends State<QuotationPage> {
             'composition_mode': 'comment',
             'force_send': true,
             'email_layout_xmlid': 'mail.mail_notification_layout_with_responsible_signature',
-            'partner_ids': [partnerId],
+            'partner_ids': [[6, 0, [partnerId]]], // Use partner_id from sale.order
           }
         ],
         'kwargs': {},
@@ -733,7 +855,7 @@ class _QuotationPageState extends State<QuotationPage> {
 
       int mailComposeId = mailComposeResponse;
 
-      final sendMailResponse = await client?.callKw({
+      await client?.callKw({
         'model': 'mail.compose.message',
         'method': 'action_send_mail',
         'args': [
@@ -742,17 +864,18 @@ class _QuotationPageState extends State<QuotationPage> {
         'kwargs': {},
       });
 
-      print("Email Sent Successfully: $sendMailResponse");
+      print("Email Sent Successfully");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Email Sent Successfully'),
-            backgroundColor:Color(0xFF9EA700),
+            backgroundColor: Color(0xFF9EA700),
           ),
         );
       }
 
-      if (currentStatus == 'draft') {
+      // If the quotation was in draft state, mark it as sent
+      if (currentState == 'draft') {
         await client?.callKw({
           'model': 'sale.order',
           'method': 'action_quotation_sent',
@@ -765,7 +888,7 @@ class _QuotationPageState extends State<QuotationPage> {
 
       await fetchQuotationDetails();
     } catch (e) {
-      print("Error sending email: $e");
+      log("Error sending email: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error sending email: $e')),
