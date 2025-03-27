@@ -25,6 +25,7 @@ class _LeadviewState extends State<Leadview> {
   String conversionAction = 'Convert to opportunity'; // Default radio button value
   String customerAction = 'Link to an existing customer'; // Default customer action
   int? selectedCustomerId;
+  List<Map<String, dynamic>> opportunitiesToMerge = [];
 
   // Dropdown data
   List<Map<String, dynamic>> salesPersons = [];
@@ -680,120 +681,124 @@ class _LeadviewState extends State<Leadview> {
           return const Center(child: Text('Error loading duplicate opportunities'));
         }
 
-        List<Map<String, dynamic>> opportunitiesToMerge = snapshot.data ?? [];
+        if (opportunitiesToMerge.isEmpty && snapshot.data != null) {
+          opportunitiesToMerge = List.from(snapshot.data!);
+        }
 
         if (opportunitiesToMerge.isEmpty) {
           return const Center(child: Text('No duplicate opportunities found'));
         }
 
         return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey[300]!),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: DataTable(
-              columnSpacing: 16,
-              dataRowHeight: 56,
-              headingRowHeight: 56,
-              headingRowColor: MaterialStateProperty.resolveWith((states) => Colors.grey[100]),
-              columns: [
-                DataColumn(
-                  label: Checkbox(
-                    value: selectedOpportunityIds.length == opportunitiesToMerge.length,
-                    onChanged: (bool? value) {
-                      setDialogState(() {
-                        if (value == true) {
-                          selectedOpportunityIds = opportunitiesToMerge.map((opp) => opp['id'] as int).toList();
-                        } else {
-                          selectedOpportunityIds = [];
-                        }
-                        onSelectionChanged(selectedOpportunityIds);
-                      });
-                    },
-                  ),
-                ),
-                DataColumn(label: Text('Opportunity', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Contact Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Email', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Salesperson', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Expected Revenue', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Expected Closing', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Stage', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
-              ],
-              rows: [
-                ...opportunitiesToMerge.map((opp) {
-                  return DataRow(
-                    cells: [
-                      DataCell(
-                        Checkbox(
-                          value: selectedOpportunityIds.contains(opp['id']),
-                          onChanged: (bool? value) {
-                            setDialogState(() {
-                              if (value == true) {
-                                selectedOpportunityIds.add(opp['id']);
-                              } else {
-                                selectedOpportunityIds.remove(opp['id']);
-                              }
-                              onSelectionChanged(selectedOpportunityIds);
-                            });
-                          },
-                        ),
-                      ),
-                      DataCell(Text(_handleFalseValue(opp['name']))),
-                      DataCell(Text(_handleFalseValue(opp['contact_name']))),
-                      DataCell(Text(_handleFalseValue(opp['email_from']))),
-                      DataCell(Text(_handleRelationalField(opp['user_id']))),
-                      DataCell(Text(_handleFalseValue(opp['planned_revenue']))),
-                      DataCell(Text(_handleFalseValue(opp['date_deadline']))),
-                      DataCell(Text(_handleFalseValue(opp['stage_id'] is List ? opp['stage_id'][1] : 'None'))),
-                      DataCell(
-                        IconButton(
-                          icon: Icon(Icons.close, color: Colors.grey[600]),
-                          onPressed: () {
-                            setDialogState(() {
-                              opportunitiesToMerge.removeWhere((item) => item['id'] == opp['id']);
-                              selectedOpportunityIds.remove(opp['id']);
-                              onSelectionChanged(selectedOpportunityIds);
-                            });
-                          },
-                        ),
-                      ),
-                    ],
-                  );
-                }).toList(),
-                // Add Line Row
-                DataRow(
-                  cells: [
-                    DataCell(Container()), // Empty cell for checkbox column
-                    DataCell(
-                      TextButton(
-                        onPressed: () {
-                          _showAddOpportunityDialog(context, setDialogState, opportunitiesToMerge, (newOpportunities) {
-                            setDialogState(() {
-                              opportunitiesToMerge.addAll(newOpportunities);
-                              onSelectionChanged(selectedOpportunityIds);
-                            });
-                          });
-                        },
-                        child: const Text(
-                          'Add Line',
-                          style: TextStyle(color: Colors.blue),
-                        ),
-                      ),
+          scrollDirection: Axis.vertical,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey[300]!),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: DataTable(
+                columnSpacing: 16,
+                dataRowHeight: 56,
+                headingRowHeight: 56.0,
+                headingRowColor: MaterialStateProperty.resolveWith((states) => Colors.grey[100]),
+                columns: [
+                  DataColumn(
+                    label: Checkbox(
+                      value: selectedOpportunityIds.length == opportunitiesToMerge.length,
+                      onChanged: (bool? value) {
+                        setDialogState(() {
+                          if (value == true) {
+                            selectedOpportunityIds = opportunitiesToMerge.map((opp) => opp['id'] as int).toList();
+                          } else {
+                            selectedOpportunityIds = [];
+                          }
+                          onSelectionChanged(selectedOpportunityIds);
+                        });
+                      },
                     ),
-                    DataCell(Container()),
-                    DataCell(Container()),
-                    DataCell(Container()),
-                    DataCell(Container()),
-                    DataCell(Container()),
-                    DataCell(Container()),
-                    DataCell(Container()),
-                  ],
-                ),
-              ],
+                  ),
+                  DataColumn(label: Text('Opportunity', style: TextStyle(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Contact Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Email', style: TextStyle(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Salesperson', style: TextStyle(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Expected Revenue', style: TextStyle(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Expected Closing', style: TextStyle(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Stage', style: TextStyle(fontWeight: FontWeight.bold))),
+                  DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
+                ],
+                rows: [
+                  ...opportunitiesToMerge.map((opp) {
+                    return DataRow(
+                      cells: [
+                        DataCell(
+                          Checkbox(
+                            value: selectedOpportunityIds.contains(opp['id']),
+                            onChanged: (bool? value) {
+                              setDialogState(() {
+                                if (value == true) {
+                                  selectedOpportunityIds.add(opp['id']);
+                                } else {
+                                  selectedOpportunityIds.remove(opp['id']);
+                                }
+                                onSelectionChanged(selectedOpportunityIds);
+                              });
+                            },
+                          ),
+                        ),
+                        DataCell(Text(_handleFalseValue(opp['name']))),
+                        DataCell(Text(_handleFalseValue(opp['contact_name']))),
+                        DataCell(Text(_handleFalseValue(opp['email_from']))),
+                        DataCell(Text(_handleRelationalField(opp['user_id']))),
+                        DataCell(Text(_handleFalseValue(opp['planned_revenue']))),
+                        DataCell(Text(_handleFalseValue(opp['date_deadline']))),
+                        DataCell(Text(_handleFalseValue(opp['stage_id'] is List ? opp['stage_id'][1] : 'None'))),
+                        DataCell(
+                          IconButton(
+                            icon: Icon(Icons.close, color: Colors.grey[600]),
+                            onPressed: () {
+                              setDialogState(() {
+                                opportunitiesToMerge.removeWhere((item) => item['id'] == opp['id']);
+                                selectedOpportunityIds.remove(opp['id']);
+                                onSelectionChanged(selectedOpportunityIds);
+                              });
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                  DataRow(
+                    cells: [
+                      DataCell(Container()), // 1
+                      DataCell(
+                        TextButton(
+                          onPressed: () {
+                            _showAddOpportunityDialog(context, setDialogState, opportunitiesToMerge, (newOpportunities) {
+                              setDialogState(() {
+                                opportunitiesToMerge.addAll(newOpportunities);
+                                onSelectionChanged(selectedOpportunityIds);
+                              });
+                            });
+                          },
+                          child: const Text(
+                            'Add Line',
+                            style: TextStyle(color: Colors.blue),
+                          ),
+                        ),
+                      ), // 2
+                      DataCell(Container()),
+                      DataCell(Container()),
+                      DataCell(Container()),
+                      DataCell(Container()),
+                      DataCell(Container()),
+                      DataCell(Container()),
+                      DataCell(Container()),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -808,7 +813,6 @@ class _LeadviewState extends State<Leadview> {
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
-        // Define state variables outside the FutureBuilder
         List<Map<String, dynamic>> allOpportunities = [];
         List<int> selectedNewOpportunityIds = [];
 
@@ -817,96 +821,100 @@ class _LeadviewState extends State<Leadview> {
             return AlertDialog(
               backgroundColor: Colors.white,
               title: const Text('Add Opportunities'),
-              content: FutureBuilder<List<Map<String, dynamic>>>(
-                future: fetchAllOpportunities(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (snapshot.hasError) {
-                    return const Center(child: Text('Error loading opportunities'));
-                  }
+              content: SizedBox(
+                width: MediaQuery.of(context).size.width * 0.9,
+                height: MediaQuery.of(context).size.height * 0.6,
+                child: FutureBuilder<List<Map<String, dynamic>>>(
+                  future: fetchAllOpportunities(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError) {
+                      return const Center(child: Text('Error loading opportunities'));
+                    }
 
-                  // Update the state variable with the fetched data
-                  allOpportunities = snapshot.data ?? [];
-                  // Filter out opportunities already in the merge list
-                  allOpportunities = allOpportunities
-                      .where((opp) => !opportunitiesToMerge.any((existing) => existing['id'] == opp['id']))
-                      .toList();
+                    allOpportunities = snapshot.data ?? [];
+                    allOpportunities = allOpportunities
+                        .where((opp) => !opportunitiesToMerge.any((existing) => existing['id'] == opp['id']))
+                        .toList();
 
-                  if (allOpportunities.isEmpty) {
-                    return const Center(child: Text('No additional opportunities available'));
-                  }
+                    if (allOpportunities.isEmpty) {
+                      return const Center(child: Text('No additional opportunities available'));
+                    }
 
-                  return SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Container(
-                      width: MediaQuery.of(context).size.width * 0.8,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey[300]!),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: DataTable(
-                        columnSpacing: 16,
-                        dataRowHeight: 56,
-                        headingRowHeight: 56,
-                        headingRowColor: MaterialStateProperty.resolveWith((states) => Colors.grey[100]),
-                        columns: const [
-                          DataColumn(label: Text('')),
-                          DataColumn(label: Text('Opportunity', style: TextStyle(fontWeight: FontWeight.bold))),
-                          DataColumn(label: Text('Contact Name', style: TextStyle(fontWeight: FontWeight.bold))),
-                          DataColumn(label: Text('Email', style: TextStyle(fontWeight: FontWeight.bold))),
-                          DataColumn(label: Text('Salesperson', style: TextStyle(fontWeight: FontWeight.bold))),
-                          DataColumn(label: Text('Expected Revenue', style: TextStyle(fontWeight: FontWeight.bold))),
-                          DataColumn(label: Text('Expected Closing', style: TextStyle(fontWeight: FontWeight.bold))),
-                          DataColumn(label: Text('Stage', style: TextStyle(fontWeight: FontWeight.bold))),
-                          DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
-                        ],
-                        rows: allOpportunities.map((opp) {
-                          return DataRow(
-                            cells: [
-                              DataCell(
-                                Checkbox(
-                                  value: selectedNewOpportunityIds.contains(opp['id']),
-                                  onChanged: (bool? value) {
-                                    setDialogState(() {
-                                      if (value == true) {
-                                        selectedNewOpportunityIds.add(opp['id']);
-                                      } else {
-                                        selectedNewOpportunityIds.remove(opp['id']);
-                                      }
-                                    });
-                                  },
-                                ),
-                              ),
-                              DataCell(Text(_handleFalseValue(opp['name']))),
-                              DataCell(Text(_handleFalseValue(opp['contact_name']))),
-                              DataCell(Text(_handleFalseValue(opp['email_from']))),
-                              DataCell(Text(_handleRelationalField(opp['user_id']))),
-                              DataCell(Text(_handleFalseValue(opp['planned_revenue']))),
-                              DataCell(Text(_handleFalseValue(opp['date_deadline']))),
-                              DataCell(Text(_handleFalseValue(opp['stage_id'] is List ? opp['stage_id'][1] : 'None'))),
-                              DataCell(
-                                Row(
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.email, color: Colors.grey),
-                                      onPressed: () {},
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.sms, color: Colors.grey),
-                                      onPressed: () {},
-                                    ),
-                                  ],
-                                ),
-                              ),
+                    return SingleChildScrollView(
+                      scrollDirection: Axis.vertical,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey[300]!),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: DataTable(
+                            columnSpacing: 16,
+                            dataRowHeight: 56,
+                            headingRowHeight: 56,
+                            headingRowColor: MaterialStateProperty.resolveWith((states) => Colors.grey[100]),
+                            columns: const [
+                              DataColumn(label: Text('')),
+                              DataColumn(label: Text('Opportunity', style: TextStyle(fontWeight: FontWeight.bold))),
+                              DataColumn(label: Text('Contact Name', style: TextStyle(fontWeight: FontWeight.bold))),
+                              DataColumn(label: Text('Email', style: TextStyle(fontWeight: FontWeight.bold))),
+                              DataColumn(label: Text('Salesperson', style: TextStyle(fontWeight: FontWeight.bold))),
+                              DataColumn(label: Text('Expected Revenue', style: TextStyle(fontWeight: FontWeight.bold))),
+                              DataColumn(label: Text('Expected Closing', style: TextStyle(fontWeight: FontWeight.bold))),
+                              DataColumn(label: Text('Stage', style: TextStyle(fontWeight: FontWeight.bold))),
+                              DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
                             ],
-                          );
-                        }).toList(),
+                            rows: allOpportunities.map((opp) {
+                              return DataRow(
+                                cells: [
+                                  DataCell(
+                                    Checkbox(
+                                      value: selectedNewOpportunityIds.contains(opp['id']),
+                                      onChanged: (bool? value) {
+                                        setDialogState(() {
+                                          if (value == true) {
+                                            selectedNewOpportunityIds.add(opp['id']);
+                                          } else {
+                                            selectedNewOpportunityIds.remove(opp['id']);
+                                          }
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  DataCell(Text(_handleFalseValue(opp['name']))),
+                                  DataCell(Text(_handleFalseValue(opp['contact_name']))),
+                                  DataCell(Text(_handleFalseValue(opp['email_from']))),
+                                  DataCell(Text(_handleRelationalField(opp['user_id']))),
+                                  DataCell(Text(_handleFalseValue(opp['planned_revenue']))),
+                                  DataCell(Text(_handleFalseValue(opp['date_deadline']))),
+                                  DataCell(Text(_handleFalseValue(opp['stage_id'] is List ? opp['stage_id'][1] : 'None'))),
+                                  DataCell(
+                                    Row(
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.email, color: Colors.grey),
+                                          onPressed: () {},
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.sms, color: Colors.grey),
+                                          onPressed: () {},
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }).toList(),
+                          ),
+                        ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
               actions: [
                 ElevatedButton(
@@ -915,12 +923,11 @@ class _LeadviewState extends State<Leadview> {
                     foregroundColor: Colors.white,
                   ),
                   onPressed: () {
-                    // Add selected opportunities to the merge list
                     List<Map<String, dynamic>> newOpportunities = allOpportunities
                         .where((opp) => selectedNewOpportunityIds.contains(opp['id']))
                         .toList();
-                    onAddOpportunities(newOpportunities);
-                    Navigator.of(dialogContext).pop();
+                    onAddOpportunities(newOpportunities); // Pass new opportunities back
+                    Navigator.of(dialogContext).pop(); // Close the dialog
                   },
                   child: const Text('Add Selected'),
                 ),
