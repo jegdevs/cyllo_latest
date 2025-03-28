@@ -45,6 +45,7 @@ class _MyactivityState extends State<Myactivity> {
   String? selectedClosedDate;
 
   Map<String, Map<String, dynamic>> getFilters() {
+    String todayDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
     return {
       'my_activities': {
         'name': 'My Activities',
@@ -54,7 +55,11 @@ class _MyactivityState extends State<Myactivity> {
       },
       'unassigned': {
         'name': 'Unassigned',
-        'domain': ["&", ("user_id", "=", false), ("type", "=", "lead")]
+        'domain':[
+          '&',
+          ['user_id', '=', false],
+          ['type', '=', 'lead']
+        ]
 
       },
       'my_assigned_partners': {
@@ -71,13 +76,6 @@ class _MyactivityState extends State<Myactivity> {
           ['probability', '=', 0]
         ]
       },
-      'archived': {
-        'name': 'Archived',
-        'domain': [
-          '&',
-          ['active', '=', false],
-        ]
-      },
       'created_on': {
         'name': 'Created On',
         'domain': [],
@@ -85,6 +83,30 @@ class _MyactivityState extends State<Myactivity> {
       'closed_on': {
         'name': 'Closed On',
         'domain': [],
+      },
+      'late_activities': {
+        'name': 'Late Activities',
+        'domain': [
+          ['activity_date_deadline', '<', todayDate]
+        ]
+      },
+      'today_activities': {
+        'name': 'Today Activities',
+        'domain': [
+          ['my_activity_date_deadline', '=', todayDate]
+        ]
+      },
+      'future_activities': {
+        'name': 'Future Activities',
+        'domain': [
+          ['my_activity_date_deadline', '>', todayDate]
+        ]
+      },
+      'archived': {
+        'name': 'Archived',
+        'domain': [
+          ['active', '=', false],
+        ]
       },
     };
   }
@@ -540,35 +562,149 @@ class _MyactivityState extends State<Myactivity> {
       final currentFilters = getFilters();
       List<dynamic> finalFilter = [];
 
-      if (selectedFilters.isNotEmpty) {
-        if (selectedFilters.length > 1) {
-          finalFilter.add("|");
-        }
+      // Build the filter logic (unchanged until the issue with empty filter is resolved)
+      bool hasUnassigned = selectedFilters.contains('unassigned');
+      bool hasMyActivities = selectedFilters.contains('my_activities');
+      bool hasMyAssignedPartners = selectedFilters.contains('my_assigned_partners');
+      bool hasLost = selectedFilters.contains('lost');
+      bool hasCreatedOn = selectedFilters.contains('created_on') && selectedCreationDate != null;
+      bool hasClosedOn = selectedFilters.contains('closed_on') && selectedClosedDate != null;
+      bool hasLateActivities = selectedFilters.contains('late_activities');
+      bool hasTodayActivities = selectedFilters.contains('today_activities');
+      bool hasFutureActivities = selectedFilters.contains('future_activities');
+      bool hasArchived = selectedFilters.contains('archived');
 
-        for (var filter in selectedFilters) {
-          if (currentFilters.containsKey(filter)) {
-            if (filter == 'created_on' && selectedCreationDate != null) {
-              DateTime parsedDate = DateFormat('MMMM yyyy').parse(selectedCreationDate!);
-              String year = parsedDate.year.toString();
-              String month = (parsedDate.month).toString().padLeft(2, '0');
-              finalFilter.add(['create_date', '=like', '$year-$month%']);
-            } else if (filter == 'closed_on' && selectedClosedDate != null) {
-              DateTime parsedDate = DateFormat('MMMM yyyy').parse(selectedClosedDate!);
-              String year = parsedDate.year.toString();
-              String month = (parsedDate.month).toString().padLeft(2, '0');
-              finalFilter.add(['date_closed', '=like', '$year-$month%']);
-            } else {
-              finalFilter.addAll(currentFilters[filter]!['domain']);
-            }
-          }
-        }
-      } else {
-        finalFilter = [
-          ["activity_user_id", "=", userid]
-        ];
+      log('Selected Filters: $selectedFilters');
+
+      // Primary domain (unassigned, my_activities, my_assigned_partners) with OR logic
+      List<dynamic> primaryDomain = [];
+      if (hasMyActivities || (!hasUnassigned && !hasMyAssignedPartners)) {
+        primaryDomain.addAll(currentFilters['my_activities']!['domain']);
       }
 
-      log('Activity Filter: ${finalFilter.toString()}');
+      if (hasUnassigned || hasMyAssignedPartners) {
+        if (hasUnassigned && hasMyAssignedPartners && hasMyActivities) {
+          primaryDomain = ['|', '|', ...currentFilters['unassigned']!['domain'],
+            ...currentFilters['my_activities']!['domain'],
+            ...currentFilters['my_assigned_partners']!['domain']];
+        } else if (hasUnassigned && hasMyActivities) {
+          primaryDomain = ['|', ...currentFilters['unassigned']!['domain'],
+            ...currentFilters['my_activities']!['domain']];
+        } else if (hasUnassigned && hasMyAssignedPartners) {
+          primaryDomain = ['|', ...currentFilters['unassigned']!['domain'],
+            ...currentFilters['my_assigned_partners']!['domain']];
+        } else if (hasMyActivities && hasMyAssignedPartners) {
+          primaryDomain = ['|', ...currentFilters['my_activities']!['domain'],
+            ...currentFilters['my_assigned_partners']!['domain']];
+        } else if (hasUnassigned) {
+          primaryDomain = [...currentFilters['unassigned']!['domain']];
+        } else if (hasMyAssignedPartners) {
+          primaryDomain = [...currentFilters['my_assigned_partners']!['domain']];
+        }
+      }
+
+      // Activities domain (late, today, future) with OR logic
+      List<dynamic> activitiesDomain = [];
+      if (hasLateActivities || hasTodayActivities || hasFutureActivities) {
+        if (hasLateActivities && hasTodayActivities && hasFutureActivities) {
+          activitiesDomain.add('|');
+          activitiesDomain.add('|');
+          activitiesDomain.addAll(currentFilters['late_activities']!['domain']);
+          activitiesDomain.addAll(currentFilters['today_activities']!['domain']);
+          activitiesDomain.addAll(currentFilters['future_activities']!['domain']);
+        } else if (hasLateActivities && hasTodayActivities) {
+          activitiesDomain.add('|');
+          activitiesDomain.addAll(currentFilters['late_activities']!['domain']);
+          activitiesDomain.addAll(currentFilters['today_activities']!['domain']);
+        } else if (hasLateActivities && hasFutureActivities) {
+          activitiesDomain.add('|');
+          activitiesDomain.addAll(currentFilters['late_activities']!['domain']);
+          activitiesDomain.addAll(currentFilters['future_activities']!['domain']);
+        } else if (hasTodayActivities && hasFutureActivities) {
+          activitiesDomain.add('|');
+          activitiesDomain.addAll(currentFilters['today_activities']!['domain']);
+          activitiesDomain.addAll(currentFilters['future_activities']!['domain']);
+        } else if (hasLateActivities) {
+          activitiesDomain.addAll(currentFilters['late_activities']!['domain']);
+        } else if (hasTodayActivities) {
+          activitiesDomain.addAll(currentFilters['today_activities']!['domain']);
+        } else if (hasFutureActivities) {
+          activitiesDomain.addAll(currentFilters['future_activities']!['domain']);
+        }
+      }
+
+      // Date filters (created_on, closed_on) with proper range
+      List<dynamic> dateDomain = [];
+      bool hasDateFilter = false;
+      if (hasCreatedOn) {
+        DateTime parsedDate = DateFormat('MMMM yyyy').parse(selectedCreationDate!);
+        // Start: Last day of previous month at 18:30:00
+        DateTime startDateTime = DateTime(parsedDate.year, parsedDate.month, 0, 18, 30, 0);
+        String startDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(startDateTime);
+        // End: Last day of selected month at 18:29:59
+        DateTime endDateTime = DateTime(parsedDate.year, parsedDate.month + 1, 0, 18, 29, 59);
+        String endDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(endDateTime);
+        dateDomain.add(['create_date', '>=', startDate]);
+        dateDomain.add(['create_date', '<=', endDate]);
+        hasDateFilter = true;
+      }
+      if (hasClosedOn) {
+        DateTime parsedDate = DateFormat('MMMM yyyy').parse(selectedClosedDate!);
+        // Start: Last day of previous month at 18:30:00
+        DateTime startDateTime = DateTime(parsedDate.year, parsedDate.month, 0, 18, 30, 0);
+        String startDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(startDateTime);
+        // End: Last day of selected month at 18:29:59
+        DateTime endDateTime = DateTime(parsedDate.year, parsedDate.month + 1, 0, 18, 29, 59);
+        String endDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(endDateTime);
+        dateDomain.add(['date_closed', '>=', startDate]);
+        dateDomain.add(['date_closed', '<=', endDate]);
+        hasDateFilter = true;
+      }
+      if (hasCreatedOn && hasClosedOn) {
+        dateDomain = ['&', ...dateDomain];
+      } else if (hasCreatedOn || hasClosedOn) {
+        dateDomain = ['&', ...dateDomain];
+      }
+
+      // Combine domains with AND logic
+      if (primaryDomain.isNotEmpty) {
+        finalFilter = [...finalFilter, ...primaryDomain];
+      }
+      if (activitiesDomain.isNotEmpty) {
+        if (finalFilter.isNotEmpty) {
+          finalFilter = ['&', ...finalFilter, ...activitiesDomain];
+        } else {
+          finalFilter = [...activitiesDomain];
+        }
+      }
+      if (hasDateFilter) {
+        if (finalFilter.isNotEmpty) {
+          finalFilter = ['&', ...finalFilter, ...dateDomain];
+        } else {
+          finalFilter = [...dateDomain];
+        }
+      }
+      if (hasLost) {
+        if (finalFilter.isNotEmpty) {
+          finalFilter = ['&', ...finalFilter, ...currentFilters['lost']!['domain']];
+        } else {
+          finalFilter = [...currentFilters['lost']!['domain']];
+        }
+      }
+      if (hasArchived) {
+        if (finalFilter.isNotEmpty) {
+          finalFilter = ['&', ...finalFilter, ...currentFilters['archived']!['domain']];
+        } else {
+          finalFilter = [...currentFilters['archived']!['domain']];
+        }
+      }
+
+      // Default filter if none selected
+      // if (finalFilter.isEmpty) {
+      //   finalFilter = [['activity_user_id', '=', userid]];
+      // }
+
+      log('monnnaa$finalFilter');
       final response = await client?.callKw({
         'model': 'crm.lead',
         'method': 'search_read',
@@ -594,21 +730,28 @@ class _MyactivityState extends State<Myactivity> {
             'probability',
             'activity_user_id',
             'date_closed',
-            'type'
+            'type',
           ],
         }
       });
       log('Response: $response');
       if (response != null) {
         leadsList = List<Map<String, dynamic>>.from(response);
+        // Safely filter activitiesList by checking if activity_user_id is a list
         activitiesList = leadsList
-            .where((lead) => lead['activity_user_id'] != null && lead['activity_user_id'][0] == userid)
+            .where((lead) =>
+        lead['activity_user_id'] != null &&
+            lead['activity_user_id'] is List &&
+            lead['activity_user_id'].isNotEmpty &&
+            lead['activity_user_id'][0] == userid)
             .toList();
 
         Map<String, List<Map<String, dynamic>>> groupedLeads = {};
 
         for (var lead in activitiesList) {
-          String stage = lead['stage_id'][1] ?? '';
+          String stage = lead['stage_id'] is List && lead['stage_id'].length > 1
+              ? lead['stage_id'][1]
+              : 'Unknown';
           List<String> tagNames = [];
           if (lead['tag_ids'] != null && lead['tag_ids'] is List) {
             for (var tagId in lead['tag_ids']) {
@@ -636,7 +779,7 @@ class _MyactivityState extends State<Myactivity> {
                 }
               }
               return LeadItem(
-                leadId:lead['id'],
+                leadId: lead['id'],
                 name: lead['name'],
                 revenue: lead['expected_revenue'].toString(),
                 customerName: lead['partner_id'] != null &&
@@ -687,7 +830,8 @@ class _MyactivityState extends State<Myactivity> {
                 value = (stageValues[stageName] ?? 0) + (item['day_open'] as double);
               } else if (selectedFilter == "day_close" && item['day_close'] != false) {
                 value = (stageValues[stageName] ?? 0) + (item['day_close'] as double);
-              } else if (selectedFilter == "recurring_revenue_monthly" && item['recurring_revenue_monthly'] != false) {
+              } else if (selectedFilter == "recurring_revenue_monthly" &&
+                  item['recurring_revenue_monthly'] != false) {
                 value = (stageValues[stageName] ?? 0) + (item['recurring_revenue_monthly'] as double);
               } else if (selectedFilter == "expected_revenue" && item['expected_revenue'] != false) {
                 value = (stageValues[stageName] ?? 0) + (item['expected_revenue'] as double);
@@ -736,7 +880,6 @@ class _MyactivityState extends State<Myactivity> {
       });
     }
   }
-
   Widget ChartSelection() {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 15),
@@ -2063,6 +2206,7 @@ class _MyactivityState extends State<Myactivity> {
   @override
   void initState() {
     super.initState();
+    selectedFilters = {'my_activities'};
     initializeOdooClient();
     boardController = AppFlowyBoardScrollController();
   }

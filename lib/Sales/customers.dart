@@ -193,7 +193,6 @@ class _CustomersState extends State<Customers> {
           tempActivities.putIfAbsent(customerId, () => []).add(activity);
         }
 
-        // Get all user IDs to fetch their images
         Set<int> userIds = {};
         for (var activities in tempActivities.values) {
           for (var activity in activities) {
@@ -205,7 +204,6 @@ class _CustomersState extends State<Customers> {
           }
         }
 
-        // Fetch user images
         if (userIds.isNotEmpty) {
           final userResponse = await client!.callKw({
             'model': 'res.users',
