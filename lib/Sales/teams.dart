@@ -20,6 +20,7 @@ class _SalesTeamState extends State<SalesTeam> {
   List<dynamic> salesTeams = [];
   bool isLoading = false;
   OdooClient? client;
+  bool showArchived = false;
 
   @override
   void initState() {
@@ -58,12 +59,28 @@ class _SalesTeamState extends State<SalesTeam> {
     setState(() => isLoading = false);
   }
 
+  Map<String, Map<String, dynamic>> getFilters() {
+    return {
+      'archived': {
+        'name': 'Show Archived',
+        'domain': [
+          ['active', '=', false]
+        ]
+      },
+    };
+  }
+
   Future<void> fetchAllSalesTeamsData() async {
     try {
+      List domain = [];
+      domain.add(['use_opportunities','=',true]);
+      if(showArchived) {
+        domain.add(['active', '=', false]);
+      }
       final teamsResponse = await client?.callKw({
         'model': 'crm.team',
         'method': 'search_read',
-        'args': [[]],
+        'args': [domain],
         'kwargs': {
           'fields': ['id', 'name', 'invoiced_target'],
         },
@@ -361,12 +378,84 @@ class _SalesTeamState extends State<SalesTeam> {
     );
   }
 
+  void showFilterDialog(BuildContext context) {
+    bool tempShowArchived = showArchived;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: Colors.white,
+          title: Text(
+            "Select Filter",
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.blueGrey[800],
+            ),
+          ),
+          content: StatefulBuilder(
+            builder: (context, setDialogState) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CheckboxListTile(
+                    title: Text(
+                      "Show Archived",
+                      style: TextStyle(color: Colors.blueGrey[800]),
+                    ),
+                    value: tempShowArchived,
+                    activeColor: Colors.blue,
+                    onChanged: (bool? value) {
+                      setDialogState(() {
+                        tempShowArchived = value ?? false;
+                      });
+                    },
+                  ),
+                ],
+              );
+            },
+          ),
+          actionsPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              style: TextButton.styleFrom(foregroundColor: Colors.grey[600]),
+              child: Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  showArchived = tempShowArchived;
+                });
+                Navigator.pop(context);
+                fetchAllSalesTeamsData(); // Refresh data with new filter
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF9EA700),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text("Apply", style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sales Teams'),
         backgroundColor: Color(0xFF9EA700),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.filter_list),
+            onPressed: () => showFilterDialog(context),
+          ),
+        ],
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())

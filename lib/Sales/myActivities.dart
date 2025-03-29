@@ -578,10 +578,12 @@ class _MyactivityState extends State<Myactivity> {
 
       // Primary domain (unassigned, my_activities, my_assigned_partners) with OR logic
       List<dynamic> primaryDomain = [];
-      if (hasMyActivities || (!hasUnassigned && !hasMyAssignedPartners)) {
-        primaryDomain.addAll(currentFilters['my_activities']!['domain']);
+      if (hasMyActivities) {
+        primaryDomain.addAll(currentFilters['my_activities']!['domain']); // ['activity_user_id', '=', currentUserId]
       }
-
+      if(!hasMyActivities){
+        finalFilter.add(['activity_user_id','!=',false]);
+      }
       if (hasUnassigned || hasMyAssignedPartners) {
         if (hasUnassigned && hasMyAssignedPartners && hasMyActivities) {
           primaryDomain = ['|', '|', ...currentFilters['unassigned']!['domain'],
@@ -638,10 +640,8 @@ class _MyactivityState extends State<Myactivity> {
       bool hasDateFilter = false;
       if (hasCreatedOn) {
         DateTime parsedDate = DateFormat('MMMM yyyy').parse(selectedCreationDate!);
-        // Start: Last day of previous month at 18:30:00
         DateTime startDateTime = DateTime(parsedDate.year, parsedDate.month, 0, 18, 30, 0);
         String startDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(startDateTime);
-        // End: Last day of selected month at 18:29:59
         DateTime endDateTime = DateTime(parsedDate.year, parsedDate.month + 1, 0, 18, 29, 59);
         String endDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(endDateTime);
         dateDomain.add(['create_date', '>=', startDate]);
@@ -650,10 +650,8 @@ class _MyactivityState extends State<Myactivity> {
       }
       if (hasClosedOn) {
         DateTime parsedDate = DateFormat('MMMM yyyy').parse(selectedClosedDate!);
-        // Start: Last day of previous month at 18:30:00
         DateTime startDateTime = DateTime(parsedDate.year, parsedDate.month, 0, 18, 30, 0);
         String startDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(startDateTime);
-        // End: Last day of selected month at 18:29:59
         DateTime endDateTime = DateTime(parsedDate.year, parsedDate.month + 1, 0, 18, 29, 59);
         String endDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(endDateTime);
         dateDomain.add(['date_closed', '>=', startDate]);
@@ -699,12 +697,13 @@ class _MyactivityState extends State<Myactivity> {
         }
       }
 
-      // Default filter if none selected
-      // if (finalFilter.isEmpty) {
-      //   finalFilter = [['activity_user_id', '=', userid]];
-      // }
+      // Default filter: Ensure activity_user_id != false when no primary filters are selected
+      if (finalFilter.isEmpty && !hasMyActivities && !hasUnassigned && !hasMyAssignedPartners) {
+        finalFilter = [['activity_user_id', '!=', false]];
+      }
 
       log('monnnaa$finalFilter');
+
       final response = await client?.callKw({
         'model': 'crm.lead',
         'method': 'search_read',
@@ -734,17 +733,22 @@ class _MyactivityState extends State<Myactivity> {
           ],
         }
       });
+
       log('Response: $response');
       if (response != null) {
         leadsList = List<Map<String, dynamic>>.from(response);
-        // Safely filter activitiesList by checking if activity_user_id is a list
-        activitiesList = leadsList
-            .where((lead) =>
-        lead['activity_user_id'] != null &&
-            lead['activity_user_id'] is List &&
-            lead['activity_user_id'].isNotEmpty &&
-            lead['activity_user_id'][0] == userid)
-            .toList();
+        // Conditionally filter activitiesList based on "My Activities" selection
+        if (hasMyActivities) {
+          activitiesList = leadsList
+              .where((lead) =>
+          lead['activity_user_id'] != null &&
+              lead['activity_user_id'] is List &&
+              lead['activity_user_id'].isNotEmpty &&
+              lead['activity_user_id'][0] == userid)
+              .toList();
+        } else {
+          activitiesList = leadsList; // Use all leads from the filtered leadsList
+        }
 
         Map<String, List<Map<String, dynamic>>> groupedLeads = {};
 

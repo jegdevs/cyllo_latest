@@ -38,7 +38,8 @@ class _MyquotationsState extends State<Myquotations> {
   Uint8List? profileImage;
   List<String> activityTypes = [];
   List<Map<String, dynamic>> activitiesList = [];
-
+  Set<String> selectedFilters = {'my_quotations'}; // Default filter
+  String? selectedCreationDate;
   @override
   void initState() {
     super.initState();
@@ -73,34 +74,120 @@ class _MyquotationsState extends State<Myquotations> {
     }
     setState(() => isLoading = false);
   }
-
+  Map<String, Map<String, dynamic>> getFilters() {
+    return {
+      'my_quotations': {
+        'name': 'My Quotations',
+        'domain': [
+          ['user_id', '=', currentUserId]
+        ]
+      },
+      'quotations': {
+        'name': 'Quotations',
+        'domain': [
+          ['state', 'in', ['draft', 'sent']]
+        ]
+      },
+      'sales_order': {
+        'name': 'Sales Order',
+        'domain': [
+          ['state', '=', 'sale']
+        ]
+      },
+      'created_on': {
+        'name': 'Created On',
+        'domain': [],
+      },
+    };
+  }
   Future<void> fetchLeadsData() async {
     if (client == null || currentUserId == null) {
       print("Client or user ID is null");
       return;
     }
 
+    setState(() => isLoading = true);
     try {
-      List<List<dynamic>> domainFilter = [];
+      List<dynamic> domainFilter = [];
 
-      if (widget.applyUserFilter && currentUserId != null) {
-        domainFilter.add(["user_id", "=", currentUserId]);
-      }
-
+      // Apply widget-specific filters
       if (widget.teamId != null) {
         domainFilter.add(["team_id", "=", widget.teamId]);
       }
-
       if (widget.domain != null && widget.domain!.isNotEmpty) {
         domainFilter.addAll(widget.domain!);
       }
-      log('www3222$domainFilter');
 
+      // Apply selected filters
+      final filters = getFilters();
+      bool hasMyQuotations = selectedFilters.contains('my_quotations');
+      bool hasQuotations = selectedFilters.contains('quotations');
+      bool hasSalesOrder = selectedFilters.contains('sales_order');
+      bool hasCreatedOn =
+          selectedFilters.contains('created_on') && selectedCreationDate != null;
+
+      // Primary domain: OR logic for quotations and sales_order, AND with my_quotations
+      List<dynamic> primaryDomain = [];
+      if (hasMyQuotations || hasQuotations || hasSalesOrder) {
+        // Handle quotations and sales_order with OR logic
+        List<dynamic> quotationsSalesDomain = [];
+        if (hasQuotations && hasSalesOrder) {
+          quotationsSalesDomain = [
+            '|',
+            ...filters['quotations']!['domain'],
+            ...filters['sales_order']!['domain']
+          ];
+        } else if (hasQuotations) {
+          quotationsSalesDomain = [...filters['quotations']!['domain']];
+        } else if (hasSalesOrder) {
+          quotationsSalesDomain = [...filters['sales_order']!['domain']];
+        }
+
+        // Combine with my_quotations using AND if selected
+        if (hasMyQuotations && quotationsSalesDomain.isNotEmpty) {
+          primaryDomain = [
+            '&',
+            ...filters['my_quotations']!['domain'],
+            ...quotationsSalesDomain
+          ];
+        } else if (hasMyQuotations) {
+          primaryDomain = [...filters['my_quotations']!['domain']];
+        } else if (quotationsSalesDomain.isNotEmpty) {
+          primaryDomain = [...quotationsSalesDomain];
+        }
+      }
+
+      // Date filter for created_on with specific time boundaries
+      List<dynamic> dateDomain = [];
+      bool hasDateFilter = false;
+      if (hasCreatedOn) {
+        DateTime parsedDate = DateFormat('MMMM yyyy').parse(selectedCreationDate!);
+        DateTime startDateTime = DateTime(parsedDate.year, parsedDate.month, 0, 18, 30, 0);
+        String startDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(startDateTime);
+        DateTime endDateTime = DateTime(parsedDate.year, parsedDate.month + 1, 0, 18, 29, 59);
+        String endDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(endDateTime);
+        dateDomain.add(['create_date', '>=', startDate]);
+        dateDomain.add(['create_date', '<=', endDate]);
+        hasDateFilter = true;
+      }
+
+      // Combine domains with AND logic
+      if (primaryDomain.isNotEmpty) {
+        domainFilter = [...domainFilter, ...primaryDomain];
+      }
+      if (hasDateFilter) {
+        if (domainFilter.isNotEmpty) {
+          domainFilter = ['&', ...domainFilter, ...dateDomain];
+        } else {
+          domainFilter = [...dateDomain];
+        }
+      }
+
+      log('www3222$domainFilter');
       final response = await client?.callKw({
         'model': 'sale.order',
         'method': 'search_read',
-        'args':
-            [domainFilter],
+        'args': [domainFilter],
         'kwargs': {
           'fields': [
             'name',
@@ -120,22 +207,174 @@ class _MyquotationsState extends State<Myquotations> {
 
       log("Leads fetched: ${response}");
 
-      if (response != null) {
+      if (response != null && mounted) {
         setState(() {
           leadsList = List<Map<String, dynamic>>.from(response);
-          opportunitiesList =
-              leadsList.where((lead) => lead['type'] == "opportunity").toList();
+          opportunitiesList = leadsList.where((lead) => lead['type'] == "opportunity").toList();
           chartDatavalues = prepareChartData(leadsList);
           showNoDataMessage = chartDatavalues.isEmpty;
+          isLoading = false;
         });
 
         print("Leads list updated with ${leadsList.length} items");
       }
     } catch (e) {
       print("Failed to fetch leads: $e");
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
   }
+  void showFilterDialog(BuildContext context) {
+    final currentFilters = getFilters();
+    Set<String> tempSelectedFilters = Set.from(selectedFilters);
+    String? tempCreationDate = selectedCreationDate;
 
+    // Generate creationDates list (similar to your reference)
+    List<String> creationDates = List.generate(3, (index) {
+      DateTime date = DateTime.now().subtract(Duration(days: index * 30));
+      return DateFormat('MMMM yyyy').format(date);
+    });
+    if (!creationDates.contains("None")) {
+      creationDates.insert(0, "None");
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: Colors.white,
+          title: Text(
+            "Select Filters",
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.blueGrey[800],
+            ),
+          ),
+          content: StatefulBuilder(
+            builder: (context, setDialogState) {
+              return Container(
+                width: double.maxFinite,
+                constraints: BoxConstraints(maxHeight: 300),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Filters as Checkboxes (excluding 'created_on')
+                      ...currentFilters.entries
+                          .where((entry) => entry.key != 'created_on')
+                          .map((entry) {
+                        return Card(
+                          elevation: 0,
+                          color: Colors.grey[50],
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: CheckboxListTile(
+                            title: Text(
+                              entry.value['name'],
+                              style: TextStyle(color: Colors.blueGrey[800]),
+                            ),
+                            value: tempSelectedFilters.contains(entry.key),
+                            activeColor: Colors.blue,
+                            onChanged: (bool? value) {
+                              setDialogState(() {
+                                if (value == true) {
+                                  tempSelectedFilters.add(entry.key);
+                                } else {
+                                  tempSelectedFilters.remove(entry.key);
+                                }
+                              });
+                            },
+                          ),
+                        );
+                      }).toList(),
+                      // 'Created On' as Dropdown (styled like reference)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              currentFilters['created_on']!['name'],
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.blueGrey[700],
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Container(
+                              padding: EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey[300]!),
+                                borderRadius: BorderRadius.circular(8),
+                                color: Colors.grey[50],
+                              ),
+                              child: DropdownButton<String>(
+                                value: tempCreationDate ?? "None",
+                                hint: Text("Select a month"),
+                                isExpanded: true,
+                                underline: SizedBox(), // Removes default underline
+                                items: creationDates.map((String date) {
+                                  return DropdownMenuItem<String>(
+                                    value: date,
+                                    child: Text(date),
+                                  );
+                                }).toList(),
+                                onChanged: (String? newValue) {
+                                  setDialogState(() {
+                                    tempCreationDate =
+                                    newValue == "None" ? null : newValue;
+                                    if (newValue != "None") {
+                                      tempSelectedFilters.add('created_on');
+                                    } else {
+                                      tempSelectedFilters.remove('created_on');
+                                    }
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          actionsPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              style: TextButton.styleFrom(foregroundColor: Colors.grey[600]),
+              child: Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  selectedFilters = tempSelectedFilters;
+                  selectedCreationDate = tempCreationDate;
+                  fetchLeadsData();
+                });
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF9EA700),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text("Apply", style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
   Widget ChartSelection() {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 15),
@@ -1743,7 +1982,7 @@ class _MyquotationsState extends State<Myquotations> {
           SizedBox(width: 4),
           IconButton(
               onPressed: () {
-                // showFilterDialog(context);
+                showFilterDialog(context);
               },
               icon: Icon(Icons.filter_list_sharp)),
         ],
