@@ -403,7 +403,7 @@ class _SalesTeamState extends State<SalesTeam> {
                 children: [
                   CheckboxListTile(
                     title: Text(
-                      "Show Archived",
+                      "Archived",
                       style: TextStyle(color: Colors.blueGrey[800]),
                     ),
                     value: tempShowArchived,

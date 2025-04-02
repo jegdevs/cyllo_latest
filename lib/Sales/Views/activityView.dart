@@ -902,7 +902,7 @@ class _ActivityviewState extends State<Activityview> with SingleTickerProviderSt
               Text('Customer', style: TextStyle(
                   color: Colors.grey.shade700, fontWeight: FontWeight.w500)),
               SizedBox(width: 4),
-              Icon(Icons.help_outline, size: 12, color: Colors.grey),
+              // Icon(Icons.help_outline, size: 12, color: Colors.grey),
             ],
           ),
           SizedBox(height: 8),
@@ -935,7 +935,7 @@ class _ActivityviewState extends State<Activityview> with SingleTickerProviderSt
               Text('Salesperson', style: TextStyle(
                   color: Colors.grey.shade700, fontWeight: FontWeight.w500)),
               SizedBox(width: 4),
-              Icon(Icons.help_outline, size: 12, color: Colors.grey),
+              // Icon(Icons.help_outline, size: 12, color: Colors.grey),
             ],
           ),
           SizedBox(height: 8),
@@ -973,7 +973,7 @@ class _ActivityviewState extends State<Activityview> with SingleTickerProviderSt
               Text(label, style: TextStyle(
                   color: Colors.grey.shade700, fontWeight: FontWeight.w500)),
               SizedBox(width: 4),
-              Icon(Icons.help_outline, size: 12, color: Colors.grey),
+              // Icon(Icons.help_outline, size: 12, color: Colors.grey),
             ],
           ),
           SizedBox(height: 8),
@@ -1133,22 +1133,6 @@ class _ActivityviewState extends State<Activityview> with SingleTickerProviderSt
             SizedBox(width: 8),
             _buildStatusButton('Lost', Colors.red.shade300, false),
             SizedBox(width: 24),
-            Row(
-              children: [
-                Text('New', style: TextStyle(
-                    fontWeight: FontWeight.bold, color: Color(0xFF9EA700))),
-                Text(' 2M '),
-                Icon(Icons.chevron_right, size: 16),
-                Text(' Qualified'),
-                Text(' 1m '),
-                Icon(Icons.chevron_right, size: 16),
-                Text(' Proposition '),
-                Icon(Icons.chevron_right, size: 16),
-                Text(' Won '),
-                Icon(Icons.chevron_right, size: 16),
-                Text(' double won'),
-              ],
-            ),
           ],
         ),
       ),
@@ -1179,7 +1163,7 @@ class _ActivityviewState extends State<Activityview> with SingleTickerProviderSt
               Text('Tags', style: TextStyle(
                   color: Colors.grey.shade700, fontWeight: FontWeight.w500)),
               SizedBox(width: 4),
-              Icon(Icons.help_outline, size: 12, color: Colors.grey),
+              // Icon(Icons.help_outline, size: 12, color: Colors.grey),
             ],
           ),
           SizedBox(height: 8),

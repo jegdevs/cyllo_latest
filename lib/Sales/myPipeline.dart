@@ -587,56 +587,187 @@ class _MypipelineState extends State<Mypipeline> {
     }
   }
 
-  Future<void> pipe() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userid = prefs.getInt("userId") ?? "";
-    print('iddddd$userid');
-    try {
-      Map<int, String> tagMap = await tag();
-      final currentFilters = getFilters();
-      List<dynamic> finalFilter = [];
+      Future<void> pipe() async {
+        final prefs = await SharedPreferences.getInstance();
+        final userid = prefs.getInt("userId") ?? "";
+        print('iddddd$userid');
+        try {
+          Map<int, String> tagMap = await tag();
+          final currentFilters = getFilters();
+          List<dynamic> finalFilter = [];
+          List<dynamic> domain = [
+            ['type', '=', 'opportunity']
+          ];
 
+          bool hasMyPipeline = selectedFilters.contains('my_pipeline');
+          bool hasUnassigned = selectedFilters.contains('unassigned');
+          bool hasMyAssignedPartners = selectedFilters.contains('my_assigned_partners');
+          bool hasOpenOpportunities = selectedFilters.contains('open_opportunties');
+          bool hasWon = selectedFilters.contains('won');
+          bool hasLost = selectedFilters.contains('lost');
+          bool hasArchived = selectedFilters.contains('archived');
+          log('selytt$selectedFilters');
 
-      if (widget.domain != null && widget.domain!.isNotEmpty) {
-        finalFilter.addAll(widget.domain!);
-      } else if (widget.teamId != null) {
-        // Fallback to teamId filter if no domain is provided
-        finalFilter.add(['team_id', '=', widget.teamId]);
-      }
+          // Temporary list for "My Pipeline or Unassigned or My Assigned Partners or Open Opportunities"
+          List<dynamic> pipelineDomain = [];
 
-      // Apply additional filters only if explicitly selected
-      if (selectedFilters.isNotEmpty) {
-        if (finalFilter.isNotEmpty && selectedFilters.length > 0) {
-          finalFilter.insert(0, "&"); // AND condition with domain/teamId and selected filters
-        }
+          // Handle "My Pipeline or Unassigned or My Assigned Partners or Open Opportunities" with OR logic
+          if (hasMyPipeline && hasUnassigned && hasMyAssignedPartners && hasOpenOpportunities) {
+            pipelineDomain.add('|');
+            pipelineDomain.add('|');
+            pipelineDomain.add('|');
+            pipelineDomain.addAll(currentFilters['my_pipeline']!['domain']);
+            pipelineDomain.addAll(currentFilters['unassigned']!['domain']);
+            pipelineDomain.addAll(currentFilters['my_assigned_partners']!['domain']);
+            pipelineDomain.addAll(currentFilters['open_opportunties']!['domain']);
+          } else if (hasMyPipeline && hasUnassigned && hasMyAssignedPartners) {
+            pipelineDomain.add('|');
+            pipelineDomain.add('|');
+            pipelineDomain.addAll(currentFilters['my_pipeline']!['domain']);
+            pipelineDomain.addAll(currentFilters['unassigned']!['domain']);
+            pipelineDomain.addAll(currentFilters['my_assigned_partners']!['domain']);
+          } else if (hasMyPipeline && hasUnassigned && hasOpenOpportunities) {
+            pipelineDomain.add('|');
+            pipelineDomain.add('|');
+            pipelineDomain.addAll(currentFilters['my_pipeline']!['domain']);
+            pipelineDomain.addAll(currentFilters['unassigned']!['domain']);
+            pipelineDomain.addAll(currentFilters['open_opportunties']!['domain']);
+          } else if (hasMyPipeline && hasMyAssignedPartners && hasOpenOpportunities) {
+            pipelineDomain.add('|');
+            pipelineDomain.add('|');
+            pipelineDomain.addAll(currentFilters['my_pipeline']!['domain']);
+            pipelineDomain.addAll(currentFilters['my_assigned_partners']!['domain']);
+            pipelineDomain.addAll(currentFilters['open_opportunties']!['domain']);
+          } else if (hasUnassigned && hasMyAssignedPartners && hasOpenOpportunities) {
+            pipelineDomain.add('|');
+            pipelineDomain.add('|');
+            pipelineDomain.addAll(currentFilters['unassigned']!['domain']);
+            pipelineDomain.addAll(currentFilters['my_assigned_partners']!['domain']);
+            pipelineDomain.addAll(currentFilters['open_opportunties']!['domain']);
+          } else if (hasMyPipeline && hasUnassigned) {
+            pipelineDomain.add('|');
+            pipelineDomain.addAll(currentFilters['my_pipeline']!['domain']);
+            pipelineDomain.addAll(currentFilters['unassigned']!['domain']);
+          } else if (hasMyPipeline && hasMyAssignedPartners) {
+            pipelineDomain.add('|');
+            pipelineDomain.addAll(currentFilters['my_pipeline']!['domain']);
+            pipelineDomain.addAll(currentFilters['my_assigned_partners']!['domain']);
+          } else if (hasMyPipeline && hasOpenOpportunities) {
+            pipelineDomain.add('|');
+            pipelineDomain.addAll(currentFilters['my_pipeline']!['domain']);
+            pipelineDomain.addAll(currentFilters['open_opportunties']!['domain']);
+          } else if (hasUnassigned && hasMyAssignedPartners) {
+            pipelineDomain.add('|');
+            pipelineDomain.addAll(currentFilters['unassigned']!['domain']);
+            pipelineDomain.addAll(currentFilters['my_assigned_partners']!['domain']);
+          } else if (hasUnassigned && hasOpenOpportunities) {
+            pipelineDomain.add('|');
+            pipelineDomain.addAll(currentFilters['unassigned']!['domain']);
+            pipelineDomain.addAll(currentFilters['open_opportunties']!['domain']);
+          } else if (hasMyAssignedPartners && hasOpenOpportunities) {
+            pipelineDomain.add('|');
+            pipelineDomain.addAll(currentFilters['my_assigned_partners']!['domain']);
+            pipelineDomain.addAll(currentFilters['open_opportunties']!['domain']);
+          } else if (hasMyPipeline) {
+            pipelineDomain.addAll(currentFilters['my_pipeline']!['domain']);
+          } else if (hasUnassigned) {
+            pipelineDomain.addAll(currentFilters['unassigned']!['domain']);
+          } else if (hasMyAssignedPartners) {
+            pipelineDomain.addAll(currentFilters['my_assigned_partners']!['domain']);
+          } else if (hasOpenOpportunities) {
+            pipelineDomain.addAll(currentFilters['open_opportunties']!['domain']);
+          }
 
+          // Temporary list for "Won or Lost"
+          List<dynamic> wonLostDomain = [];
 
-        for (var filter in selectedFilters) {
-          if (currentFilters.containsKey(filter)) {
-            if (filter == 'created_on' && selectedCreationDate != null) {
-              DateTime parsedDate = DateFormat('MMMM yyyy').parse(selectedCreationDate!);
-              String year = parsedDate.year.toString();
-              String month = (parsedDate.month).toString().padLeft(2, '0');
-              finalFilter.add(['create_date', '=like', '$year-$month%']);
-            } else if (filter == 'closed_on' && selectedClosedDate != null) {
-              DateTime parsedDate = DateFormat('MMMM yyyy').parse(selectedClosedDate!);
-              String year = parsedDate.year.toString();
-              String month = (parsedDate.month).toString().padLeft(2, '0');
-              finalFilter.add(['date_closed', '=like', '$year-$month%']);
-            } else {
-              finalFilter.addAll(currentFilters[filter]!['domain']);
+          // Handle "Won or Lost" with OR logic
+          if (hasWon && hasLost) {
+            wonLostDomain.add('|');
+            wonLostDomain.addAll(currentFilters['won']!['domain']);
+            wonLostDomain.addAll(currentFilters['lost']!['domain']);
+          } else if (hasWon) {
+            wonLostDomain.addAll(currentFilters['won']!['domain']);
+          } else if (hasLost) {
+            wonLostDomain.addAll(currentFilters['lost']!['domain']);
+          }
+
+          // Handle date filters
+          bool hasDateFilter = false;
+          for (String filterKey in selectedFilters) {
+            if (filterKey == 'created_on' && selectedCreationDate != null) {
+              DateTime selectedMonth = DateFormat('MMMM yyyy').parse(selectedCreationDate!);
+              String startDate = DateFormat('yyyy-MM-01').format(selectedMonth);
+              String endDate = DateFormat('yyyy-MM-dd')
+                  .format(DateTime(selectedMonth.year, selectedMonth.month + 1, 0));
+
+              domain = [
+                '&',
+                ...domain,
+                ['create_date', '>=', startDate],
+                ['create_date', '<=', endDate],
+              ];
+              hasDateFilter = true;
+            } else if (filterKey == 'closed_on' && selectedClosedDate != null) {
+              DateTime selectedMonth = DateFormat('MMMM yyyy').parse(selectedClosedDate!);
+              String startDate = DateFormat('yyyy-MM-01').format(selectedMonth);
+              String endDate = DateFormat('yyyy-MM-dd')
+                  .format(DateTime(selectedMonth.year, selectedMonth.month + 1, 0));
+
+              domain = [
+                '&',
+                ...domain,
+                ['date_closed', '>=', startDate],
+                ['date_closed', '<=', endDate],
+              ];
+              hasDateFilter = true;
             }
           }
+
+          // Combine pipeline domain
+          if (pipelineDomain.isNotEmpty) {
+            if (hasDateFilter) {
+              domain = ['&', ...domain, ...pipelineDomain];
+            } else {
+              domain = [...domain, ...pipelineDomain];
+            }
+          }
+
+          // Combine won/lost domain
+          if (wonLostDomain.isNotEmpty) {
+            if (pipelineDomain.isNotEmpty || hasDateFilter) {
+              domain = ['&', ...domain, ...wonLostDomain];
+            } else {
+              domain = [...domain, ...wonLostDomain];
+            }
+          }
+
+
+          if (hasArchived) {
+            // Explicitly create a properly formatted domain
+            List<dynamic> archivedCondition = [['active', '=', false]];
+
+            if (domain.length > 1) {  // If domain already has conditions
+              domain = ['&', ...domain, ...archivedCondition];
+            } else {  // If domain only has the initial ['type', '=', 'opportunity']
+              domain = [['type', '=', 'opportunity'], ...archivedCondition];
+            }
+          }
+
+        // Add widget domain/team_id if present
+        if (widget.domain != null && widget.domain!.isNotEmpty) {
+        domain = ['&', ...widget.domain!, ...domain];
+        } else if (widget.teamId != null) {
+        domain = ['&', ['team_id', '=', widget.teamId], ...domain];
         }
-      }
 
-      finalFilter.add(["type", "=", "opportunity"]);
 
-      log('aasas${finalFilter.toString()}');
+
+        log('aasas${finalFilter.toString()}');
       final response = await client?.callKw({
         'model': 'crm.lead',
         'method': 'search_read',
-        'args': [finalFilter],
+        'args': [domain],
         'kwargs': {
           'fields': [
             'name',
@@ -810,7 +941,6 @@ class _MypipelineState extends State<Mypipeline> {
                 .where((stage) => stageValues.containsKey(stage))
                 .map((stage) => ChartData(stage, stageValues[stage]!))
                 .toList();
-
             chartDatavalues = sortedData;
 
             if (stageOrder.isEmpty || sortedData.every((data) => data.y == 0)) {
@@ -830,7 +960,7 @@ class _MypipelineState extends State<Mypipeline> {
         }
       }
     } catch (e) {
-      print("Odoo Fetch Failed: $e");
+      log("Odoo Fetch Failed: $e");
       setState(() {
         isLoading = false;
         showNoDataMessage = true;
@@ -943,7 +1073,8 @@ class _MypipelineState extends State<Mypipeline> {
               final customerName = lead['contact_name'] == false
                   ? 'None'
                   : lead['contact_name']?.toString() ?? 'None';
-              final email = lead['email_from'] ?? 'None';
+              final email = lead['email_from'] == false ? 'None'
+                  : lead['email_from']?.toString() ?? 'None';
               final stageName = lead['stage_id'] != null &&
                       lead['stage_id'] is List &&
                       lead['stage_id'].length > 1
@@ -2498,6 +2629,7 @@ class _MypipelineState extends State<Mypipeline> {
   @override
   void initState() {
     super.initState();
+    selectedFilters = {'my_pipeline'};
     initializeOdooClient();
     boardController = AppFlowyBoardScrollController();
   }

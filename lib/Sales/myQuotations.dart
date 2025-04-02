@@ -40,6 +40,8 @@ class _MyquotationsState extends State<Myquotations> {
   List<Map<String, dynamic>> activitiesList = [];
   Set<String> selectedFilters = {'my_quotations'}; // Default filter
   String? selectedCreationDate;
+  String selectedFilter = "count";
+  String showVariable = "count";
   @override
   void initState() {
     super.initState();
@@ -201,6 +203,13 @@ class _MyquotationsState extends State<Myquotations> {
             'activity_summary',
             'activity_date_deadline',
             'date_order',
+            'amount_to_invoice',
+            'currency_rate',
+            'prepayment_percent',
+            'shipping_weight',
+            'amount_tax',
+            'amount_untaxed',
+
           ],
         }
       });
@@ -1743,42 +1752,108 @@ class _MyquotationsState extends State<Myquotations> {
             );
     }
   }
-
+  //
+  // List<ChartData> prepareChartData(List<Map<String, dynamic>> salesOrders) {
+  //   if (salesOrders.isEmpty) {
+  //     return [];
+  //   }
+  //   Map<String, double> customerSales = {};
+  //
+  //   for (var order in salesOrders) {
+  //     String customerName = "";
+  //     double amount = 0.0;
+  //
+  //     if (order['partner_id'] != false &&
+  //         order['partner_id'] is List &&
+  //         order['partner_id'].length > 1) {
+  //       customerName = order['partner_id'][1].toString();
+  //     } else {
+  //       customerName = "Unknown";
+  //     }
+  //     if (order['amount_total'] != false) {
+  //       amount = double.tryParse(order['amount_total'].toString()) ?? 0.0;
+  //     }
+  //
+  //
+  //     if (customerSales.containsKey(customerName)) {
+  //       customerSales[customerName] = customerSales[customerName]! + amount;
+  //     } else {
+  //       customerSales[customerName] = amount;
+  //     }
+  //   }
+  //
+  //   List<ChartData> chartData = customerSales.entries.map((entry) {
+  //     return ChartData(entry.key, entry.value);
+  //   }).toList();
+  //
+  //   // Sort the list based on x value (customer name)
+  //   chartData.sort((a, b) => a.x.compareTo(b.x));
+  //
+  //   return chartData;
+  // }
   List<ChartData> prepareChartData(List<Map<String, dynamic>> salesOrders) {
     if (salesOrders.isEmpty) {
       return [];
     }
-    Map<String, double> customerSales = {};
+    Map<String, double> customerMetrics = {};
+    Map<String, int> customerCounts = {};
 
     for (var order in salesOrders) {
-      String customerName = "";
-      double amount = 0.0;
+      String customerName = order['partner_id'] != false && order['partner_id'] is List && order['partner_id'].length > 1
+          ? order['partner_id'][1].toString()
+          : "Unknown";
 
-      if (order['partner_id'] != false &&
-          order['partner_id'] is List &&
-          order['partner_id'].length > 1) {
-        customerName = order['partner_id'][1].toString();
-      } else {
-        customerName = "Unknown";
-      }
-      if (order['amount_total'] != false) {
-        amount = double.tryParse(order['amount_total'].toString()) ?? 0.0;
+      double value = 0.0;
+      switch (selectedFilter) {
+        case "count":
+          value = 1.0; // Increment count by 1
+          customerCounts[customerName] = (customerCounts[customerName] ?? 0) + 1;
+          break;
+        case "amount_to_invoice":
+          value = double.tryParse(order['amount_to_invoice']?.toString() ?? "0") ?? 0.0;
+          break;
+        case "currency_rate":
+          value = double.tryParse(order['currency_rate']?.toString() ?? "0") ?? 0.0;
+          break;
+        case "prepayment_percent":
+          value = double.tryParse(order['prepayment_percent']?.toString() ?? "0") ?? 0.0;
+          break;
+        case "shipping_weight":
+          value = double.tryParse(order['shipping_weight']?.toString() ?? "0") ?? 0.0;
+        case "amount_tax":
+          value = double.tryParse(order['amount_tax']?.toString() ?? "0") ?? 0.0;
+        case "amount_total":
+          value = double.tryParse(order['amount_total']?.toString() ?? "0") ?? 0.0;
+        case "amount_untaxed":
+          value = double.tryParse(order['amount_untaxed']?.toString() ?? "0") ?? 0.0;
+          break;
       }
 
-      if (customerSales.containsKey(customerName)) {
-        customerSales[customerName] = customerSales[customerName]! + amount;
-      } else {
-        customerSales[customerName] = amount;
+      if (selectedFilter != "count") {
+        customerMetrics[customerName] = (customerMetrics[customerName] ?? 0) + value;
       }
     }
 
-    List<ChartData> chartData = customerSales.entries.map((entry) {
-      return ChartData(entry.key, entry.value);
-    }).toList();
+    List<ChartData> chartData = [];
+    if (selectedFilter == "count") {
+      chartData = customerCounts.entries.map((entry) {
+        return ChartData(entry.key, entry.value.toDouble());
+      }).toList();
+    } else if (selectedFilter == "average_amount") {
+      chartData = customerMetrics.entries.map((entry) {
+        int count = salesOrders.where((order) =>
+        (order['partner_id'] is List && order['partner_id'].length > 1
+            ? order['partner_id'][1].toString()
+            : "Unknown") == entry.key).length;
+        return ChartData(entry.key, count > 0 ? entry.value / count : 0);
+      }).toList();
+    } else {
+      chartData = customerMetrics.entries.map((entry) {
+        return ChartData(entry.key, entry.value);
+      }).toList();
+    }
 
-    // Sort the list based on x value (customer name)
     chartData.sort((a, b) => a.x.compareTo(b.x));
-
     return chartData;
   }
 
@@ -1794,7 +1869,9 @@ class _MyquotationsState extends State<Myquotations> {
             width: 105,
             height: 30,
             child: ElevatedButton(
-              onPressed: () {},
+              onPressed: () {
+                filterOptions();
+              },
               style: ElevatedButton.styleFrom(
                 padding: EdgeInsets.zero,
                 backgroundColor: Color(0xFF9EA700),
@@ -1870,6 +1947,411 @@ class _MyquotationsState extends State<Myquotations> {
         ),
       ],
     );
+  }
+
+  void filterOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      backgroundColor: Colors.white,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.all(16.0),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "Select Filter",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(
+                  height: 12,
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border(
+                      left: BorderSide(
+                        color: selectedFilter == "count"
+                            ? Color(0xFF656805)
+                            : Colors.transparent,
+                        width: 6, // Border thickness
+                      ),
+                    ),
+                  ),
+                  child: ListTile(
+                    leading: Icon(
+                      selectedFilter == "count" ? Icons.done : Icons.timelapse,
+                      color: Color(0xFF9EA700),
+                    ),
+                    title: Text('Count'),
+                    onTap: () {
+                      applyFilter("count", 'Count');
+                    },
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    tileColor: Color(0x1B9EA700),
+                    contentPadding:
+                    EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  ),
+                ),
+                SizedBox(
+                  height: 5,
+                ),
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border(
+                        left: BorderSide(
+                          color: selectedFilter == "amount_to_invoice"
+                              ? Color(0xFF656805)
+                              : Colors.transparent,
+                          width: 6, // Border thickness
+                        ),
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: Icon(
+                        selectedFilter == "amount_to_invoice"
+                            ? Icons.done
+                            : Icons.timelapse,
+                        color: Color(0xFF9EA700),
+                      ),
+                      title: Text('Amount to invoice'),
+                      onTap: () {
+                        applyFilter("amount_to_invoice", 'Amount to invoice');
+                      },
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      tileColor: Color(0x1B9EA700),
+                      focusColor: Colors.red,
+                      contentPadding:
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    ),
+                  ),
+                SizedBox(
+                  height: 5,
+                ),
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border(
+                          left: BorderSide(
+                            color: selectedFilter == "currency_rate"
+                                ? Color(0xFF656805)
+                                : Colors.transparent,
+                            width: 6, // Border thickness
+                          ),
+                        ),
+                      ),
+                      child: ListTile(
+                        leading: Icon(
+                          selectedFilter == "currency_rate"
+                              ? Icons.done
+                              : Icons.timelapse,
+                          color: Color(0xFF9EA700),
+                        ),
+                        title: Text('Currency Rate'),
+                        onTap: () {
+                          applyFilter("currency_rate", 'Currency Rate');
+                        },
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        tileColor: Color(0x1B9EA700),
+                        contentPadding:
+                        EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      ),
+                    ),
+                  SizedBox(
+                    height: 5,
+                  ),
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border(
+                          left: BorderSide(
+                            color: selectedFilter == "prepayment_percent"
+                                ? Color(0xFF656805)
+                                : Colors.transparent,
+                            width: 6, // Border thickness
+                          ),
+                        ),
+                      ),
+                      child: ListTile(
+                        leading: Icon(
+                          selectedFilter == "prepayment_percent"
+                              ? Icons.done
+                              : Icons.timelapse,
+                          color: Color(0xFF9EA700),
+                        ),
+                        title: Text('Prepayment Percentage'),
+                        onTap: () {
+                          applyFilter("prepayment_percent", 'Prepayment Percentage');
+                        },
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        tileColor: Color(0x1B9EA700),
+                        contentPadding:
+                        EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      ),
+                    ),
+                  SizedBox(
+                    height: 5,
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border(
+                        left: BorderSide(
+                          color: selectedFilter == "shipping_weight"
+                              ? Color(0xFF656805)
+                              : Colors.transparent,
+                          width: 7, // Border thickness
+                        ),
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: Icon(
+                        selectedFilter == "shipping_weight"
+                            ? Icons.done
+                            : Icons.timelapse,
+                        color: Color(0xFF9EA700),
+                      ),
+                      title: Text('Shipping Weight'),
+                      onTap: () {
+                        applyFilter(
+                            "shipping_weight", 'Shipping Weight');
+                      },
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      tileColor: Color(0x1B9EA700),
+                      contentPadding:
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    ),
+                  ),
+                  SizedBox(
+                    height: 5,
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border(
+                        left: BorderSide(
+                          color: selectedFilter == "amount_tax"
+                              ? Color(0xFF656805)
+                              : Colors.transparent,
+                          width: 7, // Border thickness
+                        ),
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: Icon(
+                        selectedFilter == "amount_tax"
+                            ? Icons.done
+                            : Icons.timelapse,
+                        color: Color(0xFF9EA700),
+                      ),
+                      title: Text('Taxes'),
+                      onTap: () {
+                        applyFilter("amount_tax", 'Taxes');
+                      },
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      tileColor: Color(0x1B9EA700),
+                      contentPadding:
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    ),
+                  ),
+                  SizedBox(
+                    height: 5,
+                  ),
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border(
+                          left: BorderSide(
+                            color: selectedFilter == "amount_total"
+                                ? Color(0xFF656805)
+                                : Colors.transparent,
+                            width: 7, // Border thickness
+                          ),
+                        ),
+                      ),
+                      child: ListTile(
+                        leading: Icon(
+                          selectedFilter == "amount_total"
+                              ? Icons.done
+                              : Icons.timelapse,
+                          color: Color(0xFF9EA700),
+                        ),
+                        title: Text('Total'),
+                        onTap: () {
+                          applyFilter("amount_total", 'Total');
+                        },
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        tileColor: Color(0x1B9EA700),
+                        contentPadding:
+                        EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      ),
+                    ),
+                  SizedBox(
+                    height: 5,
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border(
+                        left: BorderSide(
+                          color: selectedFilter ==
+                              "amount_untaxed"
+                              ? Color(0xFF656805)
+                              : Colors.transparent,
+                          width: 7, // Border thickness
+                        ),
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: Icon(
+                        selectedFilter == "amount_untaxed"
+                            ? Icons.done
+                            : Icons.timelapse,
+                        color: Color(0xFF9EA700),
+                      ),
+                      title: Text('Untaxed Amount'),
+                      onTap: () {
+                        applyFilter("amount_untaxed",
+                            'Untaxed Amount');
+                      },
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      tileColor: Color(0x1B9EA700),
+                      contentPadding:
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    ),
+                  ),
+                  SizedBox(
+                    height: 5,
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border(
+                        left: BorderSide(
+                          color: selectedFilter == "recurring_revenue_prorated"
+                              ? Color(0xFF656805)
+                              : Colors.transparent,
+                          width: 7, // Border thickness
+                        ),
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: Icon(
+                        selectedFilter == "recurring_revenue_prorated"
+                            ? Icons.done
+                            : Icons.timelapse,
+                        color: Color(0xFF9EA700),
+                      ),
+                      title: Text('Prorated Recurring Revenues'),
+                      onTap: () {
+                        applyFilter("recurring_revenue_prorated",
+                            'Prorated Recurring Revenues');
+                      },
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      tileColor: Color(0x1B9EA700),
+                      focusColor: Colors.red,
+                      contentPadding:
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    ),
+                  ),
+                  SizedBox(
+                    height: 5,
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border(
+                        left: BorderSide(
+                          color: selectedFilter == "prorated_revenue"
+                              ? Color(0xFF656805)
+                              : Colors.transparent,
+                          width: 7, // Border thickness
+                        ),
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: Icon(
+                        selectedFilter == "prorated_revenue"
+                            ? Icons.done
+                            : Icons.timelapse,
+                        color: Color(0xFF9EA700),
+                      ),
+                      title: Text('Prorated Revenue'),
+                      onTap: () {
+                        applyFilter("prorated_revenue", 'Prorated Revenue');
+                      },
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      tileColor: Color(0x1B9EA700),
+                      contentPadding:
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    ),
+                  ),
+                  SizedBox(
+                    height: 5,
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border(
+                        left: BorderSide(
+                          color: selectedFilter == "recurring_revenue"
+                              ? Color(0xFF656805)
+                              : Colors.transparent,
+                          width: 7, // Border thickness
+                        ),
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: Icon(
+                        selectedFilter == "recurring_revenue"
+                            ? Icons.done
+                            : Icons.timelapse,
+                        color: Color(0xFF9EA700),
+                      ),
+                      title: Text('Recurring Revenues'),
+                      onTap: () {
+                        applyFilter("recurring_revenue", 'Recurring Revenues');
+                      },
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      tileColor: Color(0x1B9EA700),
+                      contentPadding:
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    ),
+                  ),
+                ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+  void applyFilter(String filter, String showfilterName) {
+    setState(() {
+      selectedFilter = filter;
+      showVariable = showfilterName;
+      isLoading = true;
+    });
+    fetchLeadsData();
+    Navigator.pop(context);
   }
 
   void changeChartType(String type) {

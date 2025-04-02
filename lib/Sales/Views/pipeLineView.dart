@@ -829,7 +829,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
             children: [
               Text('Customer', style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w500)),
               SizedBox(width: 4),
-              Icon(Icons.help_outline, size: 12, color: Colors.grey),
+              // Icon(Icons.help_outline, size: 12, color: Colors.grey),
             ],
           ),
           SizedBox(height: 8),
@@ -860,7 +860,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
             children: [
               Text('Salesperson', style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w500)),
               SizedBox(width: 4),
-              Icon(Icons.help_outline, size: 12, color: Colors.grey),
+              // Icon(Icons.help_outline, size: 12, color: Colors.grey),
             ],
           ),
           SizedBox(height: 8),
@@ -896,7 +896,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
             children: [
               Text(label, style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w500)),
               SizedBox(width: 4),
-              Icon(Icons.help_outline, size: 12, color: Colors.grey),
+              // Icon(Icons.help_outline, size: 12, color: Colors.grey),
             ],
           ),
           SizedBox(height: 8),
@@ -1044,57 +1044,6 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
       ),
     );
   }
-
-  // Widget _buildStatusButton(String text, Color color, bool isActive) {
-  //   return ElevatedButton(
-  //     onPressed: () async {
-  //       if (text == 'New Quotation') {
-  //         if (client == null) {
-  //           ScaffoldMessenger.of(context).showSnackBar(
-  //             SnackBar(content: Text('Odoo client not initialized')),
-  //           );
-  //           return;
-  //         }
-  //
-  //         try {
-  //           // Call the action_quotation_new method on the crm.lead
-  //           final response = await client!.callKw({
-  //             'model': 'crm.lead',
-  //             'method': 'action_sale_quotations_new',
-  //             'args': [widget.leadId],
-  //             'kwargs': {},
-  //           });
-  //           log('qtaaaa$response');
-  //
-  //           // The response should contain the action to open the new quotation
-  //           if (response != null && response['res_id'] != null) {
-  //             final quotationId = response['res_id'];
-  //             // Navigate to QuotationPage with the new quotation ID
-  //             Navigator.push(
-  //               context,
-  //               MaterialPageRoute(
-  //                 builder: (context) => QuotationPage(quotationId: quotationId,customerName: leadData['partner_id'][1].toString(),),
-  //               ),
-  //             );
-  //           } else {
-  //             throw Exception('Failed to create new quotation');
-  //           }
-  //         } catch (e) {
-  //             log('Error creating quotation: $e');
-  //         }
-  //       }
-  //       // Add logic for other buttons (Won, Lost) if needed
-  //     },
-  //     style: ElevatedButton.styleFrom(
-  //       backgroundColor: isActive ? color : Colors.grey.shade200,
-  //       foregroundColor: isActive ? Colors.white : Colors.black87,
-  //       elevation: isActive ? 2 : 0,
-  //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-  //     ),
-  //     child: Text(text),
-  //   );
-  // }
-
   Widget _buildStatusButton(String text, Color color, bool isActive) {
     return ElevatedButton(
       onPressed: () async {
@@ -1257,7 +1206,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
             children: [
               Text('Tags', style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w500)),
               SizedBox(width: 4),
-              Icon(Icons.help_outline, size: 12, color: Colors.grey),
+              // Icon(Icons.help_outline, size: 12, color: Colors.grey),
             ],
           ),
           SizedBox(height: 8),

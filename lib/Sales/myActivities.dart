@@ -730,6 +730,7 @@ class _MyactivityState extends State<Myactivity> {
             'activity_user_id',
             'date_closed',
             'type',
+            'prorated_revenue',
           ],
         }
       });
@@ -841,7 +842,16 @@ class _MyactivityState extends State<Myactivity> {
                 value = (stageValues[stageName] ?? 0) + (item['expected_revenue'] as double);
               } else if (selectedFilter == "probability" && item['probability'] != false) {
                 value = (stageValues[stageName] ?? 0) + (item['probability'] as double);
-              } else {
+              } else if (selectedFilter == "recurring_revenue_monthly_prorated" && item['recurring_revenue_monthly_prorated'] != false) {
+                value = (stageValues[stageName] ?? 0) + (item['recurring_revenue_monthly_prorated'] as double);
+              } else if (selectedFilter == "recurring_revenue_prorated" && item['recurring_revenue_prorated'] != false) {
+                value = (stageValues[stageName] ?? 0) + (item['recurring_revenue_prorated'] as double);
+              } else if (selectedFilter == "prorated_revenue" && item['prorated_revenue'] != false) {
+                value = (stageValues[stageName] ?? 0) + (item['prorated_revenue'] as double);}
+              else if (selectedFilter == "recurring_revenue" && item['recurring_revenue'] != false) {
+                value = (stageValues[stageName] ?? 0) + (item['recurring_revenue'] as double);
+              }
+              else {
                 value = 0;
               }
               stageValues[stageName] = value;
@@ -1935,7 +1945,7 @@ class _MyactivityState extends State<Myactivity> {
                     borderRadius: BorderRadius.circular(12),
                     border: Border(
                       left: BorderSide(
-                        color: selectedFilter == "expected_revenue"
+                        color: selectedFilter == "day_open"
                             ? Color(0xFF656805)
                             : Colors.transparent,
                         width: 7,
@@ -1944,14 +1954,45 @@ class _MyactivityState extends State<Myactivity> {
                   ),
                   child: ListTile(
                     leading: Icon(
-                      selectedFilter == "expected_revenue"
+                      selectedFilter == "day_open"
                           ? Icons.done
                           : Icons.timelapse,
                       color: Color(0xFF9EA700),
                     ),
-                    title: Text('Expected Revenue'),
+                    title: Text('Days to Assign'),
                     onTap: () {
-                      applyFilter("expected_revenue", 'Expected Revenue');
+                      applyFilter("day_open", ' Days to Assign');
+                    },
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    tileColor: Color(0x1B9EA700),
+                    contentPadding:
+                    EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  ),
+                ),
+                SizedBox(height: 5),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border(
+                      left: BorderSide(
+                        color: selectedFilter == "day_close"
+                            ? Color(0xFF656805)
+                            : Colors.transparent,
+                        width: 7,
+                      ),
+                    ),
+                  ),
+                  child: ListTile(
+                    leading: Icon(
+                      selectedFilter == "day_close"
+                          ? Icons.done
+                          : Icons.timelapse,
+                      color: Color(0xFF9EA700),
+                    ),
+                    title: Text('Days to Close'),
+                    onTap: () {
+                      applyFilter("day_close", 'Days to Close');
                     },
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
@@ -1983,6 +2024,192 @@ class _MyactivityState extends State<Myactivity> {
                     title: Text('Expected MRR'),
                     onTap: () {
                       applyFilter("recurring_revenue_monthly", 'Expected MRR');
+                    },
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    tileColor: Color(0x1B9EA700),
+                    contentPadding:
+                    EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  ),
+                ),
+                SizedBox(height: 5),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border(
+                      left: BorderSide(
+                        color: selectedFilter == "expected_revenue"
+                            ? Color(0xFF656805)
+                            : Colors.transparent,
+                        width: 7,
+                      ),
+                    ),
+                  ),
+                  child: ListTile(
+                    leading: Icon(
+                      selectedFilter == "expected_revenue"
+                          ? Icons.done
+                          : Icons.timelapse,
+                      color: Color(0xFF9EA700),
+                    ),
+                    title: Text('Expected Revenue'),
+                    onTap: () {
+                      applyFilter("expected_revenue", 'Expected Revenue');
+                    },
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    tileColor: Color(0x1B9EA700),
+                    contentPadding:
+                    EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  ),
+                ),
+                SizedBox(height: 5),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border(
+                      left: BorderSide(
+                        color: selectedFilter == "probability"
+                            ? Color(0xFF656805)
+                            : Colors.transparent,
+                        width: 7,
+                      ),
+                    ),
+                  ),
+                  child: ListTile(
+                    leading: Icon(
+                      selectedFilter == "probability"
+                          ? Icons.done
+                          : Icons.timelapse,
+                      color: Color(0xFF9EA700),
+                    ),
+                    title: Text('Probability'),
+                    onTap: () {
+                      applyFilter("probability", 'Probability');
+                    },
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    tileColor: Color(0x1B9EA700),
+                    contentPadding:
+                    EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  ),
+                ),
+                SizedBox(height: 5),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border(
+                      left: BorderSide(
+                        color: selectedFilter == "recurring_revenue_monthly_prorated"
+                            ? Color(0xFF656805)
+                            : Colors.transparent,
+                        width: 7,
+                      ),
+                    ),
+                  ),
+                  child: ListTile(
+                    leading: Icon(
+                      selectedFilter == "recurring_revenue_monthly_prorated"
+                          ? Icons.done
+                          : Icons.timelapse,
+                      color: Color(0xFF9EA700),
+                    ),
+                    title: Text('Prorated MRR'),
+                    onTap: () {
+                      applyFilter("recurring_revenue_monthly_prorated", 'Prorated MRR');
+                    },
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    tileColor: Color(0x1B9EA700),
+                    contentPadding:
+                    EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  ),
+                ),
+                SizedBox(height: 5),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border(
+                      left: BorderSide(
+                        color: selectedFilter == "recurring_revenue_prorated"
+                            ? Color(0xFF656805)
+                            : Colors.transparent,
+                        width: 7,
+                      ),
+                    ),
+                  ),
+                  child: ListTile(
+                    leading: Icon(
+                      selectedFilter == "recurring_revenue_prorated"
+                          ? Icons.done
+                          : Icons.timelapse,
+                      color: Color(0xFF9EA700),
+                    ),
+                    title: Text('Prorated Recurring Revenues'),
+                    onTap: () {
+                      applyFilter("recurring_revenue_prorated", 'Prorated Recurring Revenues');
+                    },
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    tileColor: Color(0x1B9EA700),
+                    contentPadding:
+                    EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  ),
+                ),
+                SizedBox(height: 5),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border(
+                      left: BorderSide(
+                        color: selectedFilter == "prorated_revenue"
+                            ? Color(0xFF656805)
+                            : Colors.transparent,
+                        width: 7,
+                      ),
+                    ),
+                  ),
+                  child: ListTile(
+                    leading: Icon(
+                      selectedFilter == "prorated_revenue"
+                          ? Icons.done
+                          : Icons.timelapse,
+                      color: Color(0xFF9EA700),
+                    ),
+                    title: Text('Prorated Revenue'),
+                    onTap: () {
+                      applyFilter("prorated_revenue", 'Prorated Revenue');
+                    },
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    tileColor: Color(0x1B9EA700),
+                    contentPadding:
+                    EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  ),
+                ),
+                SizedBox(height: 5),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border(
+                      left: BorderSide(
+                        color: selectedFilter == "recurring_revenue"
+                            ? Color(0xFF656805)
+                            : Colors.transparent,
+                        width: 7,
+                      ),
+                    ),
+                  ),
+                  child: ListTile(
+                    leading: Icon(
+                      selectedFilter == "recurring_revenue"
+                          ? Icons.done
+                          : Icons.timelapse,
+                      color: Color(0xFF9EA700),
+                    ),
+                    title: Text('Recurring Revenues'),
+                    onTap: () {
+                      applyFilter("recurring_revenue", 'Recurring Revenues');
                     },
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
