@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'dart:typed_data';
@@ -39,10 +40,33 @@ class _LeadsState extends State<Leads> {
   String? selectedCreationDate;
   String? selectedClosedDate;
 
+  bool isSearching = false;
+  TextEditingController searchController = TextEditingController();
+  Timer? _debounce;
+
   @override
   void initState() {
     super.initState();
     initializeOdooClient();
+    searchController.addListener(_onSearchChanged);
+  }
+
+  void _onSearchChanged() {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      if (searchController.text.isNotEmpty) {
+        leadData(query:searchController.text);
+      } else {
+        leadData();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    searchController.dispose();
+    super.dispose();
   }
 
   Future<void> initializeOdooClient() async {
@@ -476,7 +500,7 @@ class _LeadsState extends State<Leads> {
     }
   }
 
-  Future<void> leadData() async {
+  Future<void> leadData({String query=""}) async {
     try {
       List<dynamic> domain = [
         ['type', '=', 'lead']
@@ -638,6 +662,20 @@ class _LeadsState extends State<Leads> {
         } else {
           domain = [...domain, ...filters['archived']!['domain']];
         }
+      }
+
+      if(query.isNotEmpty){
+        List<dynamic> domaina = [
+          ['type','=','lead'],
+          '|',
+          '|',
+          '|',
+          ['partner_name', 'ilike', query],
+          ['email_from', 'ilike', query],
+          ['contact_name', 'ilike', query],
+          ['name', 'ilike', query],
+        ];
+        domain=[...domain,...domaina];
       }
       log('takkaaa$domain');
 
@@ -2540,15 +2578,55 @@ class _LeadsState extends State<Leads> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Color(0xFF9EA700),
-        title: Text('Leads'),
+        title: isSearching
+            ? TextField(
+          controller: searchController,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'Search...',
+            hintStyle: const TextStyle(color: Colors.white70),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(20),
+              borderSide: BorderSide.none,
+            ),
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.2),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          ),
+        )
+            : const Text("Leads"),
+        elevation: 0,
+        backgroundColor: const Color(0xFF9EA700),
         actions: [
           IconButton(
-            icon: Icon(Icons.filter_list, color: Colors.black),
+            icon: Icon(isSearching ? Icons.close : Icons.search),
+            onPressed: () {
+              setState(() {
+                if (isSearching) {
+                  searchController.clear();
+                  isSearching = false;
+                  leadData(); // Reset to full data
+                } else {
+                  isSearching = true;
+                }
+              });
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.filter_list),
             onPressed: () => showFilterDialog(context),
           ),
         ],
       ),
+      //   title: Text('Leads'),
+      //   actions: [
+      //     IconButton(
+      //       icon: Icon(Icons.filter_list, color: Colors.black),
+      //       onPressed: () => showFilterDialog(context),
+      //     ),
+      //   ],
+      // ),
       body: isLoading
           ? Center(
               child: LoadingAnimationWidget.fourRotatingDots(

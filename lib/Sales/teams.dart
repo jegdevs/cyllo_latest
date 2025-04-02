@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
@@ -21,11 +22,72 @@ class _SalesTeamState extends State<SalesTeam> {
   bool isLoading = false;
   OdooClient? client;
   bool showArchived = false;
+  bool isSearching = false;
+  TextEditingController searchController = TextEditingController();
+  Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
     initializeOdooClient();
+    searchController.addListener(_onSearchChanged);
+  }
+
+  void _onSearchChanged() {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      if (searchController.text.isNotEmpty) {
+        _searchSalesTeams(searchController.text);
+      } else {
+        fetchAllSalesTeamsData();
+      }
+    });
+  }
+  Future<void> _searchSalesTeams(String query) async {
+    if (client == null) return;
+
+    setState(() => isLoading = true);
+    try {
+      List domain = [
+        ['use_opportunities', '=', true],
+        ['name', 'ilike', query],
+        if (showArchived) ['active', '=', false],
+      ];
+      final teamsResponse = await client!.callKw({
+        'model': 'crm.team',
+        'method': 'search_read',
+        'args': [domain],
+        'kwargs': {
+          'fields': ['id', 'name', 'invoiced_target'],
+        },
+      });
+
+      if (teamsResponse != null) {
+        List<dynamic> updatedTeams = [];
+        for (var team in teamsResponse) {
+          final teamData = await fetchSalesTeamData(team['id']);
+          var updatedTeam = Map<String, dynamic>.from(team);
+          updatedTeam.addAll(teamData);
+          updatedTeams.add(updatedTeam);
+        }
+
+        setState(() {
+          salesTeams = updatedTeams;
+        });
+      }
+    } catch (e) {
+      print('Error searching sales teams: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error searching sales teams: $e")),
+      );
+    }
+    setState(() => isLoading = false);
+  }
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    searchController.dispose();
+    super.dispose();
   }
 
   Future<void> initializeOdooClient() async {
@@ -448,14 +510,63 @@ class _SalesTeamState extends State<SalesTeam> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sales Teams'),
+        // title: const Text('Sales Teams'),
         backgroundColor: Color(0xFF9EA700),
+        elevation: 4, // Add some elevation for depth
+        title: isSearching
+            ? TextField(
+          controller: searchController,
+          autofocus: true,
+          style: TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'Search...',
+            hintStyle: TextStyle(color: Colors.white70),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(20),
+              borderSide: BorderSide.none,
+            ),
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.2),
+            contentPadding: EdgeInsets.symmetric(horizontal: 16),
+          ),
+        )
+            : Text(
+          'Sales Teams', // Creative title
+          style: TextStyle(
+            color: Colors.black,
+            letterSpacing: 1.2,
+          ),
+        ),
         actions: [
           IconButton(
+            icon: Icon(isSearching ? Icons.close : Icons.search),
+            color: Colors.black,
+            onPressed: () {
+              setState(() {
+                if (isSearching) {
+                  searchController.clear();
+                  isSearching = false;
+                } else {
+                  isSearching = true;
+                }
+              });
+            },
+          ),
+          IconButton(
             icon: Icon(Icons.filter_list),
+            color: Colors.black,
             onPressed: () => showFilterDialog(context),
           ),
         ],
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF9EA700), Color(0xFFB0BF00)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -611,7 +722,7 @@ class _SalesTeamState extends State<SalesTeam> {
               builder: (context) => Myquotations(
                 teamId: teamId,
                 domain: quotationsFilter,
-                  applyUserFilter: false,
+                applyUserFilter: false,
               ),
             ),
           );
@@ -896,3 +1007,4 @@ class _SalesTeamState extends State<SalesTeam> {
     );
   }
 }
+

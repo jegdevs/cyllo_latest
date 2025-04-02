@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'dart:typed_data';
@@ -38,14 +39,42 @@ class _MyquotationsState extends State<Myquotations> {
   Uint8List? profileImage;
   List<String> activityTypes = [];
   List<Map<String, dynamic>> activitiesList = [];
-  Set<String> selectedFilters = {'my_quotations'}; // Default filter
+  // Set<String> selectedFilters = {'my_quotations'}; // Default filter
+  late Set<String> selectedFilters;
   String? selectedCreationDate;
   String selectedFilter = "count";
   String showVariable = "count";
+  bool isSearching = false;
+  TextEditingController searchController = TextEditingController();
+  Timer? _debounce;
+
   @override
   void initState() {
     super.initState();
+    if (widget.teamId == null && (widget.domain == null || widget.domain!.isEmpty)) {
+      selectedFilters = {'my_quotations'}; // Default filter only when no teamId or domain
+    } else {
+      selectedFilters = {}; // No default filter when teamId or domain is provided
+    }
+    searchController.addListener(_onSearchChanged);
     initializeOdooClient();
+  }
+
+  void _onSearchChanged() {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      if (searchController.text.isNotEmpty) {
+        fetchLeadsData(query:searchController.text);
+      } else {
+        fetchLeadsData();
+      }
+    });
+  }
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    searchController.dispose();
+    super.dispose();
   }
 
   Future<void> initializeOdooClient() async {
@@ -102,7 +131,7 @@ class _MyquotationsState extends State<Myquotations> {
       },
     };
   }
-  Future<void> fetchLeadsData() async {
+  Future<void> fetchLeadsData({String query=""}) async {
     if (client == null || currentUserId == null) {
       print("Client or user ID is null");
       return;
@@ -183,6 +212,16 @@ class _MyquotationsState extends State<Myquotations> {
         } else {
           domainFilter = [...dateDomain];
         }
+      }
+      if(query.isNotEmpty) {
+        List<dynamic> searchDomain = [
+          "|",
+          "|",
+          ["name", "ilike", query],
+          ["client_order_ref", "ilike", query],
+          ["partner_id", "child_of", query],
+        ];
+        domainFilter=[...domainFilter,...searchDomain];
       }
 
       log('www3222$domainFilter');
@@ -1149,6 +1188,7 @@ class _MyquotationsState extends State<Myquotations> {
       shrinkWrap: true,
       itemBuilder: (context, index) {
         final lead = leadsList[index];
+        final leadId = lead['id'];
         final name = lead['name'] ?? '';
         final partnerId = lead['partner_id'];
         final customerName =
@@ -1247,7 +1287,12 @@ class _MyquotationsState extends State<Myquotations> {
           ),
           child: InkWell(
             onTap: () {
-              print('Tapped');
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => QuotationPage(quotationId: leadId),
+                ),
+              );
             },
             child: Padding(
               padding: EdgeInsets.all(16),
@@ -2458,15 +2503,40 @@ class _MyquotationsState extends State<Myquotations> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Color(0xFF9EA700),
-        title: Text('Quotations'),
+        title: isSearching
+            ? TextField(
+          controller: searchController,
+          autofocus: true,
+          decoration: InputDecoration(
+            hintText: "Search quotations...",
+            border: InputBorder.none,
+            hintStyle: TextStyle(color: Colors.white70),
+          ),
+          style: TextStyle(color: Colors.white),
+        )
+            : Text('Quotations'),
         actions: [
-          IconButton(onPressed: () {}, icon: Icon(Icons.search_rounded)),
+          IconButton(
+            onPressed: () {
+              setState(() {
+                if (isSearching) {
+                  isSearching = false;
+                  searchController.clear();
+                  fetchLeadsData(); // Reset to full data when search is cleared
+                } else {
+                  isSearching = true;
+                }
+              });
+            },
+            icon: Icon(isSearching ? Icons.close : Icons.search_rounded),
+          ),
           SizedBox(width: 4),
           IconButton(
-              onPressed: () {
-                showFilterDialog(context);
-              },
-              icon: Icon(Icons.filter_list_sharp)),
+            onPressed: () {
+              showFilterDialog(context);
+            },
+            icon: Icon(Icons.filter_list_sharp),
+          ),
         ],
       ),
       backgroundColor: Colors.white,

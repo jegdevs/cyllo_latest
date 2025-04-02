@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'dart:typed_data';
@@ -52,6 +53,21 @@ class _MypipelineState extends State<Mypipeline> {
   int? currentUserId;
   String? selectedCreationDate;
   String? selectedClosedDate;
+  final TextEditingController searchController = TextEditingController();
+  bool isSearching = false;
+  Timer? _debounce;
+
+  void _onSearchChanged() {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      if (searchController.text.isNotEmpty) {
+        pipe(query: searchController.text);
+      } else {
+        pipe(); // Reset to full data when search is cleared
+      }
+    });
+  }
+
 
 
   Map<String, Map<String, dynamic>> getFilters() {
@@ -587,7 +603,7 @@ class _MypipelineState extends State<Mypipeline> {
     }
   }
 
-      Future<void> pipe() async {
+      Future<void> pipe({String query=""}) async {
         final prefs = await SharedPreferences.getInstance();
         final userid = prefs.getInt("userId") ?? "";
         print('iddddd$userid');
@@ -761,7 +777,21 @@ class _MypipelineState extends State<Mypipeline> {
         domain = ['&', ['team_id', '=', widget.teamId], ...domain];
         }
 
+          if(query.isNotEmpty){
+            List<dynamic> searchDomain = [
+              "|",
+              "|",
+              "|",
+              "|",
+              ["partner_id", "ilike", query],
+              ["partner_name", "ilike", query],
+              ["email_from", "ilike", query],
+              ["name", "ilike", query],
+              ["contact_name", "ilike", query],
+            ];
 
+            domain=[...domain,...searchDomain];
+          }
 
         log('aasas${finalFilter.toString()}');
       final response = await client?.callKw({
@@ -800,6 +830,7 @@ class _MypipelineState extends State<Mypipeline> {
           ],
         }
       });
+      log('dmn$domain');
       log('ressss$response');
       if (response != null) {
         leadsList = List<Map<String, dynamic>>.from(response);
@@ -2629,9 +2660,14 @@ class _MypipelineState extends State<Mypipeline> {
   @override
   void initState() {
     super.initState();
-    selectedFilters = {'my_pipeline'};
+    if (widget.teamId == null && (widget.domain == null || widget.domain!.isEmpty)) {
+      selectedFilters = {'my_pipeline'}; // Default filter only when no teamId or domain
+    } else {
+      selectedFilters = {}; // No default filter when teamId or domain is provided
+    }
     initializeOdooClient();
     boardController = AppFlowyBoardScrollController();
+    searchController.addListener(_onSearchChanged);
   }
 
 
@@ -2646,18 +2682,44 @@ class _MypipelineState extends State<Mypipeline> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Color(0xFF9EA700),
-        title: Text('Pipeline'),
-        actions: [
-          IconButton(onPressed: () {}, icon: Icon(Icons.search_rounded)),
-          SizedBox(
-            width: 4,
+        title: isSearching
+            ? TextField(
+          controller: searchController,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'Search...',
+            hintStyle: const TextStyle(color: Colors.white70),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(20),
+              borderSide: BorderSide.none,
+            ),
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.2),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
           ),
-          IconButton(onPressed: () {
-            showFilterDialog(context);
-          }, icon: Icon(Icons.filter_list_sharp)),
-          SizedBox(
-            width: 4,
+        )
+            : const Text("Pipeline"),
+        elevation: 0,
+        backgroundColor: const Color(0xFF9EA700),
+        actions: [
+          IconButton(
+            icon: Icon(isSearching ? Icons.close : Icons.search),
+            onPressed: () {
+              setState(() {
+                if (isSearching) {
+                  searchController.clear();
+                  isSearching = false;
+                  pipe(); // Reset to full data
+                } else {
+                  isSearching = true;
+                }
+              });
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.filter_list),
+            onPressed: () => showFilterDialog(context),
           ),
         ],
       ),

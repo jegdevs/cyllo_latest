@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'package:flutter/material.dart';
@@ -28,10 +29,108 @@ class _CustomersState extends State<Customers> {
   String? selectedCountry;
   int selectedView = 0;
 
+  bool isSearching = false;
+  TextEditingController searchController = TextEditingController();
+  Timer? _debounce;
+
+
   @override
   void initState() {
     super.initState();
     initializeOdooClient();
+    searchController.addListener(_onSearchChanged);
+  }
+
+  void _onSearchChanged() {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      if (searchController.text.isNotEmpty) {
+        _searchCustomers(searchController.text);
+      } else {
+        fetchCustomerData();
+      }
+    });
+  }
+
+  Future<void> _searchCustomers(String query) async {
+    if (client == null) return;
+
+    setState(() => isLoading = true);
+    try {
+      List<dynamic> domain = [
+        '|',
+        '|',
+        '|',
+        '|',
+        ['complete_name', 'ilike', query],
+        ['ref', 'ilike', query],
+        ['email', 'ilike', query],
+        ['vat', 'ilike', query],
+        ['company_registry', 'ilike', query],
+      ];
+
+
+      final filters = getFilters();
+      if (selectedFilters.isNotEmpty) {
+        for (var filterKey in selectedFilters) {
+          domain.addAll(filters[filterKey]!['domain']);
+        }
+      }
+
+      final response = await client!.callKw({
+        'model': 'res.partner',
+        'method': 'search_read',
+        'args': [domain],
+        'kwargs': {
+          'fields': [
+            'id',
+            'name',
+            'email',
+            'phone',
+            'city',
+            'state_id',
+            'country_id',
+            'category_id',
+            'image_128',
+            'company_type',
+            'company_id',
+            'commercial_partner_id',
+            'function',
+            'is_company',
+            'customer_rank',
+            'supplier_rank',
+            'active',
+          ],
+        },
+      });
+
+      if (mounted) {
+        setState(() {
+          customers = response ?? [];
+        });
+        await fetchCategoryData();
+        await fetchActivityData();
+        log("Searched customers: ${customers.length}");
+      }
+    } catch (e) {
+      log("Error searching customers: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error searching customers: $e")),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    searchController.dispose();
+    super.dispose();
   }
 
   Future<void> initializeOdooClient() async {
@@ -910,10 +1009,41 @@ class _CustomersState extends State<Customers> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text("Customers"),
+        title: isSearching
+            ? TextField(
+          controller: searchController,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'Search...',
+            hintStyle: const TextStyle(color: Colors.white70),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(20),
+              borderSide: BorderSide.none,
+            ),
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.2),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          ),
+        )
+            : const Text("Customers"),
         elevation: 0,
         backgroundColor: const Color(0xFF9EA700),
         actions: [
+          IconButton(
+            icon: Icon(isSearching ? Icons.close : Icons.search),
+            onPressed: () {
+              setState(() {
+                if (isSearching) {
+                  searchController.clear();
+                  isSearching = false;
+                  fetchCustomerData(); // Reset to full data
+                } else {
+                  isSearching = true;
+                }
+              });
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.filter_list),
             onPressed: () => showFilterDialog(context),

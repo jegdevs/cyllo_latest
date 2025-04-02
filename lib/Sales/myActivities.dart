@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'dart:typed_data';
@@ -43,6 +44,20 @@ class _MyactivityState extends State<Myactivity> {
   int? currentUserId;
   String? selectedCreationDate;
   String? selectedClosedDate;
+  final TextEditingController searchController = TextEditingController();
+  bool isSearching = false;
+  Timer? _debounce;
+
+  void _onSearchChanged() {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      if (searchController.text.isNotEmpty) {
+        pipe(query: searchController.text);
+      } else {
+        pipe(); // Reset to full data when search is cleared
+      }
+    });
+  }
 
   Map<String, Map<String, dynamic>> getFilters() {
     String todayDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
@@ -554,7 +569,7 @@ class _MyactivityState extends State<Myactivity> {
     }
   }
 
-  Future<void> pipe() async {
+  Future<void> pipe({String query=""}) async {
     final prefs = await SharedPreferences.getInstance();
     final userid = prefs.getInt("userId") ?? "";
     try {
@@ -702,8 +717,20 @@ class _MyactivityState extends State<Myactivity> {
         finalFilter = [['activity_user_id', '!=', false]];
       }
 
-      log('monnnaa$finalFilter');
 
+      if(query.isNotEmpty){
+        List<dynamic> searchDomain = [
+          "|",
+          "|",
+          "|",
+          ["partner_name", "ilike", query],
+          ["email_from", "ilike", query],
+          ["contact_name", "ilike", query],
+          ["name", "ilike", query],
+        ];
+
+        finalFilter=[...finalFilter,...searchDomain];
+      } log('monnnaa$finalFilter');
       final response = await client?.callKw({
         'model': 'crm.lead',
         'method': 'search_read',
@@ -2440,6 +2467,7 @@ class _MyactivityState extends State<Myactivity> {
     selectedFilters = {'my_activities'};
     initializeOdooClient();
     boardController = AppFlowyBoardScrollController();
+    searchController.addListener(_onSearchChanged);
   }
 
   @override
@@ -2447,15 +2475,40 @@ class _MyactivityState extends State<Myactivity> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Color(0xFF9EA700),
-        title: Text('Activities'),
+        title: isSearching
+            ? TextField(
+          controller: searchController,
+          autofocus: true,
+          decoration: InputDecoration(
+            hintText: "Search activities...",
+            border: InputBorder.none,
+            hintStyle: TextStyle(color: Colors.white70),
+          ),
+          style: TextStyle(color: Colors.white),
+        )
+            : Text('Activities'),
         actions: [
-          IconButton(onPressed: () {}, icon: Icon(Icons.search_rounded)),
+          IconButton(
+            onPressed: () {
+              setState(() {
+                if (isSearching) {
+                  isSearching = false;
+                  searchController.clear();
+                  pipe(); // Reset to full data
+                } else {
+                  isSearching = true;
+                }
+              });
+            },
+            icon: Icon(isSearching ? Icons.close : Icons.search_rounded),
+          ),
           SizedBox(width: 4),
           IconButton(
-              onPressed: () {
-                showFilterDialog(context);
-              },
-              icon: Icon(Icons.filter_list_sharp)),
+            onPressed: () {
+              showFilterDialog(context);
+            },
+            icon: Icon(Icons.filter_list_sharp),
+          ),
           SizedBox(width: 4),
         ],
       ),
