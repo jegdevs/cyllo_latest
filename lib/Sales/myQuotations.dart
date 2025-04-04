@@ -11,6 +11,7 @@ import 'package:syncfusion_flutter_calendar/calendar.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datagrid/datagrid.dart';
 
+import '../getUserImage.dart';
 import 'Views/quotationsView.dart';
 
 class Myquotations extends StatefulWidget {
@@ -39,7 +40,6 @@ class _MyquotationsState extends State<Myquotations> {
   Uint8List? profileImage;
   List<String> activityTypes = [];
   List<Map<String, dynamic>> activitiesList = [];
-  // Set<String> selectedFilters = {'my_quotations'}; // Default filter
   late Set<String> selectedFilters;
   String? selectedCreationDate;
   String selectedFilter = "count";
@@ -52,9 +52,9 @@ class _MyquotationsState extends State<Myquotations> {
   void initState() {
     super.initState();
     if (widget.teamId == null && (widget.domain == null || widget.domain!.isEmpty)) {
-      selectedFilters = {'my_quotations'}; // Default filter only when no teamId or domain
+      selectedFilters = {'my_quotations'};
     } else {
-      selectedFilters = {}; // No default filter when teamId or domain is provided
+      selectedFilters = {};
     }
     searchController.addListener(_onSearchChanged);
     initializeOdooClient();
@@ -658,6 +658,11 @@ class _MyquotationsState extends State<Myquotations> {
                 lead['user_id'].length > 1
             ? lead['user_id'][1]
             : "None";
+        final salespersonId = lead['user_id'] != null &&
+            lead['user_id'] is List &&
+            lead['user_id'].length > 0
+            ? lead['user_id'][0] as int
+            : null;
         final hasActivity = lead['activity_type_id'] != null &&
             lead['activity_type_id'] is List &&
             lead['activity_type_id'].isNotEmpty;
@@ -927,54 +932,63 @@ class _MyquotationsState extends State<Myquotations> {
                                 SizedBox(height: 6),
                                 Row(
                                   children: [
-                                    profileImage != null
-                                        ? Container(
+                                    FutureBuilder<Uint8List?>(
+                                      future: salespersonId != null && client != null
+                                          ? GetImage().fetchImage(salespersonId, client!)
+                                          : Future.value(null),
+                                      builder: (context, snapshot) {
+                                        if (snapshot.connectionState == ConnectionState.waiting) {
+                                          return Container(
+                                            width: 28,
+                                            height: 28,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.blue,
+                                            ),
+                                          );
+                                        } else if (snapshot.hasData && snapshot.data != null) {
+                                          return Container(
                                             width: 28,
                                             height: 28,
                                             decoration: BoxDecoration(
-                                              borderRadius:
-                                                  BorderRadius.circular(6),
+                                              borderRadius: BorderRadius.circular(6),
                                               boxShadow: [
                                                 BoxShadow(
-                                                  color: Colors.black
-                                                      .withOpacity(0.1),
+                                                  color: Colors.black.withOpacity(0.1),
                                                   blurRadius: 4,
                                                   offset: Offset(0, 2),
                                                 ),
                                               ],
                                               image: DecorationImage(
-                                                image:
-                                                    MemoryImage(profileImage!),
+                                                image: MemoryImage(snapshot.data!),
                                                 fit: BoxFit.cover,
                                               ),
                                             ),
-                                          )
-                                        : Container(
+                                          );
+                                        } else {
+                                          return Container(
                                             width: 28,
                                             height: 28,
                                             decoration: BoxDecoration(
-                                              borderRadius:
-                                                  BorderRadius.circular(6),
+                                              borderRadius: BorderRadius.circular(6),
                                               gradient: LinearGradient(
-                                                colors: [
-                                                  Colors.blue.shade700,
-                                                  Colors.blue.shade500
-                                                ],
+                                                colors: [Colors.blue.shade700, Colors.blue.shade500],
                                                 begin: Alignment.topLeft,
                                                 end: Alignment.bottomRight,
                                               ),
                                               boxShadow: [
                                                 BoxShadow(
-                                                  color: Colors.blue
-                                                      .withOpacity(0.3),
+                                                  color: Colors.blue.withOpacity(0.3),
                                                   blurRadius: 4,
                                                   offset: Offset(0, 2),
                                                 ),
                                               ],
                                             ),
-                                            child: Icon(Icons.person,
-                                                size: 16, color: Colors.white),
-                                          ),
+                                            child: Icon(Icons.person, size: 16, color: Colors.white),
+                                          );
+                                        }
+                                      },
+                                    ),
                                     SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
@@ -1797,45 +1811,6 @@ class _MyquotationsState extends State<Myquotations> {
             );
     }
   }
-  //
-  // List<ChartData> prepareChartData(List<Map<String, dynamic>> salesOrders) {
-  //   if (salesOrders.isEmpty) {
-  //     return [];
-  //   }
-  //   Map<String, double> customerSales = {};
-  //
-  //   for (var order in salesOrders) {
-  //     String customerName = "";
-  //     double amount = 0.0;
-  //
-  //     if (order['partner_id'] != false &&
-  //         order['partner_id'] is List &&
-  //         order['partner_id'].length > 1) {
-  //       customerName = order['partner_id'][1].toString();
-  //     } else {
-  //       customerName = "Unknown";
-  //     }
-  //     if (order['amount_total'] != false) {
-  //       amount = double.tryParse(order['amount_total'].toString()) ?? 0.0;
-  //     }
-  //
-  //
-  //     if (customerSales.containsKey(customerName)) {
-  //       customerSales[customerName] = customerSales[customerName]! + amount;
-  //     } else {
-  //       customerSales[customerName] = amount;
-  //     }
-  //   }
-  //
-  //   List<ChartData> chartData = customerSales.entries.map((entry) {
-  //     return ChartData(entry.key, entry.value);
-  //   }).toList();
-  //
-  //   // Sort the list based on x value (customer name)
-  //   chartData.sort((a, b) => a.x.compareTo(b.x));
-  //
-  //   return chartData;
-  // }
   List<ChartData> prepareChartData(List<Map<String, dynamic>> salesOrders) {
     if (salesOrders.isEmpty) {
       return [];
@@ -2502,40 +2477,44 @@ class _MyquotationsState extends State<Myquotations> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Color(0xFF9EA700),
         title: isSearching
             ? TextField(
           controller: searchController,
           autofocus: true,
+          style: const TextStyle(color: Colors.white),
           decoration: InputDecoration(
-            hintText: "Search quotations...",
-            border: InputBorder.none,
-            hintStyle: TextStyle(color: Colors.white70),
+            hintText: 'Search...',
+            hintStyle: const TextStyle(color: Colors.white70),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(20),
+              borderSide: BorderSide.none,
+            ),
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.2),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
           ),
-          style: TextStyle(color: Colors.white),
         )
-            : Text('Quotations'),
+            : const Text("Quotations"),
+        elevation: 0,
+        backgroundColor: const Color(0xFF9EA700),
         actions: [
           IconButton(
+            icon: Icon(isSearching ? Icons.close : Icons.search),
             onPressed: () {
               setState(() {
                 if (isSearching) {
-                  isSearching = false;
                   searchController.clear();
-                  fetchLeadsData(); // Reset to full data when search is cleared
+                  isSearching = false;
+                  fetchLeadsData(); // Reset to full data
                 } else {
                   isSearching = true;
                 }
               });
             },
-            icon: Icon(isSearching ? Icons.close : Icons.search_rounded),
           ),
-          SizedBox(width: 4),
           IconButton(
-            onPressed: () {
-              showFilterDialog(context);
-            },
-            icon: Icon(Icons.filter_list_sharp),
+            icon: const Icon(Icons.filter_list),
+            onPressed: () => showFilterDialog(context),
           ),
         ],
       ),

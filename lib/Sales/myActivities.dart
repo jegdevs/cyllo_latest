@@ -2474,42 +2474,45 @@ class _MyactivityState extends State<Myactivity> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Color(0xFF9EA700),
         title: isSearching
             ? TextField(
           controller: searchController,
           autofocus: true,
+          style: const TextStyle(color: Colors.white),
           decoration: InputDecoration(
-            hintText: "Search activities...",
-            border: InputBorder.none,
-            hintStyle: TextStyle(color: Colors.white70),
+            hintText: 'Search...',
+            hintStyle: const TextStyle(color: Colors.white70),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(20),
+              borderSide: BorderSide.none,
+            ),
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.2),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
           ),
-          style: TextStyle(color: Colors.white),
         )
-            : Text('Activities'),
+            : const Text("Activities"),
+        elevation: 0,
+        backgroundColor: const Color(0xFF9EA700),
         actions: [
           IconButton(
+            icon: Icon(isSearching ? Icons.close : Icons.search),
             onPressed: () {
               setState(() {
                 if (isSearching) {
-                  isSearching = false;
                   searchController.clear();
+                  isSearching = false;
                   pipe(); // Reset to full data
                 } else {
                   isSearching = true;
                 }
               });
             },
-            icon: Icon(isSearching ? Icons.close : Icons.search_rounded),
           ),
-          SizedBox(width: 4),
           IconButton(
-            onPressed: () {
-              showFilterDialog(context);
-            },
-            icon: Icon(Icons.filter_list_sharp),
+            icon: const Icon(Icons.filter_list),
+            onPressed: () => showFilterDialog(context),
           ),
-          SizedBox(width: 4),
         ],
       ),
       backgroundColor: Colors.white,

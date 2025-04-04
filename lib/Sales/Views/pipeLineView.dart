@@ -52,6 +52,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
   late TextEditingController zipController;
   late TextEditingController countryController;
   late TextEditingController websiteController;
+  late TextEditingController mobileController;
+  late TextEditingController jobPositionController;
   late TextEditingController campaignController;
   late TextEditingController mediumController;
   late TextEditingController sourceController;
@@ -95,6 +97,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
     zipController = TextEditingController();
     countryController = TextEditingController();
     websiteController = TextEditingController();
+    mobileController = TextEditingController();
+    jobPositionController = TextEditingController();
     campaignController = TextEditingController();
     mediumController = TextEditingController();
     sourceController = TextEditingController();
@@ -129,6 +133,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
     zipController.dispose();
     countryController.dispose();
     websiteController.dispose();
+    mobileController.dispose();
+    jobPositionController.dispose();
     campaignController.dispose();
     mediumController.dispose();
     sourceController.dispose();
@@ -423,6 +429,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
             'team_id',
             'day_open',
             'day_close',
+            'function',
+            'mobile',
           ],
         },
       });
@@ -446,8 +454,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
           selectedSalesperson = leadData['user_id'] is List && leadData['user_id'].length > 1 ? leadData['user_id'][1].toString() : null;
           selectedPartner = leadData['partner_id'] is List && leadData['partner_id'].length > 1 ? leadData['partner_id'][1].toString() : null;
 
-          contactNameController.text = leadData['contact_name'] is String ? leadData['contact_name'] : 'No data';
-          companyNameController.text = leadData['partner_name'] is String ? leadData['partner_name'] : 'No data';
+          contactNameController.text = leadData['contact_name'] is String ? leadData['contact_name'] : 'N/A';
+          companyNameController.text = leadData['partner_name'] is String ? leadData['partner_name'] : 'N/A';
 
           String street = leadData['street'] is String ? leadData['street'] : '';
           String city = leadData['city'] is String ? leadData['city'] : '';
@@ -464,22 +472,24 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
           selectedState = state.isNotEmpty ? state : null;
           selectedCountry = country.isNotEmpty ? country : null;
 
-          websiteController.text = leadData['website'] is String ? leadData['website'] : 'No data';
+          websiteController.text = leadData['website'] is String ? leadData['website'] : 'N/A';
+          jobPositionController.text = leadData['function'] is String ? leadData['function'] :'N/A';
+          mobileController.text = leadData['mobile'] is String ? leadData ['mobile'] :'N/A';
 
           selectedCampaign = leadData['campaign_id'] is List && leadData['campaign_id'].length > 1 ? leadData['campaign_id'][1].toString() : null;
           selectedMedium = leadData['medium_id'] is List && leadData['medium_id'].length > 1 ? leadData['medium_id'][1].toString() : null;
           selectedSource = leadData['source_id'] is List && leadData['source_id'].length > 1 ? leadData['source_id'][1].toString() : null;
-          campaignController.text = selectedCampaign ?? 'No data';
-          mediumController.text = selectedMedium ?? 'No data';
-          sourceController.text = selectedSource ?? 'No data';
-          referredByController.text = leadData['referred'] is String ? leadData['referred'] : 'No data';
+          campaignController.text = selectedCampaign ?? 'N/A';
+          mediumController.text = selectedMedium ?? 'N/A';
+          sourceController.text = selectedSource ?? 'N/A';
+          referredByController.text = leadData['referred'] is String ? leadData['referred'] : 'N/A';
 
           selectedCompany = leadData['company_id'] is List && leadData['company_id'].length > 1 ? leadData['company_id'][1].toString() : null;
           selectedSalesTeam = leadData['team_id'] is List && leadData['team_id'].length > 1 ? leadData['team_id'][1].toString() : null;
-          trackingCompanyController.text = selectedCompany ?? 'No data';
-          salesTeamController.text = selectedSalesTeam ?? 'No data';
-          daysToAssignController.text = leadData['day_open'] != null ? leadData['day_open'].toString() : 'No data';
-          daysToCloseController.text = leadData['day_close'] != null ? leadData['day_close'].toString() : 'No data';
+          trackingCompanyController.text = selectedCompany ?? 'N/A';
+          salesTeamController.text = selectedSalesTeam ?? 'N/A';
+          daysToAssignController.text = leadData['day_open'] != null ? leadData['day_open'].toString() : 'N/A';
+          daysToCloseController.text = leadData['day_close'] != null ? leadData['day_close'].toString() : 'N/A';
 
           isLoading = false;
         });
@@ -497,6 +507,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
           zipController.text = '';
           countryController.text = '';
           websiteController.text = 'No data';
+          mobileController.text="";
+          jobPositionController.text = '';
           campaignController.text = 'No data';
           mediumController.text = 'No data';
           sourceController.text = 'No data';
@@ -581,6 +593,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
         'zip': zipController.text,
         'country_id': countryId != false ? countryId : null,
         'website': websiteController.text,
+        'function': jobPositionController.text,
+        'mobile' :mobileController.text,
         'campaign_id': campaignId != false ? campaignId : null,
         'medium_id': mediumId != false ? mediumId : null,
         'source_id': sourceId != false ? sourceId : null,
@@ -943,7 +957,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
                       ? Icons.timer
                       : label.contains('Address')
                       ? Icons.location_city
-                      : Icons.info,
+                      : Icons.info,size: 15,
                   color: Color(0xFF9EA700),
                 ),
                 filled: true,
@@ -1145,12 +1159,6 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
               );
             }
           } else if (text == 'Lost') {
-            // Since the Lost button triggers a wizard (action ID 415), we can either:
-            // 1. Directly call action_set_lost (if no reason is required)
-            // 2. Create a wizard and call action_set_lost on it (if a reason is needed)
-
-            // For simplicity, let's directly call action_set_lost
-            // If you need to specify a reason, we can implement the wizard flow instead
 
             final lostResponse = await client!.callKw({
               'model': 'crm.lead',
@@ -1299,6 +1307,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
               'CONTACT INFORMATION',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey.shade700),
             ),
+            Divider(),
             SizedBox(height: 16),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1321,23 +1330,47 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
             ),
             SizedBox(height: 12),
             if (!isEditing)
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Column(
                 children: [
-                  Expanded(
-                    child: _buildInfoField(
-                      'Address',
-                      addressController.text,
-                      textController: addressController,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: _buildInfoField(
+                          'Address',
+                          addressController.text,
+                          textController: addressController,
+                        ),
+                      ),
+                      Expanded(
+                        child: _buildInfoField(
+                          'Website',
+                          websiteController.text,
+                          textController: websiteController,
+                        ),
+                      ),
+                    ],
                   ),
-                  Expanded(
-                    child: _buildInfoField(
-                      'Website',
-                      websiteController.text,
-                      textController: websiteController,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildInfoField(
+                          'Job Position',
+                          jobPositionController.text,
+                          textController: jobPositionController,
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: _buildInfoField(
+                          'Mobile',
+                          mobileController.text,
+                          textController: mobileController,
+                        ),
+                      ),
+                    ],
                   ),
+
                 ],
               )
             else
@@ -1416,6 +1449,27 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
                     websiteController.text,
                     textController: websiteController,
                   ),
+                  SizedBox(height: 12),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: _buildInfoField(
+                          'Job Position',
+                          jobPositionController.text,
+                          textController: jobPositionController,
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: _buildInfoField(
+                          'Mobile',
+                          mobileController.text,
+                          textController: mobileController,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             SizedBox(height: 16),
@@ -1423,6 +1477,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
               'MARKETING',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey.shade700),
             ),
+            Divider(),
             SizedBox(height: 16),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1516,6 +1571,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
               'TRACKING',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.grey.shade700),
             ),
+            Divider(),
             SizedBox(height: 16),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,

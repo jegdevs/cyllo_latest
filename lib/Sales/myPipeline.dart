@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'dart:typed_data';
+import 'package:cyllo_mobile/getUserImage.dart';
 import 'package:flutter/material.dart';
 import 'package:appflowy_board/appflowy_board.dart';
 import 'package:intl/intl.dart';
@@ -839,23 +840,28 @@ class _MypipelineState extends State<Mypipeline> {
             .toList();
 
         Map<String, List<Map<String, dynamic>>> groupedLeads = {};
+        Map<String, int> stageIdMap = {};
 
         for (var lead in opportunitiesList) {
-          String stage = lead['stage_id'][1] ?? '';
-          List<String> tagNames = [];
-          if (lead['tag_ids'] != null && lead['tag_ids'] is List) {
-            for (var tagId in lead['tag_ids']) {
-              if (tagMap.containsKey(tagId)) {
-                tagNames.add(tagMap[tagId]!);
-              }
-            }
+          if (lead['stage_id'] != null && lead['stage_id'] is List && lead['stage_id'].length > 1) {
+            int stageId = lead['stage_id'][0]; // Numeric ID
+            String stageName = lead['stage_id'][1] ?? ''; // Stage name
+            stageIdMap[stageName] = stageId; // Map stage name to its ID
+            groupedLeads.putIfAbsent(stageName, () => []).add(lead);
           }
-          groupedLeads.putIfAbsent(stage, () => []).add(lead);
         }
+
+        // Sort groups by stage_id
+        List<MapEntry<String, List<Map<String, dynamic>>>> sortedGroups = groupedLeads.entries.toList()
+          ..sort((a, b) {
+            int stageIdA = stageIdMap[a.key] ?? 0;
+            int stageIdB = stageIdMap[b.key] ?? 0;
+            return stageIdA.compareTo(stageIdB); // Sort by stage_id
+          });
 
         controller.clear();
 
-        for (var entry in groupedLeads.entries) {
+        for (var entry in sortedGroups) {
           final groupData = AppFlowyGroupData(
             id: entry.key,
             name: entry.key,
@@ -899,6 +905,11 @@ class _MypipelineState extends State<Mypipeline> {
                     ? List<String>.from(
                     lead['activity_ids'].map((e) => e.toString()))
                     : [],
+                salespersonId: lead['user_id'] != null && // Added this
+                    lead['user_id'] is List &&
+                    lead['user_id'].length > 0
+                    ? lead['user_id'][0]
+                    : null,
                 imageData:
                 profileImage != null ? base64Encode(profileImage!) : null,
               );
@@ -2614,36 +2625,52 @@ class _MypipelineState extends State<Mypipeline> {
                         SizedBox(
                           width: 58,
                         ),
-                        if (item.imageData != null && item.imageData!.isNotEmpty)
-                          Container(
-                            width: 24,
-                            height: 24,
-                            margin: EdgeInsets.only(left: 8),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(4),
-                              image: DecorationImage(
-                                image: MemoryImage(
-                                  base64Decode(item.imageData!),
+                        FutureBuilder<Uint8List?>(
+                          future: item.salespersonId != null && client != null
+                              ? GetImage().fetchImage(item.salespersonId!, client!)
+                              : Future.value(null),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              return Container(
+                                width: 24,
+                                height: 24,
+                                margin: EdgeInsets.only(left: 8),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.grey,
                                 ),
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                          )
-                        else
-                          Container(
-                            width: 24,
-                            height: 24,
-                            margin: EdgeInsets.only(left: 55),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.grey.shade300,
-                            ),
-                            child: Icon(
-                              Icons.person,
-                              size: 16,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
+                              );
+                            } else if (snapshot.hasData && snapshot.data != null) {
+                              return Container(
+                                width: 24,
+                                height: 24,
+                                margin: EdgeInsets.only(left: 8),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(4),
+                                  image: DecorationImage(
+                                    image: MemoryImage(snapshot.data!),
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              );
+                            } else {
+                              return Container(
+                                width: 24,
+                                height: 24,
+                                margin: EdgeInsets.only(left: 8),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.grey.shade300,
+                                ),
+                                child: Icon(
+                                  Icons.person,
+                                  size: 16,
+                                  color: Colors.grey.shade700,
+                                ),
+                              );
+                            }
+                          },
+                        ),
                       ],
                     ),
                   ],
@@ -2656,14 +2683,13 @@ class _MypipelineState extends State<Mypipeline> {
     }
     throw UnimplementedError();
   }
-
   @override
   void initState() {
     super.initState();
     if (widget.teamId == null && (widget.domain == null || widget.domain!.isEmpty)) {
-      selectedFilters = {'my_pipeline'}; // Default filter only when no teamId or domain
+      selectedFilters = {'my_pipeline'};
     } else {
-      selectedFilters = {}; // No default filter when teamId or domain is provided
+      selectedFilters = {};
     }
     initializeOdooClient();
     boardController = AppFlowyBoardScrollController();
@@ -2710,7 +2736,7 @@ class _MypipelineState extends State<Mypipeline> {
                 if (isSearching) {
                   searchController.clear();
                   isSearching = false;
-                  pipe(); // Reset to full data
+                  pipe();
                 } else {
                   isSearching = true;
                 }
@@ -3324,6 +3350,7 @@ class LeadItem extends AppFlowyGroupItem {
   final String activityType;
   final String? imageData;
   final bool hasActivity;
+  final int? salespersonId;
   final List<String> activityIds;
 
   LeadItem({
@@ -3336,6 +3363,7 @@ class LeadItem extends AppFlowyGroupItem {
     this.activityState = '',
     this.activityType = '',
     this.imageData,
+    this.salespersonId,
     required this.hasActivity,
     required this.activityIds,
   });

@@ -303,48 +303,103 @@ class _QuotationPageState extends State<QuotationPage> {
         return item['id'] as int?;
       }
 
-      final updatedData = {
+      // final updatedData = {
+      //   'partner_id': getIdFromList(partners, customerController.text, quotationData['partner_id']),
+      //   'partner_invoice_id': getIdFromList(partners, invoiceAddressController.text, quotationData['partner_invoice_id']),
+      //   'partner_shipping_id': getIdFromList(partners, deliveryAddressController.text, quotationData['partner_shipping_id']),
+      //   'validity_date': expirationController.text.isNotEmpty ? expirationController.text : false,
+      //   'date_order': quotationDateController.text.isNotEmpty ? quotationDateController.text : false,
+      //   'pricelist_id': getIdFromList(pricelists,
+      //       quotationData['pricelist_id'] is List ? quotationData['pricelist_id'][1] as String? : null,
+      //       quotationData['pricelist_id']),
+      //   'payment_term_id': getIdFromList(paymentTerms,
+      //       quotationData['payment_term_id'] is List ? quotationData['payment_term_id'][1] as String? : null,
+      //       quotationData['payment_term_id']),
+      //   'user_id': selectedSalesPersonId,
+      //   'team_id': getIdFromList(salesTeams,
+      //       quotationData['team_id'] is List ? quotationData['team_id'][1] as String? : null,
+      //       quotationData['team_id']),
+      //   'company_id': getIdFromList(companies,
+      //       quotationData['company_id'] is List ? quotationData['company_id'][1] as String? : null,
+      //       quotationData['company_id']),
+      //   'fiscal_position_id': getIdFromList(fiscalPos,
+      //       quotationData['fiscal_position_id'] is List ? quotationData['fiscal_position_id'][1] as String? : null,
+      //       quotationData['fiscal_position_id']),
+      //   'journal_id': getIdFromList(accJournal,
+      //       quotationData['journal_id'] is List ? quotationData['journal_id'][1] as String? : null,
+      //       quotationData['journal_id']),
+      //   'incoterm': getIdFromList(incoT,
+      //       quotationData['incoterm'] is List ? quotationData['incoterm'][1] as String? : null,
+      //       quotationData['incoterm']),
+      //   'picking_policy': quotationData['picking_policy'] ?? 'direct',
+      //   'opportunity_id': getIdFromList(oppor,
+      //       quotationData['opportunity_id'] is List ? quotationData['opportunity_id'][1] as String? : null,
+      //       quotationData['opportunity_id']),
+      //   'campaign_id': getIdFromList(campaigns,
+      //       quotationData['campaign_id'] is List ? quotationData['campaign_id'][1] as String? : null,
+      //       quotationData['campaign_id']),
+      //   'medium_id': getIdFromList(mediums,
+      //       quotationData['medium_id'] is List ? quotationData['medium_id'][1] as String? : null,
+      //       quotationData['medium_id']),
+      //   'source_id': getIdFromList(sources,
+      //       quotationData['source_id'] is List ? quotationData['source_id'][1] as String? : null,
+      //       quotationData['source_id']),
+      // };
+      //
+      // final cleanedData = updatedData.map((key, value) => MapEntry(key, value ?? false));
+      //
+      // print("Saving data to Odoo: $cleanedData");
+      final String orderState = _toString(quotationData['state'], defaultValue: 'draft');
+
+      // Base data to update
+      final Map<String, dynamic> updatedData = {
         'partner_id': getIdFromList(partners, customerController.text, quotationData['partner_id']),
         'partner_invoice_id': getIdFromList(partners, invoiceAddressController.text, quotationData['partner_invoice_id']),
         'partner_shipping_id': getIdFromList(partners, deliveryAddressController.text, quotationData['partner_shipping_id']),
         'validity_date': expirationController.text.isNotEmpty ? expirationController.text : false,
         'date_order': quotationDateController.text.isNotEmpty ? quotationDateController.text : false,
-        'pricelist_id': getIdFromList(pricelists,
-            quotationData['pricelist_id'] is List ? quotationData['pricelist_id'][1] as String? : null,
-            quotationData['pricelist_id']),
-        'payment_term_id': getIdFromList(paymentTerms,
-            quotationData['payment_term_id'] is List ? quotationData['payment_term_id'][1] as String? : null,
-            quotationData['payment_term_id']),
         'user_id': selectedSalesPersonId,
-        'team_id': getIdFromList(salesTeams,
-            quotationData['team_id'] is List ? quotationData['team_id'][1] as String? : null,
-            quotationData['team_id']),
-        'company_id': getIdFromList(companies,
-            quotationData['company_id'] is List ? quotationData['company_id'][1] as String? : null,
-            quotationData['company_id']),
-        'fiscal_position_id': getIdFromList(fiscalPos,
-            quotationData['fiscal_position_id'] is List ? quotationData['fiscal_position_id'][1] as String? : null,
-            quotationData['fiscal_position_id']),
-        'journal_id': getIdFromList(accJournal,
-            quotationData['journal_id'] is List ? quotationData['journal_id'][1] as String? : null,
-            quotationData['journal_id']),
-        'incoterm': getIdFromList(incoT,
-            quotationData['incoterm'] is List ? quotationData['incoterm'][1] as String? : null,
-            quotationData['incoterm']),
-        'picking_policy': quotationData['picking_policy'] ?? 'direct',
-        'opportunity_id': getIdFromList(oppor,
-            quotationData['opportunity_id'] is List ? quotationData['opportunity_id'][1] as String? : null,
-            quotationData['opportunity_id']),
-        'campaign_id': getIdFromList(campaigns,
-            quotationData['campaign_id'] is List ? quotationData['campaign_id'][1] as String? : null,
-            quotationData['campaign_id']),
-        'medium_id': getIdFromList(mediums,
-            quotationData['medium_id'] is List ? quotationData['medium_id'][1] as String? : null,
-            quotationData['medium_id']),
-        'source_id': getIdFromList(sources,
-            quotationData['source_id'] is List ? quotationData['source_id'][1] as String? : null,
-            quotationData['source_id']),
       };
+
+      // Conditionally include fields that can be updated in 'draft' or 'sent' states only
+      if (orderState == 'draft' || orderState == 'sent') {
+        updatedData.addAll({
+          'pricelist_id': getIdFromList(pricelists,
+              quotationData['pricelist_id'] is List ? quotationData['pricelist_id'][1] as String? : null,
+              quotationData['pricelist_id']),
+          'payment_term_id': getIdFromList(paymentTerms,
+              quotationData['payment_term_id'] is List ? quotationData['payment_term_id'][1] as String? : null,
+              quotationData['payment_term_id']),
+          'team_id': getIdFromList(salesTeams,
+              quotationData['team_id'] is List ? quotationData['team_id'][1] as String? : null,
+              quotationData['team_id']),
+          'company_id': getIdFromList(companies,
+              quotationData['company_id'] is List ? quotationData['company_id'][1] as String? : null,
+              quotationData['company_id']),
+          'fiscal_position_id': getIdFromList(fiscalPos,
+              quotationData['fiscal_position_id'] is List ? quotationData['fiscal_position_id'][1] as String? : null,
+              quotationData['fiscal_position_id']),
+          'journal_id': getIdFromList(accJournal,
+              quotationData['journal_id'] is List ? quotationData['journal_id'][1] as String? : null,
+              quotationData['journal_id']),
+          'incoterm': getIdFromList(incoT,
+              quotationData['incoterm'] is List ? quotationData['incoterm'][1] as String? : null,
+              quotationData['incoterm']),
+          'picking_policy': quotationData['picking_policy'] ?? 'direct',
+          'opportunity_id': getIdFromList(oppor,
+              quotationData['opportunity_id'] is List ? quotationData['opportunity_id'][1] as String? : null,
+              quotationData['opportunity_id']),
+          'campaign_id': getIdFromList(campaigns,
+              quotationData['campaign_id'] is List ? quotationData['campaign_id'][1] as String? : null,
+              quotationData['campaign_id']),
+          'medium_id': getIdFromList(mediums,
+              quotationData['medium_id'] is List ? quotationData['medium_id'][1] as String? : null,
+              quotationData['medium_id']),
+          'source_id': getIdFromList(sources,
+              quotationData['source_id'] is List ? quotationData['source_id'][1] as String? : null,
+              quotationData['source_id']),
+        });
+      }
 
       final cleanedData = updatedData.map((key, value) => MapEntry(key, value ?? false));
 
@@ -1479,7 +1534,7 @@ class _QuotationPageState extends State<QuotationPage> {
                         if (context.mounted) {
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error creating invoice: $e')),
+                            SnackBar(content: Text('Invalid Operation \n Cannot create an invoice.No items are available')),
                           );
                         }
                       }

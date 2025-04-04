@@ -1563,7 +1563,7 @@ class CustomerActivityDataSource extends DataGridSource {
         return Container(
           alignment: Alignment.center,
           padding: const EdgeInsets.all(8.0),
-          color: backgroundColor, // Full cell background color
+          color: backgroundColor,
           child: date.isNotEmpty
               ? Row(
                   mainAxisSize: MainAxisSize.min,
