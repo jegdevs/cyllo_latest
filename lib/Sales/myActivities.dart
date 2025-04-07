@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_flutter_calendar/calendar.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datagrid/datagrid.dart';
+import '../getUserImage.dart';
 import 'Views/activityView.dart';
 import 'myPipeline.dart';
 
@@ -758,6 +759,7 @@ class _MyactivityState extends State<Myactivity> {
             'date_closed',
             'type',
             'prorated_revenue',
+            'user_id',
           ],
         }
       });
@@ -839,6 +841,11 @@ class _MyactivityState extends State<Myactivity> {
                 activityIds: lead['activity_ids'] != null && lead['activity_ids'] is List
                     ? List<String>.from(lead['activity_ids'].map((e) => e.toString()))
                     : [],
+                salespersonId: lead['user_id'] != null && // Added this
+                    lead['user_id'] is List &&
+                    lead['user_id'].length > 0
+                    ? lead['user_id'][0]
+                    : null,
                 imageData: profileImage != null ? base64Encode(profileImage!) : null,
               );
             }).toList(),
@@ -2420,34 +2427,52 @@ class _MyactivityState extends State<Myactivity> {
                         const SizedBox(width: 8),
                         ActivityIconDesign(item.activityState, item.activityType),
                         SizedBox(width: 58),
-                        if (item.imageData != null && item.imageData!.isNotEmpty)
-                          Container(
-                            width: 24,
-                            height: 24,
-                            margin: EdgeInsets.only(left: 8),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(4),
-                              image: DecorationImage(
-                                image: MemoryImage(base64Decode(item.imageData!)),
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                          )
-                        else
-                          Container(
-                            width: 24,
-                            height: 24,
-                            margin: EdgeInsets.only(left: 55),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.grey.shade300,
-                            ),
-                            child: Icon(
-                              Icons.person,
-                              size: 16,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
+                        FutureBuilder<Uint8List?>(
+                          future: item.salespersonId != null && client != null
+                              ? GetImage().fetchImage(item.salespersonId!, client!)
+                              : Future.value(null),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              return Container(
+                                width: 24,
+                                height: 24,
+                                margin: EdgeInsets.only(left: 8),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.grey,
+                                ),
+                              );
+                            } else if (snapshot.hasData && snapshot.data != null) {
+                              return Container(
+                                width: 24,
+                                height: 24,
+                                margin: EdgeInsets.only(left: 8),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(4),
+                                  image: DecorationImage(
+                                    image: MemoryImage(snapshot.data!),
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              );
+                            } else {
+                              return Container(
+                                width: 24,
+                                height: 24,
+                                margin: EdgeInsets.only(left: 8),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.grey.shade300,
+                                ),
+                                child: Icon(
+                                  Icons.person,
+                                  size: 16,
+                                  color: Colors.grey.shade700,
+                                ),
+                              );
+                            }
+                          },
+                        ),
                       ],
                     ),
                   ],

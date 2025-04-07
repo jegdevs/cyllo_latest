@@ -2118,9 +2118,28 @@ class _QuotationPageState extends State<QuotationPage> {
               TextEditingController(text: _toString(quotationData['incoterm_location'])),
             ),
             const SizedBox(height: 16),
+            // _buildEditableInfoRow(
+            //   'Shipping Policy',
+            //   TextEditingController(text: _toString(quotationData['picking_policy'])),
+            //   isDropdown: isEditMode,
+            //   items: ['direct', 'one'],
+            //   onDropdownChanged: (value) {
+            //     if (value != null) {
+            //       setState(() {
+            //         quotationData['picking_policy'] = value;
+            //       });
+            //     }
+            //   },
+            // ),
             _buildEditableInfoRow(
               'Shipping Policy',
-              TextEditingController(text: _toString(quotationData['picking_policy'])),
+              TextEditingController(
+                text: quotationData['picking_policy'] == 'direct'
+                    ? 'As soon as possible'
+                    : (quotationData['picking_policy'] == 'one'
+                    ? 'When all products are ready'
+                    : ''), // Default text if no value is set
+              ),
               isDropdown: isEditMode,
               items: ['direct', 'one'],
               onDropdownChanged: (value) {
@@ -2128,6 +2147,13 @@ class _QuotationPageState extends State<QuotationPage> {
                   setState(() {
                     quotationData['picking_policy'] = value;
                   });
+
+                  // Update the text field based on the selected value
+                  if (value == 'direct') {
+                    quotationData['picking_policy_text'] = 'As soon as possible';
+                  } else if (value == 'one') {
+                    quotationData['picking_policy_text'] = 'When all products are ready';
+                  }
                 }
               },
             ),
@@ -2398,10 +2424,10 @@ class _QuotationPageState extends State<QuotationPage> {
             ))
                 .toList()
                 : [
-              Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(color: Colors.red.shade200, borderRadius: BorderRadius.circular(12)),
-                  child: const Text('Product', style: TextStyle(color: Colors.white, fontSize: 12)))
+              // Container(
+              //     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              //     decoration: BoxDecoration(color: Colors.red.shade200, borderRadius: BorderRadius.circular(12)),
+              //     child: const Text('Product', style: TextStyle(color: Colors.white, fontSize: 12)))
             ],
           ),
         ),

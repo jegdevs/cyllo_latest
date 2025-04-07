@@ -2962,6 +2962,10 @@ class _SalesDataGridWidgetState extends State<SalesDataGridWidget> {
             opportunity['activity_user_id'] is List
             ? opportunity['activity_user_id'][0] as int
             : null,
+        'user_id' :opportunity['user_id'] != null &&
+            opportunity['user_id'] is List
+            ? opportunity['user_id'][0] as int
+            : null,
       };
 
       for (var type in widget.activityTypes) {
@@ -3171,6 +3175,8 @@ class SalesDataSource extends DataGridSource {
   }
 
   Widget OpportunityColumn(Map<String, dynamic> salesData, Uint8List? userImage, BuildContext context) {
+
+
     return InkWell(
       onTap: () {
         final leadId = salesData['id'];
@@ -3184,47 +3190,65 @@ class SalesDataSource extends DataGridSource {
       child: Row(
         children: [
           const SizedBox(width: 5),
-          userImage != null
-              ? Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(6),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-              image: DecorationImage(
-                image: MemoryImage(userImage),
-                fit: BoxFit.cover,
-              ),
-            ),
-          )
-              : Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(6),
-              gradient: LinearGradient(
-                colors: [
-                  Colors.blue.shade700,
-                  Colors.blue.shade500,
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.blue.withOpacity(0.3),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: const Icon(Icons.person, size: 18, color: Colors.white),
+          FutureBuilder<Uint8List?>(
+            future: salesData['user_id'] != null && client != null
+                ? GetImage().fetchImage(salesData['user_id'], client!)
+                : Future.value(null),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Container(
+                  width: 32,
+                  height: 32,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.grey,
+                  ),
+                );
+              } else if (snapshot.hasData && snapshot.data != null) {
+                return Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(6),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                    image: DecorationImage(
+                      image: MemoryImage(snapshot.data!),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                );
+              } else {
+                return Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(6),
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.blue.shade700,
+                        Colors.blue.shade500,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.blue.withOpacity(0.3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.person, size: 18, color: Colors.white),
+                );
+              }
+            },
           ),
           const SizedBox(width: 10),
           Expanded(

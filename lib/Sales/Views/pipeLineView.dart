@@ -1091,7 +1091,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
                 : null;
             final customerName = leadData['partner_id'] is List && leadData['partner_id'].length > 1
                 ? leadData['partner_id'][1].toString()
-                : leadData['name']?.toString() ?? 'Unknown';
+                : leadData['partner_id']?.toString() ?? 'Unknown';
 
             if (partnerId == null) {
               ScaffoldMessenger.of(context).showSnackBar(

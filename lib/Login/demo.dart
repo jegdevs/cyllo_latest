@@ -67,7 +67,7 @@ class _DemoState extends State<Demo> {
       client = OdooClient(baseUrl);
       try {
         final auth =
-            await client!.authenticate(dbName, userLogin, userPassword);
+        await client!.authenticate(dbName, userLogin, userPassword);
         print("Odoo Authenticated: $auth");
         await getChartData();
         await imageData();
@@ -84,8 +84,8 @@ class _DemoState extends State<Demo> {
     final userid = prefs.getInt("userId") ?? "";
     print('sdsdsdsds$userid');
     String today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    if (selectedReport == "Leads" || selectedReport == "Pipeline") {
-      try {
+    if (selectedReport == "Leads") {
+
         print(model);
         print(type);
         print(fields);
@@ -111,7 +111,121 @@ class _DemoState extends State<Demo> {
         final response = await client?.callKw({
           'model': model,
           'method': 'search_read',
-          'args': [conditions],
+          'args': [
+            [
+              "|",
+              ["active", "=", true],
+              ["active", "=", false],
+              "&",
+              ["create_date", ">=", "2024-12-31 18:30:00"],
+              ["create_date", "<=", "2025-12-31 18:29:59"]
+            ]
+          ],
+          'kwargs': {'fields': fields},
+        });
+        log('3$response');
+        if (response == null || response.isEmpty || response is! List) {
+          print('No data received or invalid format');
+          setState(() => isLoading = false);
+          return;
+        }
+
+          final List<Map<String, dynamic>> data =
+          List<Map<String, dynamic>>.from(response);
+          // Map<String, double> forecastCounts = {};
+          Map<String, double> leadValues = {};
+          double noneValue = 0;
+          log('dataaaaaaaaaaa$data');
+        for (var item in data) {
+          if (item['create_date'] != null && item['create_date'] is String) {
+            DateTime tempDate = DateFormat("yyyy-MM-dd").parse(
+                item['create_date']);
+            DateTime startRange = DateTime(2024, 12, 31, 18, 30, 00);
+            DateTime endRange = DateTime(2025, 12, 31, 18, 29, 59);
+
+            String monthYear = DateFormat('MMMM yyyy').format(tempDate);
+            double value = leadValues[monthYear] ?? 0;
+
+            // Check if tempDate is within the specified range
+            if (tempDate.isAfter(startRange.subtract(Duration(seconds: 1))) &&
+                tempDate.isBefore(endRange.add(Duration(seconds: 1)))) {
+              if (selectedFilter == "count") {
+                value = (leadValues[monthYear] ?? 0) + 1;
+              } else if (selectedFilter == "day_open" &&
+                  item['day_open'] != false) {
+                value = (leadValues[monthYear] ?? 0) +
+                    (item['day_open'] as double);
+              } else if (selectedFilter == "day_close" &&
+                  item['day_close'] != false) {
+                value = (leadValues[monthYear] ?? 0) +
+                    (item['day_close'] as double);
+              } else if (selectedFilter == "recurring_revenue_monthly" &&
+                  item['recurring_revenue_monthly'] != false) {
+                value = (leadValues[monthYear] ?? 0) +
+                    (item['recurring_revenue_monthly'] as double);
+              } else if (selectedFilter == "expected_revenue" &&
+                  item['expected_revenue'] != false) {
+                value = (leadValues[monthYear] ?? 0) +
+                    (item['expected_revenue'] as double);
+              } else if (selectedFilter == "probability" &&
+                  item['probability'] != false) {
+                value = (leadValues[monthYear] ?? 0) +
+                    (item['probability'] as double);
+              } else if (selectedFilter ==
+                  "recurring_revenue_monthly_prorated" &&
+                  item['recurring_revenue_monthly_prorated'] != false) {
+                value = (leadValues[monthYear] ?? 0) +
+                    (item['recurring_revenue_monthly_prorated'] as double);
+              } else if (selectedFilter == "recurring_revenue_prorated" &&
+                  item['recurring_revenue_prorated'] != false) {
+                value = (leadValues[monthYear] ?? 0) +
+                    (item['recurring_revenue_prorated'] as double);
+              } else if (selectedFilter == "prorated_revenue" &&
+                  item['prorated_revenue'] != false) {
+                value = (leadValues[monthYear] ?? 0) +
+                    (item['prorated_revenue'] as double);
+              } else if (selectedFilter == "recurring_revenue" &&
+                  item['recurring_revenue'] != false) {
+                value = (leadValues[monthYear] ?? 0) +
+                    (item['recurring_revenue'] as double);
+              } else {
+                value = 0;
+              }
+              leadValues[monthYear] = value;
+              //print('adadadad${stageName}');
+            }
+          }
+        }
+
+          setState(() {
+            chartDatavalues.clear();
+            chartDatavalues = leadValues.entries
+                .map((entry) => ChartData(entry.key, entry.value))
+                .toList();
+            print('lllloooooooo$chartDatavalues');
+            if (chartDatavalues.isEmpty ||
+                chartDatavalues.every((data) => data.y == 0)) {
+              showNoDataMessage = true;
+            } else {
+              showNoDataMessage = false;
+            }
+            isLoading = false;
+          });
+
+          print('Chart data updated');
+
+    }
+   else if (selectedReport == "Pipeline") {
+      try {
+        print(model);
+        print(type);
+        print(fields);
+        List conditions = [];
+
+        final response = await client?.callKw({
+          'model': model,
+          'method': 'search_read',
+          'args': [[["type", "=", "opportunity"]]],
           'kwargs': {
             'fields': fields,
           },
@@ -149,7 +263,7 @@ class _DemoState extends State<Demo> {
                 value = (stageValues[stageName] ?? 0) +
                     (item['probability'] as double);
               } else if (selectedFilter ==
-                      "recurring_revenue_monthly_prorated" &&
+                  "recurring_revenue_monthly_prorated" &&
                   item['recurring_revenue_monthly_prorated'] != false) {
                 value = (stageValues[stageName] ?? 0) +
                     (item['recurring_revenue_monthly_prorated'] as double);
@@ -200,7 +314,8 @@ class _DemoState extends State<Demo> {
         print("Error fetching data: $e");
         setState(() => isLoading = false);
       }
-    } else if (selectedReport == 'Forecast') {
+    }
+    else if (selectedReport == 'Forecast') {
       print('1');
 
       List conditions = [];
@@ -214,7 +329,6 @@ class _DemoState extends State<Demo> {
         'method': 'search_read',
         'args': [
           [
-            // ["date_deadline", "=", false],
             ["user_id", "=", userid],
             ['type', '=', 'opportunity'],
           ]
@@ -229,8 +343,7 @@ class _DemoState extends State<Demo> {
       }
       try {
         final List<Map<String, dynamic>> data =
-            List<Map<String, dynamic>>.from(response);
-        // Map<String, double> forecastCounts = {};
+        List<Map<String, dynamic>>.from(response);
         Map<String, double> forecastValues = {};
         double noneValue = 0;
         log('dataaaaaaaaaaa$data');
@@ -239,7 +352,7 @@ class _DemoState extends State<Demo> {
               item['date_deadline'] is String) {
             DateTime currentDate = DateTime.now();
             DateTime tempDate =
-                DateFormat("yyyy-MM-dd").parse(item['date_deadline']);
+            DateFormat("yyyy-MM-dd").parse(item['date_deadline']);
             print("dayyyyyyyyyyyyyyy$tempDate");
             DateTime date = DateTime.parse(item['date_deadline']);
             String monthYear = DateFormat('MMMM yyyy').format(date);
@@ -257,7 +370,7 @@ class _DemoState extends State<Demo> {
                   item['expected_revenue'] != false) {
                 value += (item['expected_revenue'] as double);
               } else if (selectedFilter ==
-                      "recurring_revenue_monthly_prorated" &&
+                  "recurring_revenue_monthly_prorated" &&
                   item['recurring_revenue_monthly_prorated'] != false) {
                 value += (item['recurring_revenue_monthly_prorated'] as double);
               } else if (selectedFilter == "recurring_revenue_prorated" &&
@@ -274,7 +387,7 @@ class _DemoState extends State<Demo> {
             }
           } else if (item['date_deadline'] == false) {
             print('itemmmmmm$item');
-            print("ansaf");
+            print("kkll");
             log("beffffff${item.length}");
             double itemValue = 0;
             print('wrokingggg');
@@ -332,18 +445,42 @@ class _DemoState extends State<Demo> {
       final response = await client?.callKw({
         'model': "crm.activity.report",
         'method': 'search_read',
-        'args': "",
+        'args':  [
+      [
+        ["date", ">=", DateFormat("yyyy-MM-dd HH:mm:ss").format(DateTime.now().subtract(Duration(days: 365)))],
+        ["date", "<=", DateFormat("yyyy-MM-dd HH:mm:ss").format(DateTime.now())],
+      ]
+      ],
         'kwargs': {'fields': fields},
       });
-      final data = response as List;
+      log('actresp$response');
+      if (response == null || response.isEmpty || response is! List) {
+        print('No data received or invalid format');
+        setState(() => isLoading = false);
+        return;
+      }
+
+      final List<Map<String, dynamic>> data = List<Map<String, dynamic>>.from(response);
       print('findddd$data');
+
+      Map<String, double> activityCounts = {};
+
+      for (var item in data) {
+        if (item['date'] != null && item['date'] is String) {
+          DateTime date = DateTime.parse(item['date']);
+          String monthYear = DateFormat('MMMM yyyy').format(date);
+          activityCounts[monthYear] = (activityCounts[monthYear] ?? 0) + 1;
+        }
+      }
+
       setState(() {
         chartDatavalues.clear();
-        DateTime date = DateTime.parse(data[0]['date']);
-        String monthYear = DateFormat('MMMM yyyy').format(date);
-        chartDatavalues.add(ChartData(monthYear, data.length.toDouble()));
+        chartDatavalues = activityCounts.entries
+            .map((entry) => ChartData(entry.key, entry.value))
+            .toList();
+
         isLoading = false;
-        if (chartDatavalues.isEmpty) {
+        if (chartDatavalues.isEmpty || chartDatavalues.every((data) => data.y == 0)) {
           showNoDataMessage = true;
         } else {
           showNoDataMessage = false;
@@ -411,7 +548,7 @@ class _DemoState extends State<Demo> {
         padding: EdgeInsets.only(left: 10, right: 10, top: 8, bottom: 8),
         child: CustomDropdown<String>(
           decoration:
-              CustomDropdownDecoration(closedFillColor: Colors.grey.shade300),
+          CustomDropdownDecoration(closedFillColor: Colors.grey.shade300),
           hintText: 'Reporting',
           items: dropvalues,
           initialItem: selectedReport,
@@ -425,7 +562,9 @@ class _DemoState extends State<Demo> {
                   model = "crm.lead";
                   type = "lead";
                   fields = [
-                    'stage_id',
+                    'user_id',
+                    'id',
+                    'create_date',
                     'day_open',
                     'day_close',
                     'recurring_revenue_monthly',
@@ -554,70 +693,70 @@ class _DemoState extends State<Demo> {
     if (selectedChart == "bar") {
       return showNoDataMessage
           ? Column(
-              children: [
-                Center(child: Image.asset('assets/nodata.png')),
-                Text(
-                  "No data to display",
-                  style: TextStyle(color: Colors.blueGrey),
-                ),
-              ],
-            )
+        children: [
+          Center(child: Image.asset('assets/nodata.png')),
+          Text(
+            "No data to display",
+            style: TextStyle(color: Colors.blueGrey),
+          ),
+        ],
+      )
           : SfCartesianChart(
-              primaryXAxis: CategoryAxis(),
-              series: <CartesianSeries<ChartData, String>>[
-                ColumnSeries<ChartData, String>(
-                  dataSource: chartDatavalues,
-                  xValueMapper: (ChartData data, _) => data.x,
-                  yValueMapper: (ChartData data, _) => data.y,
-                  color: Color(0xFF9EA700),
-                ),
-              ],
-            );
+        primaryXAxis: CategoryAxis(),
+        series: <CartesianSeries<ChartData, String>>[
+          ColumnSeries<ChartData, String>(
+            dataSource: chartDatavalues,
+            xValueMapper: (ChartData data, _) => data.x,
+            yValueMapper: (ChartData data, _) => data.y,
+            color: Color(0xFF9EA700),
+          ),
+        ],
+      );
     } else if (selectedChart == "line") {
       return showNoDataMessage
           ? Column(
-              children: [
-                Center(child: Image.asset('assets/nodata.png')),
-                Text(
-                  "No data to display",
-                  style: TextStyle(color: Colors.blueGrey),
-                ),
-              ],
-            )
+        children: [
+          Center(child: Image.asset('assets/nodata.png')),
+          Text(
+            "No data to display",
+            style: TextStyle(color: Colors.blueGrey),
+          ),
+        ],
+      )
           : SfCartesianChart(
-              primaryXAxis: CategoryAxis(),
-              series: <CartesianSeries<ChartData, String>>[
-                LineSeries<ChartData, String>(
-                  dataSource: chartDatavalues,
-                  xValueMapper: (ChartData data, _) => data.x,
-                  yValueMapper: (ChartData data, _) => data.y,
-                  color: Color(0xFF9EA700),
-                ),
-              ],
-            );
+        primaryXAxis: CategoryAxis(),
+        series: <CartesianSeries<ChartData, String>>[
+          LineSeries<ChartData, String>(
+            dataSource: chartDatavalues,
+            xValueMapper: (ChartData data, _) => data.x,
+            yValueMapper: (ChartData data, _) => data.y,
+            color: Color(0xFF9EA700),
+          ),
+        ],
+      );
     } else {
       return showNoDataMessage
           ? Column(
-              children: [
-                Center(child: Image.asset('assets/nodata.png')),
-                Text(
-                  "No data to display",
-                  style: TextStyle(color: Colors.blueGrey),
-                ),
-              ],
-            )
+        children: [
+          Center(child: Image.asset('assets/nodata.png')),
+          Text(
+            "No data to display",
+            style: TextStyle(color: Colors.blueGrey),
+          ),
+        ],
+      )
           : SfCircularChart(
-              legend: Legend(isVisible: true),
-              series: <CircularSeries<ChartData, String>>[
-                PieSeries<ChartData, String>(
-                  dataLabelSettings: DataLabelSettings(isVisible: true),
-                  explode: true,
-                  dataSource: chartDatavalues,
-                  xValueMapper: (ChartData data, _) => data.x,
-                  yValueMapper: (ChartData data, _) => data.y,
-                ),
-              ],
-            );
+        legend: Legend(isVisible: true),
+        series: <CircularSeries<ChartData, String>>[
+          PieSeries<ChartData, String>(
+            dataLabelSettings: DataLabelSettings(isVisible: true),
+            explode: true,
+            dataSource: chartDatavalues,
+            xValueMapper: (ChartData data, _) => data.x,
+            yValueMapper: (ChartData data, _) => data.y,
+          ),
+        ],
+      );
     }
   }
 
@@ -676,7 +815,7 @@ class _DemoState extends State<Demo> {
                         borderRadius: BorderRadius.circular(12)),
                     tileColor: Color(0x1B9EA700),
                     contentPadding:
-                        EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   ),
                 ),
                 SizedBox(
@@ -711,7 +850,7 @@ class _DemoState extends State<Demo> {
                       tileColor: Color(0x1B9EA700),
                       focusColor: Colors.red,
                       contentPadding:
-                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     ),
                   ),
                 SizedBox(
@@ -747,7 +886,7 @@ class _DemoState extends State<Demo> {
                             borderRadius: BorderRadius.circular(12)),
                         tileColor: Color(0x1B9EA700),
                         contentPadding:
-                            EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       ),
                     ),
                   SizedBox(
@@ -781,7 +920,7 @@ class _DemoState extends State<Demo> {
                             borderRadius: BorderRadius.circular(12)),
                         tileColor: Color(0x1B9EA700),
                         contentPadding:
-                            EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       ),
                     ),
                   SizedBox(
@@ -815,7 +954,7 @@ class _DemoState extends State<Demo> {
                           borderRadius: BorderRadius.circular(12)),
                       tileColor: Color(0x1B9EA700),
                       contentPadding:
-                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     ),
                   ),
                   SizedBox(
@@ -848,7 +987,7 @@ class _DemoState extends State<Demo> {
                           borderRadius: BorderRadius.circular(12)),
                       tileColor: Color(0x1B9EA700),
                       contentPadding:
-                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     ),
                   ),
                   SizedBox(
@@ -882,7 +1021,7 @@ class _DemoState extends State<Demo> {
                             borderRadius: BorderRadius.circular(12)),
                         tileColor: Color(0x1B9EA700),
                         contentPadding:
-                            EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       ),
                     ),
                   SizedBox(
@@ -894,7 +1033,7 @@ class _DemoState extends State<Demo> {
                       border: Border(
                         left: BorderSide(
                           color: selectedFilter ==
-                                  "recurring_revenue_monthly_prorated"
+                              "recurring_revenue_monthly_prorated"
                               ? Color(0xFF656805)
                               : Colors.transparent,
                           width: 7, // Border thickness
@@ -917,7 +1056,7 @@ class _DemoState extends State<Demo> {
                           borderRadius: BorderRadius.circular(12)),
                       tileColor: Color(0x1B9EA700),
                       contentPadding:
-                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     ),
                   ),
                   SizedBox(
@@ -952,7 +1091,7 @@ class _DemoState extends State<Demo> {
                       tileColor: Color(0x1B9EA700),
                       focusColor: Colors.red,
                       contentPadding:
-                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     ),
                   ),
                   SizedBox(
@@ -985,7 +1124,7 @@ class _DemoState extends State<Demo> {
                           borderRadius: BorderRadius.circular(12)),
                       tileColor: Color(0x1B9EA700),
                       contentPadding:
-                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     ),
                   ),
                   SizedBox(
@@ -1018,7 +1157,7 @@ class _DemoState extends State<Demo> {
                           borderRadius: BorderRadius.circular(12)),
                       tileColor: Color(0x1B9EA700),
                       contentPadding:
-                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     ),
                   ),
                 ],
@@ -1087,7 +1226,7 @@ class _DemoState extends State<Demo> {
       }
       try {
         final List<Map<String, dynamic>> data =
-            List<Map<String, dynamic>>.from(response);
+        List<Map<String, dynamic>>.from(response);
         setState(() {
           var imageData = data[0]['image_1920'];
           if (imageData != null && imageData is String) {
@@ -1150,11 +1289,11 @@ class _DemoState extends State<Demo> {
                   },
                   shape: selectedIndex == 1
                       ? RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25),
-                        )
+                    borderRadius: BorderRadius.circular(25),
+                  )
                       : null,
                   tileColor:
-                      selectedIndex == 1 ? Colors.white : Color(0xFF9EA700),
+                  selectedIndex == 1 ? Colors.white : Color(0xFF9EA700),
                   title: Text(
                     'Sales',
                     style: TextStyle(
@@ -1168,7 +1307,7 @@ class _DemoState extends State<Demo> {
                         ? Icons.keyboard_arrow_up_rounded
                         : Icons.keyboard_arrow_down_rounded,
                     color:
-                        selectedIndex == 1 ? Color(0xFF9EA700) : Colors.white70,
+                    selectedIndex == 1 ? Color(0xFF9EA700) : Colors.white70,
                   ),
                 ),
               ),
@@ -1230,11 +1369,11 @@ class _DemoState extends State<Demo> {
                   },
                   shape: selectedIndex == 2
                       ? RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25),
-                        )
+                    borderRadius: BorderRadius.circular(25),
+                  )
                       : null,
                   tileColor:
-                      selectedIndex == 2 ? Colors.white : Color(0xFF9EA700),
+                  selectedIndex == 2 ? Colors.white : Color(0xFF9EA700),
                   title: Text(
                     'Leads',
                     style: TextStyle(
@@ -1265,10 +1404,10 @@ class _DemoState extends State<Demo> {
               child: isLoading
                   ? SimmerLoad()
                   : CircleAvatar(
-                      backgroundImage: profileImage != null
-                          ? MemoryImage(profileImage!)
-                          : AssetImage('assets/pf.jpeg') as ImageProvider,
-                    ),
+                backgroundImage: profileImage != null
+                    ? MemoryImage(profileImage!)
+                    : AssetImage('assets/pf.jpeg') as ImageProvider,
+              ),
             ),
           ),
           SizedBox(
@@ -1284,26 +1423,26 @@ class _DemoState extends State<Demo> {
       ),
       body: isLoading
           ? Center(
-              child: LoadingAnimationWidget.fourRotatingDots(
-              color: Color(0xFF9EA700),
-              size: 100,
-            ))
+          child: LoadingAnimationWidget.fourRotatingDots(
+            color: Color(0xFF9EA700),
+            size: 100,
+          ))
           : Column(
-              children: [
-                SizedBox(height: 20),
-                buildReportTypeDropdown(),
-                SizedBox(
-                  height: 10,
-                ),
-                buildChartSelection(),
-                SizedBox(
-                  height: 12,
-                ),
-                Text('$showVariable'),
-                SizedBox(height: 15),
-                Expanded(child: buildChart()),
-              ],
-            ),
+        children: [
+          SizedBox(height: 20),
+          buildReportTypeDropdown(),
+          SizedBox(
+            height: 10,
+          ),
+          buildChartSelection(),
+          SizedBox(
+            height: 12,
+          ),
+          Text('$showVariable'),
+          SizedBox(height: 15),
+          Expanded(child: buildChart()),
+        ],
+      ),
     );
   }
 }

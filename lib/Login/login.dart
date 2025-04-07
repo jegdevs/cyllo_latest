@@ -20,7 +20,7 @@ class _LoginState extends State<Login> {
   bool isLoading = false;
   List<DropdownMenuItem<String>> dropdownItems = [];
   OdooClient? client;
-  TextEditingController urlController = TextEditingController(text: "http://10.0.2.2:8017/");
+  TextEditingController urlController = TextEditingController();
   TextEditingController emailController = TextEditingController();
   TextEditingController passwordController = TextEditingController();
 
@@ -193,12 +193,12 @@ class _LoginState extends State<Login> {
       });
     }
   }
-@override
+  @override
   void initState() {
-  loginCheck();
-  if(urlController.text.isNotEmpty){
-    fetchDatabaseList();
-  }
+    loginCheck();
+    if(urlController.text.isNotEmpty){
+      fetchDatabaseList();
+    }
     // TODO: implement initState
     super.initState();
   }
@@ -303,7 +303,7 @@ class _LoginState extends State<Login> {
                               prefixIcon: Icon(Icons.link, color: Colors.grey),
                             ),
                             onChanged: (value){
-                                fetchDatabaseList();
+                              fetchDatabaseList();
                             },
                             enabled: !disableFields,
                           ),
@@ -422,16 +422,16 @@ class _LoginState extends State<Login> {
                         ),
                         Center(
                           child: GestureDetector(
-                            onTap: (){
-                              setState(() {
-                                frstLogin = true;
-                              });
-                            },
+                              onTap: (){
+                                setState(() {
+                                  frstLogin = true;
+                                });
+                              },
                               child: Text('Manage Database?',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Color(0xFF9EA700),
-                              ),))
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Color(0xFF9EA700),
+                                ),))
                           ,
                         ),
                       ],
