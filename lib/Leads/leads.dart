@@ -2640,7 +2640,7 @@ class _LeadsState extends State<Leads> {
                 Padding(
                   padding: const EdgeInsets.all(10.0),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
                         'Leads',
@@ -2649,19 +2649,19 @@ class _LeadsState extends State<Leads> {
                             fontWeight: FontWeight.bold,
                             color: Colors.grey),
                       ),
-                      ElevatedButton(
-                          onPressed: () {},
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.grey.shade200,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(7)),
-                            foregroundColor: Color(0xFF9EA700),
-                          ),
-                          child: Text(
-                            'Generate Leads',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 15),
-                          )),
+                      // ElevatedButton(
+                      //     onPressed: () {},
+                      //     style: ElevatedButton.styleFrom(
+                      //       backgroundColor: Colors.grey.shade200,
+                      //       shape: RoundedRectangleBorder(
+                      //           borderRadius: BorderRadius.circular(7)),
+                      //       foregroundColor: Color(0xFF9EA700),
+                      //     ),
+                      //     child: Text(
+                      //       'Generate Leads',
+                      //       style: TextStyle(
+                      //           fontWeight: FontWeight.bold, fontSize: 15),
+                      //     )),
                     ],
                   ),
                 ),

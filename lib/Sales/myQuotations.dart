@@ -2525,7 +2525,7 @@ class _MyquotationsState extends State<Myquotations> {
           Padding(
             padding: const EdgeInsets.all(10.0),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   'Quotations',
@@ -2534,19 +2534,19 @@ class _MyquotationsState extends State<Myquotations> {
                       fontWeight: FontWeight.bold,
                       color: Colors.grey),
                 ),
-                ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey.shade200,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(7)),
-                      foregroundColor: Color(0xFF9EA700),
-                    ),
-                    child: Text(
-                      'New Activity',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                    )),
+                // ElevatedButton(
+                //     onPressed: () {},
+                //     style: ElevatedButton.styleFrom(
+                //       backgroundColor: Colors.grey.shade200,
+                //       shape: RoundedRectangleBorder(
+                //           borderRadius: BorderRadius.circular(7)),
+                //       foregroundColor: Color(0xFF9EA700),
+                //     ),
+                //     child: Text(
+                //       'New Activity',
+                //       style:
+                //           TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                //     )),
               ],
             ),
           ),

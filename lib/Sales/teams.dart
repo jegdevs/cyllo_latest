@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -43,6 +44,7 @@ class _SalesTeamState extends State<SalesTeam> {
       }
     });
   }
+
   Future<void> _searchSalesTeams(String query) async {
     if (client == null) return;
 
@@ -83,6 +85,7 @@ class _SalesTeamState extends State<SalesTeam> {
     }
     setState(() => isLoading = false);
   }
+
   @override
   void dispose() {
     _debounce?.cancel();
@@ -135,8 +138,8 @@ class _SalesTeamState extends State<SalesTeam> {
   Future<void> fetchAllSalesTeamsData() async {
     try {
       List domain = [];
-      domain.add(['use_opportunities','=',true]);
-      if(showArchived) {
+      domain.add(['use_opportunities', '=', true]);
+      if (showArchived) {
         domain.add(['active', '=', false]);
       }
       final teamsResponse = await client?.callKw({
@@ -228,7 +231,8 @@ class _SalesTeamState extends State<SalesTeam> {
               for (var range in dateRanges) {
                 if (createDate.isAfter(range['start']) &&
                     createDate.isBefore(range['end'])) {
-                  weeklyOpportunityData[range['label']] = (weeklyOpportunityData[range['label']] ?? 0) + 1;
+                  weeklyOpportunityData[range['label']] =
+                      (weeklyOpportunityData[range['label']] ?? 0) + 1;
                   break;
                 }
               }
@@ -271,7 +275,11 @@ class _SalesTeamState extends State<SalesTeam> {
         'args': [
           [
             ['team_id', '=', teamId],
-            ['state', 'in', ['sent', 'draft']],
+            [
+              'state',
+              'in',
+              ['sent', 'draft']
+            ],
           ]
         ],
         'kwargs': {
@@ -296,7 +304,11 @@ class _SalesTeamState extends State<SalesTeam> {
         'args': [
           [
             ['team_id', '=', teamId],
-            ['state', 'in', ['sale', 'done']],
+            [
+              'state',
+              'in',
+              ['sale', 'done']
+            ],
             ['invoice_status', '=', 'to invoice'],
           ]
         ],
@@ -333,8 +345,20 @@ class _SalesTeamState extends State<SalesTeam> {
             [teamField, '=', teamId],
             ['move_type', '=', 'out_invoice'],
             ['state', '=', 'posted'],
-            ['invoice_date', '>=', DateTime(DateTime.now().year, 1, 1).toIso8601String().split('T')[0]],
-            ['invoice_date', '<=', DateTime(DateTime.now().year, 12, 31).toIso8601String().split('T')[0]],
+            [
+              'invoice_date',
+              '>=',
+              DateTime(DateTime.now().year, 1, 1)
+                  .toIso8601String()
+                  .split('T')[0]
+            ],
+            [
+              'invoice_date',
+              '<=',
+              DateTime(DateTime.now().year, 12, 31)
+                  .toIso8601String()
+                  .split('T')[0]
+            ],
           ]
         ],
         'kwargs': {
@@ -355,7 +379,8 @@ class _SalesTeamState extends State<SalesTeam> {
 
       weeklyOpportunityData.removeWhere((key, value) => value == 0);
 
-      final barGroups = prepareWeeklyOpportunityData(weeklyOpportunityData, dateRanges);
+      final barGroups =
+          prepareWeeklyOpportunityData(weeklyOpportunityData, dateRanges);
 
       return {
         'unassignedLeads': unassignedLeadsCount ?? 0,
@@ -384,7 +409,8 @@ class _SalesTeamState extends State<SalesTeam> {
 
     DateTime latestWeekStart = now.subtract(Duration(days: now.weekday % 7));
 
-    DateTime firstVisibleWeekStart = latestWeekStart.subtract(Duration(days: (numberOfWeeks - 1) * 7));
+    DateTime firstVisibleWeekStart =
+        latestWeekStart.subtract(Duration(days: (numberOfWeeks - 1) * 7));
 
     for (int i = 0; i < numberOfWeeks; i++) {
       final startDate = firstVisibleWeekStart.add(Duration(days: i * 7));
@@ -447,7 +473,8 @@ class _SalesTeamState extends State<SalesTeam> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           backgroundColor: Colors.white,
           title: Text(
             "Select Filter",
@@ -497,7 +524,8 @@ class _SalesTeamState extends State<SalesTeam> {
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Color(0xFF9EA700),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
               ),
               child: Text("Apply", style: TextStyle(color: Colors.white)),
             ),
@@ -506,37 +534,39 @@ class _SalesTeamState extends State<SalesTeam> {
       },
     );
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         // title: const Text('Sales Teams'),
         backgroundColor: Color(0xFF9EA700),
-        elevation: 4, // Add some elevation for depth
+        elevation: 4,
+        // Add some elevation for depth
         title: isSearching
             ? TextField(
-          controller: searchController,
-          autofocus: true,
-          style: TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: 'Search...',
-            hintStyle: TextStyle(color: Colors.white70),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20),
-              borderSide: BorderSide.none,
-            ),
-            filled: true,
-            fillColor: Colors.white.withOpacity(0.2),
-            contentPadding: EdgeInsets.symmetric(horizontal: 16),
-          ),
-        )
+                controller: searchController,
+                autofocus: true,
+                style: TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Search...',
+                  hintStyle: TextStyle(color: Colors.white70),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.2),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                ),
+              )
             : Text(
-          'Sales Teams', // Creative title
-          style: TextStyle(
-            color: Colors.black,
-            letterSpacing: 1.2,
-          ),
-        ),
+                'Sales Teams', // Creative title
+                style: TextStyle(
+                  color: Colors.black,
+                  letterSpacing: 1.2,
+                ),
+              ),
         actions: [
           IconButton(
             icon: Icon(isSearching ? Icons.close : Icons.search),
@@ -569,17 +599,24 @@ class _SalesTeamState extends State<SalesTeam> {
         ),
       ),
       body: isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: LoadingAnimationWidget.fourRotatingDots(
+                color: Color(0xFF9EA700),
+                size: 100,
+              ),
+            )
           : salesTeams.isEmpty
-          ? const Center(child: Text('No sales teams found'))
-          : SingleChildScrollView(
-        child: Column(
-          children: salesTeams.map((team) => Padding(
-            padding: const EdgeInsets.all(16),
-            child: buildTeamSection(team),
-          )).toList(),
-        ),
-      ),
+              ? const Center(child: Text('No sales teams found'))
+              : SingleChildScrollView(
+                  child: Column(
+                    children: salesTeams
+                        .map((team) => Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: buildTeamSection(team),
+                            ))
+                        .toList(),
+                  ),
+                ),
     );
   }
 
@@ -704,7 +741,11 @@ class _SalesTeamState extends State<SalesTeam> {
     if ((team['quotationsCount'] ?? 0) > 0) {
       final quotationsFilter = [
         ["team_id", "=", teamId],
-        ["state", "in", ["draft", "sent"]]
+        [
+          "state",
+          "in",
+          ["draft", "sent"]
+        ]
       ];
       pipelineItems.add(buildPipelineRow(
         '${team['quotationsCount']} Quotation${(team['quotationsCount'] ?? 0) != 1 ? 's' : ''}',
@@ -734,7 +775,11 @@ class _SalesTeamState extends State<SalesTeam> {
     if ((team['ordersToInvoice'] ?? 0) > 0) {
       final ordersToInvoiceFilter = [
         ["team_id", "=", teamId],
-        ["state", "in", ["sale", "done"]],
+        [
+          "state",
+          "in",
+          ["sale", "done"]
+        ],
         ["invoice_status", "=", "to invoice"]
       ];
       pipelineItems.add(buildPipelineRow(
@@ -753,7 +798,6 @@ class _SalesTeamState extends State<SalesTeam> {
               builder: (context) => Myquotations(
                 teamId: teamId,
                 domain: ordersToInvoiceFilter,
-
               ),
             ),
           );
@@ -852,9 +896,11 @@ class _SalesTeamState extends State<SalesTeam> {
   Widget buildGraphCard(Map<String, dynamic> team) {
     final barGroups = team['barGroups'] as List<BarChartGroupData>;
     final dateRanges = team['dateRanges'] as List<Map<String, dynamic>>? ?? [];
-    final weeklyData = team['weeklyOpportunityData'] as Map<String, dynamic>? ?? {};
+    final weeklyData =
+        team['weeklyOpportunityData'] as Map<String, dynamic>? ?? {};
 
-    final List<String> labels = dateRanges.map((range) => range['label'] as String).toList();
+    final List<String> labels =
+        dateRanges.map((range) => range['label'] as String).toList();
 
     return Card(
       elevation: 2,
@@ -881,74 +927,79 @@ class _SalesTeamState extends State<SalesTeam> {
     );
   }
 
-  Widget buildWeeklyBarChart(List<BarChartGroupData> barGroups, List<String> labels) {
+  Widget buildWeeklyBarChart(
+      List<BarChartGroupData> barGroups, List<String> labels) {
     return Padding(
       padding: const EdgeInsets.only(top: 16),
       child: barGroups.isEmpty
           ? Center(child: Text('No data available for chart'))
           : BarChart(
-        BarChartData(
-          alignment: BarChartAlignment.spaceBetween,
-          borderData: FlBorderData(
-            show: true,
-            border: Border(
-              bottom: BorderSide(color: Colors.grey[300]!),
-              left: BorderSide.none,
-              right: BorderSide.none,
-              top: BorderSide.none,
-            ),
-          ),
-          gridData: FlGridData(show: false),
-          titlesData: FlTitlesData(
-            show: true,
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, meta) {
-                  final index = value.toInt();
-                  if (index < 0 || index >= labels.length) {
-                    return const SizedBox();
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      labels[index],
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 10,
-                      ),
+              BarChartData(
+                alignment: BarChartAlignment.spaceBetween,
+                borderData: FlBorderData(
+                  show: true,
+                  border: Border(
+                    bottom: BorderSide(color: Colors.grey[300]!),
+                    left: BorderSide.none,
+                    right: BorderSide.none,
+                    top: BorderSide.none,
+                  ),
+                ),
+                gridData: FlGridData(show: false),
+                titlesData: FlTitlesData(
+                  show: true,
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        final index = value.toInt();
+                        if (index < 0 || index >= labels.length) {
+                          return const SizedBox();
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            labels[index],
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 10,
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
+                  ),
+                  leftTitles:
+                      AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles:
+                      AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles:
+                      AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                ),
+                barGroups: barGroups,
+                barTouchData: BarTouchData(
+                  enabled: true,
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      return BarTooltipItem(
+                        '${rod.toY.toStringAsFixed(0)} opps',
+                        TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      );
+                    },
+                  ),
+                  handleBuiltInTouches: false,
+                  touchCallback: (FlTouchEvent event, barTouchResponse) {
+                    if (event is FlLongPressStart &&
+                        barTouchResponse?.spot != null) {
+                      // Show tooltip only on long press
+                    }
+                  },
+                ),
               ),
             ),
-            leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          ),
-          barGroups: barGroups,
-          barTouchData: BarTouchData(
-            enabled: true,
-            touchTooltipData: BarTouchTooltipData(
-              getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                return BarTooltipItem(
-                  '${rod.toY.toStringAsFixed(0)} opps',
-                  TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                );
-              },
-            ),
-            handleBuiltInTouches: false,
-            touchCallback: (FlTouchEvent event, barTouchResponse) {
-              if (event is FlLongPressStart && barTouchResponse?.spot != null) {
-                // Show tooltip only on long press
-              }
-            },
-          ),
-        ),
-      ),
     );
   }
 
@@ -973,7 +1024,7 @@ class _SalesTeamState extends State<SalesTeam> {
                   ),
                 ),
                 Text(
-                  '${(current/1000).toStringAsFixed(0)} / ${(target/1000).toStringAsFixed(0)}k',
+                  '${(current / 1000).toStringAsFixed(0)} / ${(target / 1000).toStringAsFixed(0)}k',
                   style: TextStyle(color: Colors.grey[700]),
                 ),
               ],
@@ -1007,4 +1058,3 @@ class _SalesTeamState extends State<SalesTeam> {
     );
   }
 }
-

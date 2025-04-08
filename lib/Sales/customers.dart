@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'package:flutter/material.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_flutter_datagrid/datagrid.dart';
@@ -1061,7 +1062,12 @@ class _CustomersState extends State<Customers> {
           ), // Added here at the start
           Expanded(
             child: isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ?Center(
+              child: LoadingAnimationWidget.fourRotatingDots(
+                color: Color(0xFF9EA700),
+                size: 100,
+              ),
+            )
                 : customers.isEmpty
                     ? Center(
                         child: Column(

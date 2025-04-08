@@ -35,6 +35,7 @@ class _EditprofileState extends State<Editprofile> {
   File? selectedImage;
   String? newImage;
   IconData? errorIcon;
+  bool isSaving = false;
 
   TextEditingController nameController = TextEditingController();
   TextEditingController genderController = TextEditingController();
@@ -785,9 +786,21 @@ class _EditprofileState extends State<Editprofile> {
                               EdgeInsets.symmetric(horizontal: 65, vertical: 8),
                         ),
                         onTap: () async {
+                          DateTime? initialDate;
+                          if (dobController.text.isNotEmpty) {
+                            try {
+                              initialDate = DateTime.parse(dobController.text);
+                            } catch (e) {
+                              print('Error parsing date: $e');
+                              initialDate = DateTime.now();
+                            }
+                          } else {
+                            initialDate = DateTime.now();
+                          }
                           final date = await showDatePickerDialog(
                             context: context,
-                            initialDate: DateTime.now(),
+                            initialDate: initialDate,
+                            selectedDate: initialDate,
                             minDate: DateTime(1900),
                             maxDate: DateTime.now(),
                             width: 300,
@@ -840,7 +853,7 @@ class _EditprofileState extends State<Editprofile> {
                           if (date != null) {
                             setState(() {
                               dobController.text =
-                                  "${date.year} - ${date.month} - ${date.day}";
+                              "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
                             });
                           }
                         },
@@ -882,10 +895,27 @@ class _EditprofileState extends State<Editprofile> {
                       SizedBox(height: 10),
                       TextFormField(
                         validator: (value) {
-                          if (value == null || value.isEmpty)
+                        //   if (value == null || value.isEmpty)
+                        //     return "Please enter your phone number";
+                        //   else if (!RegExp(r'^[0-9]{10}$').hasMatch(value)) {
+                        //     return "Please enter valid 10-digit number";
+                        //   }
+                        //   return null;
+                        // },
+                          if (value == null || value.isEmpty) {
                             return "Please enter your phone number";
-                          else if (!RegExp(r'^[0-9]{10}$').hasMatch(value)) {
-                            return "Please enter valid 10-digit number";
+                          }
+                          final cleanedNumber = value.replaceAll(RegExp(r'[^\d+]'), '');
+
+                          if (cleanedNumber.startsWith('+')) {
+                            // International format with + sign
+                            if (!RegExp(r'^\+\d{7,15}$').hasMatch(cleanedNumber)) {
+                              return "Please enter a valid international phone number";
+                            }
+                          } else {
+                            if (!RegExp(r'^\d{7,15}$').hasMatch(cleanedNumber)) {
+                              return "Please enter a valid phone number(7-15 digits)";
+                            }
                           }
                           return null;
                         },
@@ -1215,16 +1245,55 @@ class _EditprofileState extends State<Editprofile> {
                       SizedBox(
                         height: 12,
                       ),
+                      // ElevatedButton(
+                      //     onPressed: () {
+                      //       if (formKey.currentState!.validate()) saveChanges();
+                      //     },
+                      //     style: ElevatedButton.styleFrom(
+                      //       backgroundColor: Color(0xFF9EA700),
+                      //       foregroundColor: Colors.white,
+                      //       minimumSize: const Size(300, 45),
+                      //     ),
+                      //     child: Text('Save Changes')),
                       ElevatedButton(
-                          onPressed: () {
-                            if (formKey.currentState!.validate()) saveChanges();
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Color(0xFF9EA700),
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size(300, 45),
-                          ),
-                          child: Text('Save Changes')),
+                        onPressed: isSaving
+                            ? null
+                            : () async {
+                          if (formKey.currentState!.validate()) {
+                            setState(() {
+                              isSaving = true;
+                            });
+
+                            await saveChanges();
+
+                            setState(() {
+                              isSaving = false;
+                            });
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Color(0xFF9EA700),
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(300, 45),
+                        ),
+                        child: isSaving
+                            ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF9EA700),),
+                              ),
+                            ),
+                            SizedBox(width: 10),
+                            Text('Saving...'),
+                          ],
+                        )
+                            : Text('Save Changes'),
+                      ),
                       SizedBox(
                         height: 12,
                       ),

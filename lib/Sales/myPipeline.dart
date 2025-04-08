@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_flutter_calendar/calendar.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datagrid/datagrid.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 
 import 'Views/pipeLineView.dart';
 
@@ -827,7 +828,9 @@ class _MypipelineState extends State<Mypipeline> {
             'date_closed',
             'type',
             'user_id',
-              'team_id'
+            'team_id',
+            'phone',
+
           ],
         }
       });
@@ -1096,6 +1099,47 @@ class _MypipelineState extends State<Mypipeline> {
 
   Widget listCard() {
     print('ghghghhg$leadsList');
+    if (isLoading) {
+      return Center(
+        child: LoadingAnimationWidget.fourRotatingDots(
+          color: Color(0xFF9EA700),
+          size: 100,
+        ),
+      );
+    }
+
+    void openEmail(BuildContext context, Map<String, dynamic> lead) {
+      if (lead['email_from'] != null && lead['email_from'].toString().isNotEmpty) {
+        final Uri params = Uri(
+          scheme: 'mailto',
+          path: lead['email_from'].toString(),
+          query:
+          'subject=Email Regarding Your Inquiry&body=Hi,\n\nPlease let me know if you need more information about the product.\n\nBest regards,\n[Name,Mobile]',
+        );
+        final url = params.toString();
+        launchUrlString(url);
+      } else {
+       var snackBar = SnackBar(content: Text('Email not Found'));
+        ScaffoldMessenger.of(context).showSnackBar(snackBar);
+      }
+    }
+    void openMessage(BuildContext context, Map<String, dynamic> lead) async {
+      if (lead['phone'] != null && lead['phone'].toString().isNotEmpty) {
+        final Uri params = Uri(
+          scheme: 'sms',
+          path: lead['phone'].toString(),
+          queryParameters: {
+            'body': 'Hello, I\'m following up on your recent inquiry. How can I assist you today?'
+          },
+        );
+        final url = params.toString();
+        await launchUrlString(url);
+      } else {
+        var snackBar = SnackBar(content: Text('Number not Found'));
+        ScaffoldMessenger.of(context).showSnackBar(snackBar);
+      }
+    }
+
     return leadsList.isEmpty
         ? Center(
             child: Text(
@@ -1461,7 +1505,9 @@ class _MypipelineState extends State<Mypipeline> {
                                         color: Colors.black,
                                       ),
                                       label: Text('Email'),
-                                      onPressed: () {},
+                                      onPressed: () {
+                                        openEmail(context, lead);
+                                      },
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor:
                                             Color(0xFF9EA700).withOpacity(0.15),
@@ -1483,7 +1529,9 @@ class _MypipelineState extends State<Mypipeline> {
                                         color: Colors.black,
                                       ),
                                       label: Text('Message'),
-                                      onPressed: () {},
+                                      onPressed: () {
+                                        openMessage(context, lead);
+                                      },
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor:
                                             Color(0xFF9EA700).withOpacity(0.15),
@@ -1538,6 +1586,7 @@ class _MypipelineState extends State<Mypipeline> {
             },
           );
   }
+
 
   Widget iconSelectedView() {
     final config = AppFlowyBoardConfig(
@@ -1696,6 +1745,27 @@ class _MypipelineState extends State<Mypipeline> {
       ),
     );
   }
+  Future<void> deleteLead(int leadId) async {
+    try {
+      if (client == null) {
+        throw Exception('Odoo client is not initialized');
+      }
+
+      // Call the unlink method on crm.lead model
+      final response = await client!.callKw({
+        'model': 'crm.lead',
+        'method': 'unlink',
+        'args': [
+          [leadId] // Array of IDs to delete
+        ],
+        'kwargs': {},
+      });
+
+      print('Lead deletion response: $response');
+    } catch (e) {
+      throw Exception('Failed to delete lead: $e');
+    }
+  }
 
   void calendarDialogue(BuildContext context, Map<String, dynamic> lead){
     showDialog(
@@ -1794,7 +1864,13 @@ class _MypipelineState extends State<Mypipeline> {
                   icon: Icon(Icons.edit, size: 16, color: Colors.black,),
                   label: Text('Edit'),
                   onPressed: () {
-                    Navigator.of(context).pop();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => LeadDetailPage(leadId: lead["id"]),
+
+                      ),
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.grey[200],
@@ -1808,8 +1884,109 @@ class _MypipelineState extends State<Mypipeline> {
                 ElevatedButton.icon(
                   icon: Icon(Icons.delete, size: 16,color: Colors.black,),
                   label: Text('Delete'),
-                  onPressed: () {
-                    Navigator.of(context).pop();
+                  onPressed: () async{
+                    bool? confirmDelete = await showDialog<bool>(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return AlertDialog(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          title: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Bye-bye, record!',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                ),
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.close, size: 20),
+                                onPressed: () => Navigator.of(context).pop(),
+                              ),
+                            ],
+                          ),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Ready to make your record disappear into thin air? Are you sure?',
+                                style: TextStyle(fontSize: 14),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'It will be gone forever!',
+                                style: TextStyle(fontSize: 14),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'Think twice before you click that \'Delete\' button!',
+                                style: TextStyle(fontSize: 14),
+                              ),
+                            ],
+                          ),
+                          actions: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.of(context).pop(true); // Confirm delete
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Color(0xFF9EA700), // Green color for Delete
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  child: Text('Delete'),
+                                ),
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.of(context).pop(false); // Cancel
+                                  },
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.grey,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      side: BorderSide(color: Colors.grey),
+                                    ),
+                                  ),
+                                  child: Text('No, keep it'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        );
+                      },
+                    );
+
+                    // If user confirmed deletion
+                    if (confirmDelete == true) {
+                      try {
+                        await deleteLead(lead['id']); // Delete the lead in Odoo
+                        Navigator.of(context).pop(); // Close the details dialog
+
+                        // Refresh the leads list by calling pipe()
+                        setState(() => isLoading = true);
+                        await pipe();
+                        setState(() => isLoading = false);
+
+                        // Show success message
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Lead deleted successfully')),
+                        );
+                      } catch (e) {
+                        // Show error message
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error deleting lead: $e')),
+                        );
+                      }
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor:  Colors.grey[200],
@@ -2750,13 +2927,23 @@ class _MypipelineState extends State<Mypipeline> {
         ],
       ),
       backgroundColor: Colors.white,
-      body: Column(
+      body:isLoading
+          ? Center(
+        child: LoadingAnimationWidget.fourRotatingDots(
+          color: Color(0xFF9EA700),
+          size: 100,
+        ),
+      )
+          : leadsList.isEmpty
+          ? const Center(child: Text('No data found'))
+          :
+      Column(
         children: [
           Divider(thickness: 2, color: Colors.grey.shade300),
           Padding(
             padding: const EdgeInsets.all(10.0),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   'Pipeline',
@@ -2765,19 +2952,6 @@ class _MypipelineState extends State<Mypipeline> {
                       fontWeight: FontWeight.bold,
                       color: Colors.grey),
                 ),
-                ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey.shade200,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(7)),
-                      foregroundColor: Color(0xFF9EA700),
-                    ),
-                    child: Text(
-                      'Generate Leads',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                    )),
               ],
             ),
           ),

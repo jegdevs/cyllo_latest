@@ -24,6 +24,12 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
   late TabController _tabController;
   OdooClient? client;
   Uint8List? profileImage;
+
+  String? leadStage; // To track the current stage name
+  bool isLost = false; // To track if the lead is lost (active = False)
+  bool isWon = false;
+
+
   List<Map<String, dynamic>> tagsList = [];
   List<Map<String, dynamic>> salesPersons = [];
   List<Map<String, dynamic>> partners = [];
@@ -431,6 +437,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
             'day_close',
             'function',
             'mobile',
+            'stage_id',
+            'active',
           ],
         },
       });
@@ -491,6 +499,14 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
           daysToAssignController.text = leadData['day_open'] != null ? leadData['day_open'].toString() : 'N/A';
           daysToCloseController.text = leadData['day_close'] != null ? leadData['day_close'].toString() : 'N/A';
 
+          if (leadData['stage_id'] is List && leadData['stage_id'].length > 1) {
+            leadStage = leadData['stage_id'][1].toString();
+            isWon = leadStage!.toLowerCase().contains('won');
+          } else {
+            leadStage = null;
+            isWon = false;
+          }
+          isLost = leadData['active'] == false;
           isLoading = false;
         });
       } else {
@@ -1047,20 +1063,59 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            _buildStatusButton('New Quotation', Color(0xFF9EA700), true),
-            SizedBox(width: 8),
-            _buildStatusButton('Won', Colors.green, false),
-            SizedBox(width: 8),
-            _buildStatusButton('Lost', Colors.red.shade300, false),
-            SizedBox(width: 24),
+            if (isLost) // Show only Restore button if lead is lost
+              _buildStatusButton('Restore', Colors.blue, false, onPressed: restoreLead)
+            else ...[
+              _buildStatusButton('New Quotation', Color(0xFF9EA700), true),
+              SizedBox(width: 8),
+              if (!isWon) // Hide Won button if lead is already won
+                _buildStatusButton('Won', Colors.green, false),
+              if (!isWon) SizedBox(width: 8),
+              _buildStatusButton('Lost', Colors.red.shade300, false),
+              SizedBox(width: 24),
+            ],
           ],
         ),
       ),
     );
   }
-  Widget _buildStatusButton(String text, Color color, bool isActive) {
+
+  Future<void> restoreLead() async {
+    if (client == null) return;
+    try {
+      final response = await client!.callKw({
+        'model': 'crm.lead',
+        'method': 'write',
+        'args': [
+          [widget.leadId],
+          {'active': true} // Restore the lead by setting active to True
+        ],
+        'kwargs': {},
+      });
+
+      if (response == true) {
+        await fetchLeadDetails(); // Refresh lead details
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Lead restored successfully!'),
+              backgroundColor: Color(0xFF9EA700),
+            ),
+          );
+        }
+      } else {
+        throw Exception('Failed to restore lead');
+      }
+    } catch (e) {
+      log('Error restoring lead: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error restoring lead: $e')),
+      );
+    }
+  }
+  Widget _buildStatusButton(String text, Color color, bool isActive, {VoidCallback? onPressed}) {
     return ElevatedButton(
-      onPressed: () async {
+      onPressed: onPressed ?? () async {
         if (client == null) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Odoo client not initialized')),
@@ -1070,7 +1125,6 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
 
         try {
           if (text == 'New Quotation') {
-            // Fetch opportunity data to ensure partner_id exists
             final leadResponse = await client!.callKw({
               'model': 'crm.lead',
               'method': 'read',
@@ -1135,7 +1189,6 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
               throw Exception('Failed to create new quotation');
             }
           } else if (text == 'Won') {
-            // Call action_set_won_rainbowman to mark the opportunity as won
             final wonResponse = await client!.callKw({
               'model': 'crm.lead',
               'method': 'action_set_won_rainbowman',
@@ -1144,7 +1197,6 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
               ],
               'kwargs': {},
             });
-
             log('Mark as Won Response: $wonResponse');
 
             // Refresh lead details to reflect the updated state
@@ -1158,6 +1210,8 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
                 ),
               );
             }
+
+
           } else if (text == 'Lost') {
 
             final lostResponse = await client!.callKw({
@@ -1248,6 +1302,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
         Container(
           decoration: BoxDecoration(border: Border(top: BorderSide(color: Colors.grey.shade300))),
           child: TabBar(
+            isScrollable: true,
             controller: _tabController,
             labelColor: Color(0xFF9EA700),
             unselectedLabelColor: Colors.grey.shade600,

@@ -765,7 +765,7 @@ class _CustomerViewState extends State<CustomerView> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('Customer Details'),
-        backgroundColor: Colors.white,
+        backgroundColor: Color(0xFF9EA700),
         elevation: 0,
         actions: [
           IconButton(

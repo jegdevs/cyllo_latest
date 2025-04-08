@@ -13,6 +13,7 @@ import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datagrid/datagrid.dart';
 import '../getUserImage.dart';
 import 'Views/activityView.dart';
+import 'Views/pipeLineView.dart';
 import 'myPipeline.dart';
 
 class Myactivity extends StatefulWidget {
@@ -1585,15 +1586,36 @@ class _MyactivityState extends State<Myactivity> {
       ),
     );
   }
+  Future<void> deleteLead(int leadId) async {
+    try {
+      if (client == null) {
+        throw Exception('Odoo client is not initialized');
+      }
 
-  void calendarDialogue(BuildContext context, Map<String, dynamic> lead) {
+      // Call the unlink method on crm.lead model
+      final response = await client!.callKw({
+        'model': 'crm.lead',
+        'method': 'unlink',
+        'args': [
+          [leadId] // Array of IDs to delete
+        ],
+        'kwargs': {},
+      });
+
+      print('Lead deletion response: $response');
+    } catch (e) {
+      throw Exception('Failed to delete lead: $e');
+    }
+  }
+
+  void calendarDialogue(BuildContext context, Map<String, dynamic> lead){
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           title: Text(
-            'Activity Details',
+            'Opportunity Details',
             style: TextStyle(
               fontWeight: FontWeight.bold,
               color: Color(0xFF9EA700),
@@ -1680,10 +1702,16 @@ class _MyactivityState extends State<Myactivity> {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 ElevatedButton.icon(
-                  icon: Icon(Icons.edit, size: 16, color: Colors.black),
+                  icon: Icon(Icons.edit, size: 16, color: Colors.black,),
                   label: Text('Edit'),
                   onPressed: () {
-                    Navigator.of(context).pop();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => LeadDetailPage(leadId: lead["id"]),
+
+                      ),
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.grey[200],
@@ -1695,13 +1723,114 @@ class _MyactivityState extends State<Myactivity> {
                   ),
                 ),
                 ElevatedButton.icon(
-                  icon: Icon(Icons.delete, size: 16, color: Colors.black),
+                  icon: Icon(Icons.delete, size: 16,color: Colors.black,),
                   label: Text('Delete'),
-                  onPressed: () {
-                    Navigator.of(context).pop();
+                  onPressed: () async{
+                    bool? confirmDelete = await showDialog<bool>(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return AlertDialog(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          title: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Bye-bye, record!',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                ),
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.close, size: 20),
+                                onPressed: () => Navigator.of(context).pop(),
+                              ),
+                            ],
+                          ),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Ready to make your record disappear into thin air? Are you sure?',
+                                style: TextStyle(fontSize: 14),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'It will be gone forever!',
+                                style: TextStyle(fontSize: 14),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'Think twice before you click that \'Delete\' button!',
+                                style: TextStyle(fontSize: 14),
+                              ),
+                            ],
+                          ),
+                          actions: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.of(context).pop(true); // Confirm delete
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Color(0xFF9EA700), // Green color for Delete
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  child: Text('Delete'),
+                                ),
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.of(context).pop(false); // Cancel
+                                  },
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.grey,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      side: BorderSide(color: Colors.grey),
+                                    ),
+                                  ),
+                                  child: Text('No, keep it'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        );
+                      },
+                    );
+
+                    // If user confirmed deletion
+                    if (confirmDelete == true) {
+                      try {
+                        await deleteLead(lead['id']); // Delete the lead in Odoo
+                        Navigator.of(context).pop(); // Close the details dialog
+
+                        // Refresh the leads list by calling pipe()
+                        setState(() => isLoading = true);
+                        await pipe();
+                        setState(() => isLoading = false);
+
+                        // Show success message
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Lead deleted successfully')),
+                        );
+                      } catch (e) {
+                        // Show error message
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error deleting lead: $e')),
+                        );
+                      }
+                    }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey[200],
+                    backgroundColor:  Colors.grey[200],
                     foregroundColor: Color(0xFF9EA700),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
@@ -1716,6 +1845,7 @@ class _MyactivityState extends State<Myactivity> {
       },
     );
   }
+
 
   Widget ActivityIconDesign(String activityState, String activityType) {
     IconData iconData;
@@ -2541,13 +2671,22 @@ class _MyactivityState extends State<Myactivity> {
         ],
       ),
       backgroundColor: Colors.white,
-      body: Column(
+      body: isLoading
+          ? Center(
+        child: LoadingAnimationWidget.fourRotatingDots(
+          color: Color(0xFF9EA700),
+          size: 100,
+        ),
+      )
+          : leadsList.isEmpty
+          ? const Center(child: Text('No data found'))
+          :Column(
         children: [
           Divider(thickness: 2, color: Colors.grey.shade300),
           Padding(
             padding: const EdgeInsets.all(10.0),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   'Activities',
@@ -2556,17 +2695,17 @@ class _MyactivityState extends State<Myactivity> {
                       fontWeight: FontWeight.bold,
                       color: Colors.grey),
                 ),
-                ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey.shade200,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
-                      foregroundColor: Color(0xFF9EA700),
-                    ),
-                    child: Text(
-                      'New Activity',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                    )),
+                // ElevatedButton(
+                //     onPressed: () {},
+                //     style: ElevatedButton.styleFrom(
+                //       backgroundColor: Colors.grey.shade200,
+                //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+                //       foregroundColor: Color(0xFF9EA700),
+                //     ),
+                //     child: Text(
+                //       'New Activity',
+                //       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                //     )),
               ],
             ),
           ),

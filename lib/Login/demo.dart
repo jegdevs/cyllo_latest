@@ -39,7 +39,7 @@ class _DemoState extends State<Demo> {
   String selectedFilter = "count";
   String selectedChart = "bar";
   String showVariable = "count";
-  String? selectedReport;
+  String? selectedReport = "Pipeline";
   String model = "";
   String? type;
   List fields = [];
@@ -50,7 +50,34 @@ class _DemoState extends State<Demo> {
   @override
   void initState() {
     super.initState();
-    initializeOdooClient();
+    initializeApp();
+  }
+
+
+  void setDefaultReport() {
+    setState(() {
+      selectedReport = "Pipeline";
+      model = "crm.lead";
+      type = "opportunity";
+      fields = [
+        'stage_id',
+        'day_open',
+        'day_close',
+        'recurring_revenue_monthly',
+        'expected_revenue',
+        'probability',
+        'recurring_revenue_monthly_prorated',
+        'recurring_revenue_prorated',
+        'prorated_revenue',
+        'recurring_revenue',
+      ];
+    });
+  }
+
+
+  Future<void> initializeApp() async {
+    setDefaultReport();
+    await initializeOdooClient();
   }
 
   Future<void> initializeOdooClient() async {

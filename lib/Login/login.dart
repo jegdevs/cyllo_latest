@@ -10,12 +10,13 @@ class Login extends StatefulWidget {
   @override
   State<Login> createState() => _LoginState();
 }
+
 class _LoginState extends State<Login> {
   final formKey = GlobalKey<FormState>();
   bool urlCheck = false;
   bool disableFields = false;
   String? Database;
-  bool? frstLogin ;
+  bool? frstLogin;
   String? errorMessage;
   bool isLoading = false;
   List<DropdownMenuItem<String>> dropdownItems = [];
@@ -30,13 +31,14 @@ class _LoginState extends State<Login> {
         isLoading = true;
         errorMessage = null;
         disableFields = true;
-
       });
       try {
         final prefs = await SharedPreferences.getInstance();
         client = OdooClient(urlController.text.trim());
-        final savedDb = prefs.getString('database');
-        if (savedDb == null || savedDb.isEmpty) {
+
+        // Use the Database variable directly if available, fallback to SharedPreferences
+        final selectedDb = Database ?? prefs.getString('database');
+        if (selectedDb == null || selectedDb.isEmpty) {
           setState(() {
             errorMessage = 'No database selected.';
             disableFields = false;
@@ -46,9 +48,10 @@ class _LoginState extends State<Login> {
           );
           return;
         }
-        print("Dataaaaaaa:$savedDb");
+
+        print("Dataaaaaaa: $selectedDb");
         var session = await client!.authenticate(
-          savedDb!,
+          selectedDb,
           emailController.text.trim(),
           passwordController.text.trim(),
         );
@@ -65,42 +68,38 @@ class _LoginState extends State<Login> {
           setState(() {
             errorMessage = 'Authentication failed: No session returned.';
             disableFields = false;
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$errorMessage')));
-            print(errorMessage);
           });
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$errorMessage')));
+          print(errorMessage);
         }
       } on OdooException {
         setState(() {
           errorMessage = 'Invalid username or password.';
-          final snackBar = Customsnackbar().showSnackBar(
-              "error", '$errorMessage', "error", () {});
+          final snackBar = Customsnackbar().showSnackBar("error", '$errorMessage', "error", () {});
           ScaffoldMessenger.of(context).showSnackBar(snackBar);
           print(errorMessage);
         });
       } catch (e) {
         setState(() {
           print(e);
-          print(errorMessage);
           errorMessage = 'Network Error';
-          final snackBar = Customsnackbar().showSnackBar(
-              "error", '$errorMessage', "error", () {});
+          final snackBar = Customsnackbar().showSnackBar("error", '$errorMessage', "error", () {});
           ScaffoldMessenger.of(context).showSnackBar(snackBar);
           print(errorMessage);
         });
       } finally {
         setState(() {
           isLoading = false;
+          disableFields = false;
         });
       }
     }
   }
 
-
   Future<void> addShared() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isLoggedIn', true);
-    final savedDb = prefs.getString('database');
-    await prefs.setString('selectedDatabase', savedDb!);
+    await prefs.setString('selectedDatabase', Database!);
     await prefs.setString('url', urlController.text.trim());
   }
 
@@ -111,53 +110,40 @@ class _LoginState extends State<Login> {
     await prefs.setInt('userId', session.userId ?? 0);
     await prefs.setString('sessionId', session.id);
     await prefs.setString('password', passwordController.text.trim());
-
     await prefs.setString('serverVersion', session.serverVersion ?? '');
     await prefs.setString('userLang', session.userLang ?? '');
     await prefs.setInt('partnerId', session.partnerId ?? 0);
     await prefs.setBool('isSystem', session.isSystem ?? false);
     await prefs.setString('userTimezone', session.userTz);
-
   }
 
-  Future<void> saveLogin() async{
+  Future<void> saveLogin() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('urldata', urlController.text);
     await prefs.setString('emaildata', emailController.text);
     await prefs.setString('passworddata', passwordController.text);
-    // await prefs.setString('database', Database ?? "");
     if (Database != null && Database!.isNotEmpty) {
-
       await prefs.setString('database', Database!);
-
     }
-
   }
 
-  Future<String?> loginCheck()async {
+  Future<void> loginCheck() async {
     final prefs = await SharedPreferences.getInstance();
     final savedUrl = prefs.getString('urldata');
-    print(savedUrl);
     final savedDb = prefs.getString('database');
-    print(savedDb);
-    //   if (savedUrl != null && savedDb != null) {
-    //     setState(() {
-    //       frstLogin = false;
-    //     });
-    //   }
-    // }
     if (savedUrl != null && savedDb != null && savedDb.isNotEmpty) {
       setState(() {
         frstLogin = false;
         Database = savedDb;
+        urlController.text = savedUrl;
       });
-    }
-    else{
+    } else {
       setState(() {
         frstLogin = true;
       });
     }
   }
+
   Future<void> fetchDatabaseList() async {
     setState(() {
       isLoading = true;
@@ -166,7 +152,6 @@ class _LoginState extends State<Login> {
 
     try {
       final baseUrl = urlController.text.trim();
-      print(baseUrl);
       client = OdooClient(baseUrl);
       final response = await client!.callRPC('/web/database/list', 'call', {});
       final dbList = response as List<dynamic>;
@@ -180,7 +165,6 @@ class _LoginState extends State<Login> {
         urlCheck = true;
         errorMessage = null;
       });
-
     } catch (e) {
       setState(() {
         errorMessage = 'Error fetching database list: $e';
@@ -193,14 +177,15 @@ class _LoginState extends State<Login> {
       });
     }
   }
+
   @override
   void initState() {
-    loginCheck();
-    if(urlController.text.isNotEmpty){
-      fetchDatabaseList();
-    }
-    // TODO: implement initState
     super.initState();
+    loginCheck().then((_) {
+      if (urlController.text.isNotEmpty) {
+        fetchDatabaseList();
+      }
+    });
   }
 
   @override
@@ -215,7 +200,7 @@ class _LoginState extends State<Login> {
             width: 200,
             height: 200,
             decoration: BoxDecoration(
-              color:  Color(0xFF9EA700),
+              color: Color(0xFF9EA700),
               shape: BoxShape.circle,
             ),
           ),
@@ -227,7 +212,7 @@ class _LoginState extends State<Login> {
             width: 250,
             height: 250,
             decoration: BoxDecoration(
-              color:  Color(0xFF9EA700),
+              color: Color(0xFF9EA700),
               shape: BoxShape.circle,
             ),
           ),
@@ -242,11 +227,9 @@ class _LoginState extends State<Login> {
                   'assets/images.png',
                   width: 170,
                 ),
-                SizedBox(
-                  height: 30,
-                ),
+                SizedBox(height: 30),
                 Container(
-                  padding:  EdgeInsets.all(20),
+                  padding: EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(15),
@@ -254,11 +237,12 @@ class _LoginState extends State<Login> {
                       BoxShadow(
                         color: Colors.black.withOpacity(0.1),
                         blurRadius: 10,
-                        offset:  Offset(0, 5),
+                        offset: Offset(0, 5),
                       ),
                     ],
                   ),
-                  child: Form( key: formKey,
+                  child: Form(
+                    key: formKey,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -271,7 +255,7 @@ class _LoginState extends State<Login> {
                           ),
                         ),
                         SizedBox(height: 15),
-                        if(frstLogin == true)...[
+                        if (frstLogin == true) ...[
                           TextFormField(
                             validator: (value) {
                               if (value == null || value.isEmpty) {
@@ -285,9 +269,8 @@ class _LoginState extends State<Login> {
                                 r'(\/[^\s]*)?$',
                                 caseSensitive: false,
                               );
-
                               if (!newReg.hasMatch(value)) {
-                                return 'Enter a valid  URL';
+                                return 'Enter a valid URL';
                               }
                               return null;
                             },
@@ -302,7 +285,7 @@ class _LoginState extends State<Login> {
                               hintText: 'Url',
                               prefixIcon: Icon(Icons.link, color: Colors.grey),
                             ),
-                            onChanged: (value){
+                            onChanged: (value) {
                               fetchDatabaseList();
                             },
                             enabled: !disableFields,
@@ -324,8 +307,10 @@ class _LoginState extends State<Login> {
                             dropdownColor: Colors.white,
                             hint: const Text("Choose Database"),
                             value: Database,
-                            items: urlCheck? dropdownItems : [],
-                            onChanged: disableFields? null:(value) {
+                            items: urlCheck ? dropdownItems : [],
+                            onChanged: disableFields
+                                ? null
+                                : (value) {
                               setState(() {
                                 Database = value;
                               });
@@ -357,6 +342,7 @@ class _LoginState extends State<Login> {
                             hintText: 'Email',
                             prefixIcon: Icon(Icons.email, color: Colors.grey),
                           ),
+                          enabled: !disableFields,
                         ),
                         SizedBox(height: 15),
                         TextFormField(
@@ -377,62 +363,69 @@ class _LoginState extends State<Login> {
                             hintText: 'Password',
                             prefixIcon: Icon(Icons.lock, color: Colors.grey),
                           ),
+                          enabled: !disableFields,
                         ),
-                        SizedBox(
-                          height: 20,
-                        ),
+                        SizedBox(height: 20),
                         ElevatedButton(
-                            onPressed: () {
-                              if(Database==null){
-                                errorMessage = 'Choose Database first';
-                                final snackBar = Customsnackbar().showSnackBar(
-                                    "error", '$errorMessage', "error", () {});
-                                ScaffoldMessenger.of(context).showSnackBar(snackBar);
-                                print(errorMessage);
-                              }
-                              saveLogin();
-                              login();
-                            },
-                            style: ElevatedButton.styleFrom(
-                              padding: EdgeInsets.symmetric(vertical: 15),
-                              backgroundColor: Color(0xFF9EA700),
-                              foregroundColor: Colors.white,
-                              minimumSize: Size(400, 50),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
+                          onPressed: isLoading
+                              ? null
+                              : () async {
+                            if (Database == null && frstLogin == true) {
+                              errorMessage = 'Choose Database first';
+                              final snackBar = Customsnackbar().showSnackBar(
+                                  "error", '$errorMessage', "error", () {});
+                              ScaffoldMessenger.of(context).showSnackBar(snackBar);
+                              print(errorMessage);
+                              return;
+                            }
+                            await saveLogin(); // Wait for saveLogin to complete
+                            await login();     // Then proceed to login
+                          },
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(vertical: 15),
+                            backgroundColor: Color(0xFF9EA700),
+                            foregroundColor: Colors.white,
+                            minimumSize: Size(400, 50),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            child: Text(
-                              'Login',
-                              style: TextStyle(fontSize: 18),
-                            )),
-                        SizedBox(height: 10),
+                          ),
+                          child: isLoading
+                              ? CircularProgressIndicator(color: Colors.white)
+                              : Text(
+                            'Login',
+                            style: TextStyle(fontSize: 18),
+                          ),
+                        ),
+                        SizedBox(height: 24),
+                        // Center(
+                        //   child: TextButton(
+                        //     onPressed: () {},
+                        //     child: Text(
+                        //       'Forgot Password?',
+                        //       style: TextStyle(
+                        //         fontSize: 16,
+                        //         color: Color(0xFF9EA700),
+                        //       ),
+                        //     ),
+                        //   ),
+                        // ),
+                        if (frstLogin == false )
                         Center(
-                          child: TextButton(
-                            onPressed: () {
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                frstLogin = true;
+                              });
                             },
                             child: Text(
-                              'Forgot Password?',
+                              'Manage Credentials?',
                               style: TextStyle(
                                 fontSize: 16,
                                 color: Color(0xFF9EA700),
                               ),
                             ),
                           ),
-                        ),
-                        Center(
-                          child: GestureDetector(
-                              onTap: (){
-                                setState(() {
-                                  frstLogin = true;
-                                });
-                              },
-                              child: Text('Manage Database?',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Color(0xFF9EA700),
-                                ),))
-                          ,
                         ),
                       ],
                     ),
