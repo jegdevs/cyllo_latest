@@ -1456,6 +1456,28 @@ class _MyquotationsState extends State<Myquotations> {
     );
   }
 
+  Future<void> deleteLead(int leadId) async {
+    try {
+      if (client == null) {
+        throw Exception('Odoo client is not initialized');
+      }
+
+      // Call the unlink method on crm.lead model
+      final response = await client!.callKw({
+        'model': 'crm.lead',
+        'method': 'unlink',
+        'args': [
+          [leadId] // Array of IDs to delete
+        ],
+        'kwargs': {},
+      });
+
+      print('Lead deletion response: $response');
+    } catch (e) {
+      throw Exception('Failed to delete lead: $e');
+    }
+  }
+
   void calendarDialogue(BuildContext context, Map<String, dynamic> lead) {
     showDialog(
       context: context,
@@ -1555,10 +1577,16 @@ class _MyquotationsState extends State<Myquotations> {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 ElevatedButton.icon(
-                  icon: Icon(Icons.edit, size: 16, color: Colors.black),
+                  icon: Icon(Icons.edit, size: 16, color: Colors.black,),
                   label: Text('Edit'),
                   onPressed: () {
-                    Navigator.of(context).pop();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => QuotationPage(quotationId: lead["id"]),
+
+                      ),
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.grey[200],
@@ -1570,13 +1598,114 @@ class _MyquotationsState extends State<Myquotations> {
                   ),
                 ),
                 ElevatedButton.icon(
-                  icon: Icon(Icons.delete, size: 16, color: Colors.black),
+                  icon: Icon(Icons.delete, size: 16,color: Colors.black,),
                   label: Text('Delete'),
-                  onPressed: () {
-                    Navigator.of(context).pop();
+                  onPressed: () async{
+                    bool? confirmDelete = await showDialog<bool>(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return AlertDialog(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          title: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Bye-bye, record!',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                ),
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.close, size: 20),
+                                onPressed: () => Navigator.of(context).pop(),
+                              ),
+                            ],
+                          ),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Ready to make your record disappear into thin air? Are you sure?',
+                                style: TextStyle(fontSize: 14),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'It will be gone forever!',
+                                style: TextStyle(fontSize: 14),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'Think twice before you click that \'Delete\' button!',
+                                style: TextStyle(fontSize: 14),
+                              ),
+                            ],
+                          ),
+                          actions: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.of(context).pop(true); // Confirm delete
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Color(0xFF9EA700), // Green color for Delete
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  child: Text('Delete'),
+                                ),
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.of(context).pop(false); // Cancel
+                                  },
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.grey,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      side: BorderSide(color: Colors.grey),
+                                    ),
+                                  ),
+                                  child: Text('No, keep it'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        );
+                      },
+                    );
+
+                    // If user confirmed deletion
+                    if (confirmDelete == true) {
+                      try {
+                        await deleteLead(lead['id']); // Delete the lead in Odoo
+                        Navigator.of(context).pop(); // Close the details dialog
+
+                        // Refresh the leads list by calling pipe()
+                        setState(() => isLoading = true);
+                        await fetchLeadsData();
+                        setState(() => isLoading = false);
+
+                        // Show success message
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Lead deleted successfully')),
+                        );
+                      } catch (e) {
+                        // Show error message
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error deleting lead: $e')),
+                        );
+                      }
+                    }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey[200],
+                    backgroundColor:  Colors.grey[200],
                     foregroundColor: Color(0xFF9EA700),
                     elevation: 0,
                     shape: RoundedRectangleBorder(

@@ -262,15 +262,15 @@ class _CustomerViewState extends State<CustomerView> {
   }
 
   void updateControllers() {
-    nameController.text = customerData!['name']?.toString() ?? '';
-    streetController.text = customerData!['street']?.toString() ?? '';
-    cityController.text = customerData!['city']?.toString() ?? '';
-    zipController.text = customerData!['zip']?.toString() ?? '';
-    phoneController.text = customerData!['phone']?.toString() ?? '';
-    mobileController.text = customerData!['mobile']?.toString() ?? '';
-    emailController.text = customerData!['email']?.toString() ?? '';
-    websiteController.text = customerData!['website']?.toString() ?? '';
-    vatController.text = customerData!['vat']?.toString() ?? '';
+    nameController.text = (customerData!['name'] == null || customerData!['name'] == false || customerData!['name'] == '') ? 'N/A' : customerData!['name'].toString();
+    streetController.text = (customerData!['street'] == null || customerData!['street'] == false || customerData!['street'] == '') ? 'N/A' : customerData!['street'].toString();
+    cityController.text = (customerData!['city'] == null || customerData!['city'] == false || customerData!['city'] == '') ? 'N/A' : customerData!['city'].toString();
+    zipController.text = (customerData!['zip'] == null || customerData!['zip'] == false || customerData!['zip'] == '') ? 'N/A' : customerData!['zip'].toString();
+    phoneController.text = (customerData!['phone'] == null || customerData!['phone'] == false || customerData!['phone'] == '') ? 'N/A' : customerData!['phone'].toString();
+    mobileController.text = (customerData!['mobile'] == null || customerData!['mobile'] == false || customerData!['mobile'] == '') ? 'N/A' : customerData!['mobile'].toString();
+    emailController.text = (customerData!['email'] == null || customerData!['email'] == false || customerData!['email'] == '') ? 'N/A' : customerData!['email'].toString();
+    websiteController.text = (customerData!['website'] == null || customerData!['website'] == false || customerData!['website'] == '') ? 'N/A' : customerData!['website'].toString();
+    vatController.text = (customerData!['vat'] == null || customerData!['vat'] == false || customerData!['vat'] == '') ? 'N/A' : customerData!['vat'].toString();
     selectedCountryIndex = customerData!['country_id'] is List
         ? countries.indexWhere((c) => c['id'] == customerData!['country_id'][0])
         : null;
@@ -654,51 +654,52 @@ class _CustomerViewState extends State<CustomerView> {
       setState(() => isLoading = true);
 
       final updateData = {
-        'name': nameController.text.isEmpty ? false : nameController.text,
-        'street': streetController.text.isEmpty ? false : streetController.text,
-        'city': cityController.text.isEmpty ? false : cityController.text,
-        'zip': zipController.text.isEmpty ? false : zipController.text,
-        'country_id': selectedCountryIndex != null && selectedCountryIndex! >= 0 ? countries[selectedCountryIndex!]['id'] : false,
-        'state_id': selectedStateIndex != null && selectedStateIndex! >= 0 ? states[selectedStateIndex!]['id'] : false,
-        'phone': phoneController.text.isEmpty ? false : phoneController.text,
-        'mobile': mobileController.text.isEmpty ? false : mobileController.text,
-        'email': emailController.text.isEmpty ? false : emailController.text,
-        'website': websiteController.text.isEmpty ? false : websiteController.text,
-        'vat': vatController.text.isEmpty ? false : vatController.text,
-        'user_id': selectedSalespersonIndex != null && selectedSalespersonIndex! >= 0 ? users[selectedSalespersonIndex!]['id'] : false,
-        'team_id': selectedSalesTeamIndex != null && selectedSalesTeamIndex! >= 0 ? teams[selectedSalesTeamIndex!]['id'] : false,
+        'name': nameController.text.isEmpty ? '' : nameController.text,
+        'street': streetController.text.isEmpty ? '' : streetController.text,
+        'city': cityController.text.isEmpty ? '' : streetController.text,
+        'zip': zipController.text.isEmpty ? '' : zipController.text,
+        'country_id': selectedCountryIndex != null && selectedCountryIndex! >= 0 ? countries[selectedCountryIndex!]['id'] : null,
+        'state_id': selectedStateIndex != null && selectedStateIndex! >= 0 ? states[selectedStateIndex!]['id'] : null,
+        'phone': phoneController.text.isEmpty ? '' : phoneController.text,
+        'mobile': mobileController.text.isEmpty ? '' : mobileController.text,
+        'email': emailController.text.isEmpty ? '' : emailController.text,
+        'website': websiteController.text.isEmpty ? '' : websiteController.text,
+        'vat': vatController.text.isEmpty ? '' : vatController.text,
+        'is_company': customerData!['is_company'] ?? '',
+        'user_id': selectedSalespersonIndex != null && selectedSalespersonIndex! >= 0 ? users[selectedSalespersonIndex!]['id'] : null,
+        'team_id': selectedSalesTeamIndex != null && selectedSalesTeamIndex! >= 0 ? teams[selectedSalesTeamIndex!]['id'] : null,
         'property_payment_term_id': selectedPaymentTermsSalesIndex != null && selectedPaymentTermsSalesIndex! >= 0
             ? paymentTerms[selectedPaymentTermsSalesIndex!]['id']
-            : false,
+            : null,
         'assigned_partner_id': selectedImplementedByIndex != null && selectedImplementedByIndex! >= 0
             ? partners[selectedImplementedByIndex!]['id']
-            : false,
+            : null,
         'property_product_pricelist': selectedPricelistIndex != null && selectedPricelistIndex! >= 0
             ? pricelists[selectedPricelistIndex!]['id']
-            : false,
+            : null,
         'property_delivery_carrier_id': selectedDeliveryMethodIndex != null && selectedDeliveryMethodIndex! >= 0
             ? deliveryCarriers[selectedDeliveryMethodIndex!]['id']
-            : false,
+            : null,
         'property_supplier_payment_term_id': selectedPaymentTermsPurchaseIndex != null && selectedPaymentTermsPurchaseIndex! >= 0
             ? paymentTerms[selectedPaymentTermsPurchaseIndex!]['id']
-            : false,
+            : null,
         'property_payment_method_id': selectedPaymentMethodIndex != null && selectedPaymentMethodIndex! >= 0
             ? paymentMethods[selectedPaymentMethodIndex!]['id']
-            : false,
+            : null,
         'property_account_position_id': selectedFiscalPositionIndex != null && selectedFiscalPositionIndex! >= 0
             ? fiscalPositions[selectedFiscalPositionIndex!]['id']
-            : false,
-        'company_id': selectedCompanyIndex != null && selectedCompanyIndex! >= 0 ? companies[selectedCompanyIndex!]['id'] : false,
-        'ref': referenceController.text.isEmpty ? false : referenceController.text,
-        'industry_id': selectedIndustryIndex != null && selectedIndustryIndex! >= 0 ? industries[selectedIndustryIndex!]['id'] : false,
+            : null,
+        'company_id': selectedCompanyIndex != null && selectedCompanyIndex! >= 0 ? companies[selectedCompanyIndex!]['id'] : null,
+        'ref': referenceController.text.isEmpty ? '' : referenceController.text,
+        'industry_id': selectedIndustryIndex != null && selectedIndustryIndex! >= 0 ? industries[selectedIndustryIndex!]['id'] : null,
         'property_stock_customer': selectedCustomerLocationIndex != null && selectedCustomerLocationIndex! >= 0
             ? locations[selectedCustomerLocationIndex!]['id']
-            : false,
+            : null,
         'property_stock_supplier': selectedVendorLocationIndex != null && selectedVendorLocationIndex! >= 0
             ? locations[selectedVendorLocationIndex!]['id']
-            : false,
-        'grade_id': selectedPartnerLevelIndex != null && selectedPartnerLevelIndex! >= 0 ? grades[selectedPartnerLevelIndex!]['id'] : false,
-        'activation': selectedActivationIndex != null && selectedActivationIndex! >= 0 ? activations[selectedActivationIndex!]['id'] : false,
+            : null,
+        'grade_id': selectedPartnerLevelIndex != null && selectedPartnerLevelIndex! >= 0 ? grades[selectedPartnerLevelIndex!]['id'] : null,
+        'activation': selectedActivationIndex != null && selectedActivationIndex! >= 0 ? activations[selectedActivationIndex!]['id'] : null,
         'partner_weight': int.tryParse(levelWeightController.text) ?? 0,
         'date_review': latestReviewController.text.isEmpty ? null : latestReviewController.text,
         'date_review_next': nextReviewController.text.isEmpty ? null : nextReviewController.text,
@@ -735,7 +736,6 @@ class _CustomerViewState extends State<CustomerView> {
       setState(() => isLoading = false);
     }
   }
-
   // Date picker helper method
   Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
     DateTime? initialDate;
@@ -815,7 +815,7 @@ class _CustomerViewState extends State<CustomerView> {
 
   Widget _buildCustomerHeader() {
     final bool isCompany = customerData!['is_company'] == true;
-    final String customerType = isCompany ? 'company' : 'individual';
+    String customerType = isCompany ? 'company' : 'individual';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -830,14 +830,28 @@ class _CustomerViewState extends State<CustomerView> {
                   Radio<String>(
                     value: 'individual',
                     groupValue: customerType,
-                    onChanged: (value) {},
+                    onChanged: isEditing
+                        ? (value) {
+                      setState(() {
+                        customerType = value!; // Update local display
+                        customerData!['is_company'] = false; // Update data to save
+                      });
+                    }
+                        : null, // Disable when not editing
                   ),
                   const Text('Individual'),
                   const SizedBox(width: 16),
                   Radio<String>(
                     value: 'company',
                     groupValue: customerType,
-                    onChanged: (value) {},
+                    onChanged: isEditing
+                        ? (value) {
+                      setState(() {
+                        customerType = value!; // Update local display
+                        customerData!['is_company'] = true; // Update data to save
+                      });
+                    }
+                        : null, // Disable when not editing
                   ),
                   const Text('Company'),
                 ],

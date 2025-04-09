@@ -1345,29 +1345,29 @@ class _CustomersState extends State<Customers> {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildStatItem(
-                      Icons.star_border,
-                      customer['customer_rank']?.toString() ?? "0",
-                      Colors.amber),
-                  _buildStatItem(
-                      Icons.description_outlined,
-                      customer['supplier_rank']?.toString() ?? "0",
-                      Colors.blue),
-                  _buildStatItem(Icons.attach_money,
-                      customer['amount']?.toString() ?? "0", Colors.green),
-                  IconButton(
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    icon: Icon(Icons.access_time,
-                        size: 16, color: Colors.grey[600]),
-                    onPressed: () {},
-                  ),
-                ],
-              ),
+              // const SizedBox(height: 8),
+              // Row(
+              //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              //   children: [
+              //     _buildStatItem(
+              //         Icons.star_border,
+              //         customer['customer_rank']?.toString() ?? "0",
+              //         Colors.amber),
+              //     _buildStatItem(
+              //         Icons.description_outlined,
+              //         customer['supplier_rank']?.toString() ?? "0",
+              //         Colors.blue),
+              //     _buildStatItem(Icons.attach_money,
+              //         customer['amount']?.toString() ?? "0", Colors.green),
+              //     IconButton(
+              //       padding: EdgeInsets.zero,
+              //       constraints: const BoxConstraints(),
+              //       icon: Icon(Icons.access_time,
+              //           size: 16, color: Colors.grey[600]),
+              //       onPressed: () {},
+              //     ),
+              //   ],
+              // ),
             ],
           ),
         ),

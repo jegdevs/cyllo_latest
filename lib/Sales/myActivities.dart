@@ -1453,6 +1453,578 @@ class _MyactivityState extends State<Myactivity> {
       },
     );
   }
+  void _showAddLeadDialog(BuildContext context, AppFlowyGroupData columnData) {
+    final TextEditingController organizationController = TextEditingController();
+    final TextEditingController opportunityController = TextEditingController();
+    final TextEditingController emailController = TextEditingController();
+    final TextEditingController phoneController = TextEditingController();
+    final TextEditingController revenueController = TextEditingController();
+    String? selectedFrequency; // Maps to recurring_plan
+    final TextEditingController recurringRevenueController = TextEditingController(text: "0.00");
+
+    // Fetch partners for the dropdown
+    List<Map<String, dynamic>> partners = [];
+    Future<void> fetchPartners() async {
+      if (client != null) {
+        try {
+          final response = await client!.callKw({
+            'model': 'res.partner',
+            'method': 'search_read',
+            'args': [],
+            'kwargs': {
+              'fields': ['id', 'name'],
+              'limit': 50,
+            },
+          });
+          if (response != null) {
+            partners = List<Map<String, dynamic>>.from(response);
+          }
+        } catch (e) {
+          log("Failed to fetch partners: $e");
+        }
+      }
+    }
+
+    // Fetch recurring plans for the dropdown
+    List<Map<String, dynamic>> recurringPlans = [];
+    Future<void> fetchRecurringPlans() async {
+      if (client != null) {
+        try {
+          final response = await client!.callKw({
+            'model': 'crm.recurring.plan',
+            'method': 'search_read',
+            'args': [],
+            'kwargs': {
+              'fields': ['id', 'name'],
+              'limit': 50,
+            },
+          });
+          if (response != null) {
+            recurringPlans = List<Map<String, dynamic>>.from(response);
+          }
+        } catch (e) {
+          log("Failed to fetch recurring plans: $e");
+        }
+      }
+    }
+
+    // Initialize data
+    fetchPartners();
+    fetchRecurringPlans();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        int starRating = 0; // Local state for star rating
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          child: Container(
+            width: 300,
+            padding: EdgeInsets.all(16.0),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: SingleChildScrollView(
+              child: FutureBuilder(
+                future: Future.wait([fetchPartners(), fetchRecurringPlans()]),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Center(child: CircularProgressIndicator());
+                  }
+                  return StatefulBuilder(
+                    builder: (BuildContext context, StateSetter setState) {
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Organization/Contact Field with dropdown
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    "Organization / Contact",
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  Text(
+                                    " ?",
+                                    style: TextStyle(
+                                      color: Colors.red,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: 4),
+                              Container(
+                                height: 40,
+                                child: DropdownButtonFormField<String>(
+                                  decoration: InputDecoration(
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(4),
+                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                    ),
+                                  ),
+                                  items: partners.map((partner) {
+                                    return DropdownMenuItem<String>(
+                                      value: partner['id'].toString(),
+                                      child: Text(partner['name'] ?? ''),
+                                    );
+                                  }).toList(),
+                                  value: organizationController.text.isNotEmpty
+                                      ? organizationController.text
+                                      : null,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      organizationController.text = value ?? '';
+                                    });
+                                  },
+                                  isExpanded: true,
+                                  icon: Icon(Icons.arrow_drop_down),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 16),
+
+                          // Opportunity Field
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Opportunity",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Container(
+                                height: 40,
+                                child: TextField(
+                                  controller: opportunityController,
+                                  decoration: InputDecoration(
+                                    hintText: "e.g. Product Pricing",
+                                    hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(4),
+                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 16),
+
+                          // Email Field
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Email",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Container(
+                                height: 40,
+                                child: TextField(
+                                  controller: emailController,
+                                  decoration: InputDecoration(
+                                    hintText: 'e.g. "email@address.com"',
+                                    hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(4),
+                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 16),
+
+                          // Phone Field
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Phone",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Container(
+                                height: 40,
+                                child: TextField(
+                                  controller: phoneController,
+                                  decoration: InputDecoration(
+                                    hintText: 'e.g. "0123456789"',
+                                    hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(4),
+                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 16),
+
+                          // Expected Revenue and Priority (Star Rating) Field
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Expected Revenue",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Container(
+                                      height: 40,
+                                      child: TextField(
+                                        controller: revenueController,
+                                        decoration: InputDecoration(
+                                          hintText: "0.00",
+                                          hintStyle: TextStyle(color: Colors.black87),
+                                          prefixIcon: Text(
+                                            "\$ ",
+                                            style: TextStyle(fontSize: 16, color: Colors.black87),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                          prefixIconConstraints: BoxConstraints(minWidth: 0, minHeight: 0),
+                                          contentPadding: EdgeInsets.only(left: 12, top: 10, bottom: 10),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(4),
+                                            borderSide: BorderSide(color: Colors.grey.shade300),
+                                          ),
+                                        ),
+                                        keyboardType: TextInputType.number,
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(width: 8),
+                                  // Star Rating (Priority)
+                                  Row(
+                                    children: List.generate(3, (index) {
+                                      return IconButton(
+                                        padding: EdgeInsets.zero,
+                                        constraints: BoxConstraints(),
+                                        icon: Icon(
+                                          index < starRating ? Icons.star : Icons.star_border,
+                                          color: index < starRating ? Colors.amber : Colors.grey,
+                                          size: 20,
+                                        ),
+                                        onPressed: () {
+                                          setState(() {
+                                            starRating = index + 1;
+                                          });
+                                        },
+                                      );
+                                    }),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 8),
+
+                          // Frequency (Recurring Plan) and Recurring Revenue Field
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Frequency",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 120,
+                                    height: 40,
+                                    child: TextField(
+                                      controller: recurringRevenueController,
+                                      enabled: selectedFrequency != null, // Enable only when frequency is selected
+                                      decoration: InputDecoration(
+                                        hintText: "0.00",
+                                        hintStyle: TextStyle(color: Colors.black87),
+                                        prefixIcon: Text(
+                                          "\$ ",
+                                          style: TextStyle(fontSize: 16, color: Colors.black87),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                        prefixIconConstraints: BoxConstraints(minWidth: 0, minHeight: 0),
+                                        contentPadding: EdgeInsets.only(left: 12, top: 10, bottom: 10),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(4),
+                                          borderSide: BorderSide(color: Colors.grey.shade300),
+                                        ),
+                                      ),
+                                      keyboardType: TextInputType.number,
+                                    ),
+                                  ),
+                                  SizedBox(width: 8),
+                                  Expanded(
+                                    child: Container(
+                                      height: 40,
+                                      child: DropdownButtonFormField<String>(
+                                        decoration: InputDecoration(
+                                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(4),
+                                            borderSide: BorderSide(color: Colors.grey.shade300),
+                                          ),
+                                        ),
+                                        items: recurringPlans.map((plan) {
+                                          return DropdownMenuItem<String>(
+                                            value: plan['id'].toString(),
+                                            child: Text(plan['name'] ?? ''),
+                                          );
+                                        }).toList(),
+                                        value: selectedFrequency,
+                                        onChanged: (value) {
+                                          setState(() {
+                                            selectedFrequency = value;
+                                            if (value != null && recurringRevenueController.text == "0.00") {
+                                              // Only set initial value if recurringRevenueController is still default
+                                              recurringRevenueController.text = revenueController.text.replaceAll('\$', '').trim().isNotEmpty
+                                                  ? revenueController.text.replaceAll('\$', '').trim()
+                                                  : "0.00";
+                                            }
+                                          });
+                                        },
+                                        isExpanded: true,
+                                        icon: Icon(Icons.arrow_drop_down),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 16),
+
+                          // Action Buttons
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: () async {
+                                    // Fetch stage_id based on group name
+                                    int? stageId = await _getStageId(columnData.headerData.groupName);
+                                    if (stageId == null) {
+                                      log("Stage not found for name: ${columnData.headerData.groupName}");
+                                      return;
+                                    }
+
+                                    // Map star rating to Odoo priority values
+                                    String priorityValue;
+                                    switch (starRating) {
+                                      case 1:
+                                        priorityValue = '0'; // Low
+                                        break;
+                                      case 2:
+                                        priorityValue = '1'; // Medium
+                                        break;
+                                      case 3:
+                                        priorityValue = '2'; // High
+                                        break;
+                                      default:
+                                        priorityValue = '0'; // Default to Low
+                                    }
+
+                                    // Handle the addition of the new lead
+                                    final newLead = {
+                                      'name': opportunityController.text,
+                                      'expected_revenue': double.tryParse(revenueController.text.replaceAll('\$', '').trim()) ?? 0.0,
+                                      'email_from': emailController.text,
+                                      'phone': phoneController.text,
+                                      'partner_id': int.tryParse(organizationController.text) ?? false,
+                                      'priority': priorityValue, // Use string value for priority
+                                      'recurring_plan': int.tryParse(selectedFrequency ?? '') ?? false,
+                                      'recurring_revenue': selectedFrequency != null
+                                          ? double.tryParse(recurringRevenueController.text) ?? 0.0
+                                          : 0.0,
+                                      'stage_id': stageId,
+                                      'activity_user_id': [currentUserId ?? 0, userName ?? ''],
+                                      'type': 'opportunity',
+                                    };
+                                    log('New Lead: $newLead');
+                                    final response = await _addLeadToOdoo(newLead);
+                                    Navigator.pop(context); // Close the dialog after adding
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Color(0xFFAFBA00),
+                                    padding: EdgeInsets.symmetric(vertical: 12),
+                                  ),
+                                  child: Text(
+                                    "Add",
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              ElevatedButton(
+                                onPressed: () async {
+                                  // Check if any field has a value
+                                  bool hasValue = opportunityController.text.isNotEmpty ||
+                                      emailController.text.isNotEmpty ||
+                                      phoneController.text.isNotEmpty ||
+                                      revenueController.text.isNotEmpty ||
+                                      organizationController.text.isNotEmpty ||
+                                      selectedFrequency != null ||
+                                      recurringRevenueController.text != "0.00";
+
+                                  if (hasValue) {
+                                    // Fetch stage_id based on group name
+                                    int? stageId = await _getStageId(columnData.headerData.groupName);
+                                    if (stageId == null) {
+                                      log("Stage not found for name: ${columnData.headerData.groupName}");
+                                      return;
+                                    }
+
+                                    // Map star rating to Odoo priority values
+                                    String priorityValue;
+                                    switch (starRating) {
+                                      case 1:
+                                        priorityValue = '0'; // Low
+                                        break;
+                                      case 2:
+                                        priorityValue = '1'; // Medium
+                                        break;
+                                      case 3:
+                                        priorityValue = '2'; // High
+                                        break;
+                                      default:
+                                        priorityValue = '0'; // Default to Low
+                                    }
+
+                                    // Handle the addition of the new lead
+                                    final newLead = {
+                                      'name': opportunityController.text,
+                                      'expected_revenue': double.tryParse(revenueController.text.replaceAll('\$', '').trim()) ?? 0.0,
+                                      'email_from': emailController.text,
+                                      'phone': phoneController.text,
+                                      'partner_id': int.tryParse(organizationController.text) ?? false,
+                                      'priority': priorityValue, // Use string value for priority
+                                      'recurring_plan': int.tryParse(selectedFrequency ?? '') ?? false,
+                                      'recurring_revenue': selectedFrequency != null
+                                          ? double.tryParse(recurringRevenueController.text) ?? 0.0
+                                          : 0.0,
+                                      'stage_id': stageId,
+                                      'activity_user_id': [currentUserId ?? 0, userName ?? ''],
+                                      'type': 'opportunity',
+                                    };
+                                    log('New Lead: $newLead');
+                                    final response = await _addLeadToOdoo(newLead);
+                                    if (response != null) {
+                                      // Navigate to LeadDetailPage with the leadId
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => LeadDetailPage(leadId: response as int),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.grey.shade200,
+                                  padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                ),
+                                child: Text(
+                                  "Edit",
+                                  style: TextStyle(color: Colors.black54),
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                            ],
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+// Method to fetch stage_id based on stage name
+  Future<int?> _getStageId(String stageName) async {
+    if (client == null) return null;
+    try {
+      final response = await client!.callKw({
+        'model': 'crm.stage',
+        'method': 'search_read',
+        'args': [
+          [['name', '=', stageName]]
+        ],
+        'kwargs': {
+          'fields': ['id'],
+          'limit': 1,
+        },
+      });
+      if (response != null && response.isNotEmpty) {
+        return response[0]['id'] as int?;
+      }
+      return null;
+    } catch (e) {
+      log("Failed to fetch stage_id: $e");
+      return null;
+    }
+  }
+  Future<int?> _addLeadToOdoo(Map<String, dynamic> leadData) async {
+    if (client == null) return  null;
+
+    try {
+      final response = await client!.callKw({
+        'model': 'crm.lead',
+        'method': 'create',
+        'args': [leadData],
+        'kwargs': {},
+      });
+      print('Lead created: $response');
+      await pipe(); // Refresh the data
+      setState(() {});
+      return response as int?;
+    } catch (e) {
+      log("Failed to create lead: $e");
+    }
+  }
 
   Widget iconSelectedView() {
     final config = AppFlowyBoardConfig(
@@ -1498,6 +2070,9 @@ class _MyactivityState extends State<Myactivity> {
                   ),
                 ),
                 addIcon: const Icon(Icons.add, size: 20),
+                onAddButtonClick:() {
+                  _showAddLeadDialog(context, columnData);
+                },
                 moreIcon: const Icon(Icons.more_horiz, size: 20),
                 height: 50,
                 margin: config.groupBodyPadding,

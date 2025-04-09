@@ -1,9 +1,14 @@
+import 'dart:convert';
 import 'dart:developer';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:animated_custom_dropdown/custom_dropdown.dart';
+import 'package:signature/signature.dart';
 
 class QuotationPage extends StatefulWidget {
   final int quotationId;
@@ -31,6 +36,12 @@ class _QuotationPageState extends State<QuotationPage> {
   String? selectedProductId;
   int? selectedSalesPersonId;
   String currentStatus = 'draft';
+  bool _showSaveButton = false; // New flag to control Save button visibility
+  final SignatureController _signatureController = SignatureController(
+    penStrokeWidth: 3.0,
+    penColor: Colors.black,
+    exportBackgroundColor: Colors.transparent,
+  );
 
   late TextEditingController customerController;
   late TextEditingController streetController;
@@ -75,6 +86,7 @@ class _QuotationPageState extends State<QuotationPage> {
 
   @override
   void dispose() {
+    _signatureController.dispose();
     client?.close();
     customerController.dispose();
     streetController.dispose();
@@ -106,6 +118,7 @@ class _QuotationPageState extends State<QuotationPage> {
         await fetchOptionalProducts();
         await fetchDropdownData();
         _updateControllers();
+        await _loadExistingSignature();
       } catch (e) {
         print("Odoo Authentication Failed: $e");
         if (mounted) {
@@ -723,122 +736,6 @@ class _QuotationPageState extends State<QuotationPage> {
     }
   }
 
-  // Future<void> sendQuotationEmail(int saleId, BuildContext context) async {
-  //   try {
-  //     setState(() => isLoading = true);
-  //
-  //     final quotationResponse = await client?.callKw({
-  //       'model': 'sale.order',
-  //       'method': 'action_quotation_send',
-  //       'args': [
-  //         [saleId]
-  //       ],
-  //       'kwargs': {
-  //         'context': {
-  //           'validate_analytic': true,
-  //         },
-  //       },
-  //     });
-  //
-  //     final contextData = quotationResponse['context'];
-  //     int? templateId = contextData?['default_template_id'];
-  //
-  //     if (templateId == null) {
-  //       print("No default template ID found for Sale Order ID: $saleId");
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         const SnackBar(content: Text('No email template found for this quotation')),
-  //       );
-  //       return;
-  //     }
-  //
-  //     final saleOrder = await client?.callKw({
-  //       'model': 'sale.order',
-  //       'method': 'read',
-  //       'args': [
-  //         [saleId]
-  //       ],
-  //       'kwargs': {
-  //         'fields': [
-  //           'partner_id',
-  //           'state',
-  //         ],
-  //       },
-  //     });
-  //
-  //     if (saleOrder.isEmpty || saleOrder[0]['partner_id'] == null) {
-  //       print("❌ No customer found for Sale Order ID: $saleId");
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         const SnackBar(content: Text('No customer found for this quotation')),
-  //       );
-  //       return;
-  //     }
-  //
-  //     int partnerId = saleOrder[0]['partner_id'][0] as int;
-  //     String currentStatus = saleOrder[0]['state'] as String;
-  //
-  //     final mailComposeResponse = await client?.callKw({
-  //       'model': 'mail.compose.message',
-  //       'method': 'create',
-  //       'args': [
-  //         {
-  //           'model': 'sale.order',
-  //           'res_ids': [saleId],
-  //           'template_id': templateId,
-  //           'composition_mode': 'comment',
-  //           'force_send': true,
-  //           'email_layout_xmlid': 'mail.mail_notification_layout_with_responsible_signature',
-  //           'partner_ids': [partnerId],
-  //         }
-  //       ],
-  //       'kwargs': {},
-  //     });
-  //
-  //     int mailComposeId = mailComposeResponse;
-  //
-  //     final sendMailResponse = await client?.callKw({
-  //       'model': 'mail.compose.message',
-  //       'method': 'action_send_mail',
-  //       'args': [
-  //         [mailComposeId]
-  //       ],
-  //       'kwargs': {},
-  //     });
-  //
-  //     print("Email Sent Successfully: $sendMailResponse");
-  //     if (mounted) {
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         const SnackBar(
-  //           content: Text('Email Sent Successfully'),
-  //           backgroundColor:Color(0xFF9EA700),
-  //         ),
-  //       );
-  //     }
-  //
-  //     if (currentStatus == 'draft') {
-  //       await client?.callKw({
-  //         'model': 'sale.order',
-  //         'method': 'action_quotation_sent',
-  //         'args': [
-  //           [saleId]
-  //         ],
-  //         'kwargs': {},
-  //       });
-  //     }
-  //
-  //     await fetchQuotationDetails();
-  //   } catch (e) {
-  //     log("Error sending email: $e");
-  //     if (mounted) {
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         SnackBar(content: Text('Error sending email: $e')),
-  //       );
-  //     }
-  //   } finally {
-  //     if (mounted) {
-  //       setState(() => isLoading = false);
-  //     }
-  //   }
-  // }
 
   Future<void> sendQuotationEmail(int saleId, BuildContext context) async {
     try {
@@ -865,9 +762,9 @@ class _QuotationPageState extends State<QuotationPage> {
           ? quotationCheck[0]['partner_id'][0] as int
           : throw Exception('No customer associated with this quotation');
 
-      if (currentState != 'draft' && currentState != 'sent') {
-        throw Exception('Quotation must be in draft or sent state to send an email');
-      }
+      // if (currentState != 'draft' && currentState != 'sent') {
+      //   throw Exception('Quotation must be in draft or sent state to send an email');
+      // }
 
       // Trigger the email sending action
       final quotationResponse = await client?.callKw({
@@ -1008,10 +905,10 @@ class _QuotationPageState extends State<QuotationPage> {
         const SizedBox(width: 8),
         OutlinedButton(
           onPressed: () {
-            // Add logic for preview
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Preview clicked')),
-            );
+            // // Add logic for preview
+            // ScaffoldMessenger.of(context).showSnackBar(
+            //   const SnackBar(content: Text('Preview clicked')),
+            // );
           },
           style: OutlinedButton.styleFrom(
               foregroundColor: Colors.grey,
@@ -1078,9 +975,9 @@ class _QuotationPageState extends State<QuotationPage> {
         OutlinedButton(
           onPressed: () {
             // Add logic for preview
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Preview clicked')),
-            );
+            // ScaffoldMessenger.of(context).showSnackBar(
+            //   const SnackBar(content: Text('Preview clicked')),
+            // );
           },
           style: OutlinedButton.styleFrom(
               foregroundColor: Colors.grey
@@ -1149,9 +1046,9 @@ class _QuotationPageState extends State<QuotationPage> {
         OutlinedButton(
           onPressed: () {
             // Add logic for preview
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Preview clicked')),
-            );
+            // ScaffoldMessenger.of(context).showSnackBar(
+            //   const SnackBar(content: Text('Preview clicked')),
+            // );
           },
           style: OutlinedButton.styleFrom(
               foregroundColor: Colors.grey
@@ -2118,19 +2015,6 @@ class _QuotationPageState extends State<QuotationPage> {
               TextEditingController(text: _toString(quotationData['incoterm_location'])),
             ),
             const SizedBox(height: 16),
-            // _buildEditableInfoRow(
-            //   'Shipping Policy',
-            //   TextEditingController(text: _toString(quotationData['picking_policy'])),
-            //   isDropdown: isEditMode,
-            //   items: ['direct', 'one'],
-            //   onDropdownChanged: (value) {
-            //     if (value != null) {
-            //       setState(() {
-            //         quotationData['picking_policy'] = value;
-            //       });
-            //     }
-            //   },
-            // ),
             _buildEditableInfoRow(
               'Shipping Policy',
               TextEditingController(
@@ -2248,6 +2132,32 @@ class _QuotationPageState extends State<QuotationPage> {
     );
   }
 
+  File? _signatureImage;
+
+  // Widget _buildCustomerSignatureTab() {
+  //   return Padding(
+  //     padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+  //     child: Column(
+  //       crossAxisAlignment: CrossAxisAlignment.start,
+  //       children: [
+  //         const Text('Customer Signature', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+  //         const SizedBox(height: 16),
+  //         Container(
+  //           height: 150,
+  //           width: double.infinity,
+  //           decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(8)),
+  //           child: const Center(child: Text('Signature area (Not implemented)', style: TextStyle(color: Colors.black54))),
+  //         ),
+  //         const SizedBox(height: 16),
+  //         ElevatedButton(
+  //           onPressed: () {},
+  //           style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9EA700), foregroundColor: Colors.white),
+  //           child: const Text('Add Signature'),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
   Widget _buildCustomerSignatureTab() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -2256,23 +2166,270 @@ class _QuotationPageState extends State<QuotationPage> {
         children: [
           const Text('Customer Signature', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
-          Container(
-            height: 150,
-            width: double.infinity,
-            decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(8)),
-            child: const Center(child: Text('Signature area (Not implemented)', style: TextStyle(color: Colors.black54))),
+          GestureDetector(
+            onTap: _signatureImage != null ? null : _showSignatureOptions, // Show options if no image
+            child: Container(
+              height: 150,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: _signatureImage != null
+                  ? Image.file(
+                _signatureImage!,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  log('Error displaying signature image: $error');
+                  return const Center(
+                    child: Text(
+                      'Error loading signature',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  );
+                },
+              )
+                  : const Center(
+                child: Text(
+                  'Tap to add signature or use button below',
+                  style: TextStyle(color: Colors.black54),
+                ),
+              ),
+            ),
           ),
           const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9EA700), foregroundColor: Colors.white),
-            child: const Text('Add Signature'),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              ElevatedButton(
+                onPressed: _showSignatureOptions,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF9EA700),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Add Signature'),
+              ),
+              if (_showSaveButton && _signatureImage != null)
+                ElevatedButton(
+                  onPressed: _saveSignature,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Save'),
+                ),
+            ],
           ),
         ],
       ),
     );
   }
 
+  void _showSignatureOptions() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Add Signature'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: const Text('Upload Signature'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickSignatureImage();
+                },
+              ),
+              ListTile(
+                title: const Text('Write Signature'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showSignaturePad();
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _pickSignatureImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+
+    if (image != null) {
+      setState(() {
+        _signatureImage = File(image.path);
+        _showSaveButton = true; // Show Save button only after adding a new signature
+      });
+      log('Signature image picked: ${image.path}');
+    }
+  }
+
+  void _showSignaturePad() {
+    _signatureController.clear();
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Draw Signature'),
+          content: SizedBox(
+            width: 300,
+            height: 200,
+            child: Signature(
+              controller: _signatureController,
+              backgroundColor: Colors.white,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                _signatureController.clear();
+              },
+              child: const Text('Clear'),
+            ),
+            TextButton(
+              onPressed: () async {
+                if (_signatureController.isNotEmpty) {
+                  final signatureBytes = await _signatureController.toPngBytes();
+                  if (signatureBytes != null) {
+                    final tempDir = await getTemporaryDirectory();
+                    final tempFile = File('${tempDir.path}/signature_${widget.quotationId}.png');
+                    await tempFile.writeAsBytes(signatureBytes);
+                    setState(() {
+                      _signatureImage = tempFile;
+                      _showSaveButton = true; // Show Save button after drawing
+                    });
+                    log('Signature drawn and saved to: ${tempFile.path}');
+                  }
+                }
+                Navigator.pop(context);
+              },
+              child: const Text('Done'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _saveSignature() async {
+    if (_signatureImage != null && client != null) {
+      try {
+        final bytes = await _signatureImage!.readAsBytes();
+        final base64Image = base64Encode(bytes);
+        log('Saving signature with base64 length: ${base64Image.length}');
+
+        await client!.callKw({
+          'model': 'sale.order',
+          'method': 'write',
+          'args': [
+            [widget.quotationId],
+            {
+              'signature': base64Image, // Ensure this matches your Odoo field name
+            },
+          ],
+          'kwargs': {},
+        });
+
+        log('Signature saved to Odoo for quotation ID: ${widget.quotationId}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Signature saved successfully'),
+            backgroundColor: Color(0xFF9EA700),
+          ),
+        );
+
+        setState(() {
+          _showSaveButton = false; // Hide Save button after saving
+        });
+        await _loadExistingSignature(); // Reload to confirm
+      } catch (e) {
+        log('Error saving signature: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving signature: $e'),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _loadExistingSignature() async {
+    if (client != null) {
+      try {
+        final response = await client!.callKw({
+          'model': 'sale.order',
+          'method': 'read',
+          'args': [
+            [widget.quotationId]
+          ],
+          'kwargs': {
+            'fields': ['signature'],
+          },
+        });
+
+        log('Signature fetch response: $response');
+
+        if (response.isNotEmpty && response[0]['signature'] != null && response[0]['signature'] != false) {
+          final base64Image = response[0]['signature'] as String;
+          log('Signature base64 length: ${base64Image.length}');
+          final bytes = base64Decode(base64Image);
+
+          // Add timestamp to filename to avoid caching issues
+          final timestamp = DateTime.now().millisecondsSinceEpoch;
+          final tempDir = await getTemporaryDirectory();
+          final tempFile = File('${tempDir.path}/signature_${widget.quotationId}_$timestamp.png');
+
+          // Delete any existing signature files for this quotation ID
+          final dir = Directory(tempDir.path);
+          await for (final file in dir.list()) {
+            if (file.path.contains('signature_${widget.quotationId}') && file.path != tempFile.path) {
+              try {
+                await file.delete();
+                log('Deleted old signature file: ${file.path}');
+              } catch (e) {
+                log('Error deleting old signature file: $e');
+              }
+            }
+          }
+
+          await tempFile.writeAsBytes(bytes);
+          log('Signature file written to: ${tempFile.path}');
+
+          if (await tempFile.exists()) {
+            setState(() {
+              _signatureImage = tempFile;
+              _showSaveButton = false;
+            });
+            log('Signature image set successfully');
+          } else {
+            log('Signature file does not exist after writing');
+          }
+        } else {
+          log('No signature found in Odoo response or signature is null/false');
+          setState(() {
+            _signatureImage = null;
+            _showSaveButton = false;
+          });
+        }
+      } catch (e) {
+        log('Error loading existing signature: $e');
+        setState(() {
+          _signatureImage = null;
+          _showSaveButton = false;
+        });
+      }
+    }
+  }
   Widget _buildEditableInfoRow(
       String label,
       TextEditingController controller, {
