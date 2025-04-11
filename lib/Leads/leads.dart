@@ -2699,6 +2699,7 @@ class _LeadsState extends State<Leads> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
+        iconTheme: IconThemeData(color: Colors.white),
         title: isSearching
             ? TextField(
           controller: searchController,
@@ -2716,12 +2717,12 @@ class _LeadsState extends State<Leads> {
             contentPadding: const EdgeInsets.symmetric(horizontal: 16),
           ),
         )
-            : const Text("Leads"),
+            : const Text("Leads",style: TextStyle(color: Colors.white),),
         elevation: 0,
         backgroundColor: const Color(0xFF9EA700),
         actions: [
           IconButton(
-            icon: Icon(isSearching ? Icons.close : Icons.search),
+            icon: Icon(isSearching ? Icons.close : Icons.search,color: Colors.white,),
             onPressed: () {
               setState(() {
                 if (isSearching) {
@@ -2735,7 +2736,7 @@ class _LeadsState extends State<Leads> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.filter_list),
+            icon: const Icon(Icons.filter_list,color: Colors.white,),
             onPressed: () => showFilterDialog(context),
           ),
         ],
@@ -2754,7 +2755,18 @@ class _LeadsState extends State<Leads> {
                 color: Color(0xFF9EA700),
                 size: 100,
               ),
-            )
+            ):
+      leadsList.isEmpty
+          ? Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Center(child: Image.asset('assets/nodata.png')),
+          Text(
+            "No data to display",
+            style: TextStyle(color: Colors.blueGrey),
+          ),
+        ],
+      )
           : Column(
               children: [
                 Divider(thickness: 2, color: Colors.grey.shade300),

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:animated_custom_dropdown/custom_dropdown.dart';
 import 'package:flutter/material.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:typed_data';
@@ -666,7 +667,7 @@ class _ActivityviewState extends State<Activityview> with SingleTickerProviderSt
         await fetchLeadDetails();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Lead updated successfully')),
+            SnackBar(backgroundColor:Color(0xFF9EA700),content: Text('Lead updated successfully',)),
           );
           setState(() => isEditing = false);
         }
@@ -691,8 +692,9 @@ class _ActivityviewState extends State<Activityview> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        iconTheme: IconThemeData(color: Colors.white),
         backgroundColor: Color(0xFF9EA700),
-        title: Text('Lead Details'),
+        title: Text('Lead Details',style: TextStyle(color: Colors.white),),
         actions: [
           IconButton(
             icon: Icon(isEditing ? Icons.save : Icons.edit),
@@ -717,7 +719,12 @@ class _ActivityviewState extends State<Activityview> with SingleTickerProviderSt
         ],
       ),
       body: isLoading
-          ? Center(child: CircularProgressIndicator(color: Color(0xFF9EA700)))
+          ? Center(
+        child: LoadingAnimationWidget.fourRotatingDots(
+          color: Color(0xFF9EA700),
+          size: 100,
+        ),
+      )
           : SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -1198,6 +1205,7 @@ class _ActivityviewState extends State<Activityview> with SingleTickerProviderSt
           decoration: BoxDecoration(
               border: Border(top: BorderSide(color: Colors.grey.shade300))),
           child: TabBar(
+            isScrollable: true,
             controller: _tabController,
             labelColor: Color(0xFF9EA700),
             unselectedLabelColor: Colors.grey.shade600,

@@ -1,6 +1,7 @@
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:animated_custom_dropdown/custom_dropdown.dart';
@@ -1347,7 +1348,7 @@ class _LeadviewState extends State<Leadview> {
         await leadData();
         setControllers();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Lead updated successfully')),
+          const SnackBar(backgroundColor:Color(0xFF9EA700),content: Text('Lead updated successfully')),
         );
         setState(() => isEditing = false);
       } else {
@@ -1398,7 +1399,8 @@ class _LeadviewState extends State<Leadview> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Lead Details'),
+        iconTheme: IconThemeData(color: Colors.white),
+        title: const Text('Lead Details',style: TextStyle(color: Colors.white),),
         backgroundColor: const Color(0xFF9EA700),
         actions: [
           IconButton(
@@ -1424,7 +1426,12 @@ class _LeadviewState extends State<Leadview> {
         ],
       ),
       body: isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+        child: LoadingAnimationWidget.fourRotatingDots(
+          color: Color(0xFF9EA700),
+          size: 100,
+        ),
+      )
           : SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(

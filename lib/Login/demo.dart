@@ -1416,6 +1416,7 @@ class _DemoState extends State<Demo> {
         ),
       ),
       appBar: AppBar(
+        iconTheme: IconThemeData(color: Colors.white),
         actions: [
           GestureDetector(
             onTap: () {

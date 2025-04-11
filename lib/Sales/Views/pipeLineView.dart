@@ -3,6 +3,7 @@ import 'dart:developer';
 import 'package:animated_custom_dropdown/custom_dropdown.dart';
 import 'package:cyllo_mobile/Sales/Views/quotationsView.dart';
 import 'package:flutter/material.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:typed_data';
@@ -185,9 +186,11 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
           );
         }
       }
-    }
-    if (mounted) {
-      setState(() => isLoading = false);
+      finally{
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
@@ -632,7 +635,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
         await fetchLeadDetails();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Lead updated successfully')),
+            SnackBar(backgroundColor:Color(0xFF9EA700),content: Text('Lead updated successfully')),
           );
           setState(() => isEditing = false);
         }
@@ -657,8 +660,9 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        iconTheme: IconThemeData(color: Colors.white),
         backgroundColor: Color(0xFF9EA700),
-        title: Text('Lead Details'),
+        title: Text('Lead Details',style: TextStyle(color: Colors.white),),
         actions: [
           IconButton(
             icon: Icon(isEditing ? Icons.save : Icons.edit),
@@ -683,7 +687,12 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
         ],
       ),
       body: isLoading
-          ? Center(child: CircularProgressIndicator(color: Color(0xFF9EA700)))
+          ? Center(
+        child: LoadingAnimationWidget.fourRotatingDots(
+          color: Color(0xFF9EA700),
+          size: 100,
+        ),
+      )
           : SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -870,7 +879,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
             ),
             hintText: 'Select Customer',
             items: partners.map<String>((data) => data['name'].toString()).toList(),
-            initialItem: selectedPartner,
+            initialItem: partners.isNotEmpty?selectedPartner:null,
             onChanged: (value) {
               setState(() => selectedPartner = value);
             },
@@ -901,7 +910,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
             ),
             hintText: 'Select Salesperson',
             items: salesPersons.map<String>((data) => data['name'].toString()).toList(),
-            initialItem: selectedSalesperson,
+            initialItem: salesPersons.isNotEmpty?selectedSalesperson:null,
             onChanged: (value) {
               setState(() => selectedSalesperson = value);
             },
@@ -1463,7 +1472,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
                           ),
                           hintText: 'Select State',
                           items: states.map<String>((data) => data['name'].toString()).toList(),
-                          initialItem: selectedState,
+                          initialItem: states.isNotEmpty?selectedState:null,
                           onChanged: (value) {
                             setState(() {
                               selectedState = value;
@@ -1490,7 +1499,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
                     ),
                     hintText: 'Select Country',
                     items: countries.map<String>((data) => data['name'].toString()).toList(),
-                    initialItem: selectedCountry,
+                    initialItem: countries.isNotEmpty?selectedCountry:null,
                     onChanged: (value) {
                       setState(() {
                         selectedCountry = value;
@@ -1546,7 +1555,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
                     ),
                     hintText: 'Select Campaign',
                     items: campaigns.map<String>((data) => data['name'].toString()).toList(),
-                    initialItem: selectedCampaign,
+                    initialItem: campaigns.isNotEmpty?selectedCampaign:null,
                     onChanged: (value) {
                       setState(() {
                         selectedCampaign = value;
@@ -1569,7 +1578,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
                     ),
                     hintText: 'Select Medium',
                     items: mediums.map<String>((data) => data['name'].toString()).toList(),
-                    initialItem: selectedMedium,
+                    initialItem: mediums.isNotEmpty?selectedMedium:null,
                     onChanged: (value) {
                       setState(() {
                         selectedMedium = value;
@@ -1598,7 +1607,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
                     ),
                     hintText: 'Select Source',
                     items: sources.map<String>((data) => data['name'].toString()).toList(),
-                    initialItem: selectedSource,
+                    initialItem: sources.isNotEmpty?selectedSource:null,
                     onChanged: (value) {
                       setState(() {
                         selectedSource = value;
@@ -1640,7 +1649,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
                     ),
                     hintText: 'Select Company',
                     items: companies.map<String>((data) => data['name'].toString()).toList(),
-                    initialItem: selectedCompany,
+                    initialItem: companies.isNotEmpty?selectedCompany:null,
                     onChanged: (value) {
                       setState(() {
                         selectedCompany = value;
@@ -1663,7 +1672,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> with SingleTickerProvid
                     ),
                     hintText: 'Select Sales Team',
                     items: salesTeams.map<String>((data) => data['name'].toString()).toList(),
-                    initialItem: selectedSalesTeam,
+                    initialItem: salesTeams.isNotEmpty?selectedSalesTeam:null,
                     onChanged: (value) {
                       setState(() {
                         selectedSalesTeam = value;

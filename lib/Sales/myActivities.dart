@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_flutter_calendar/calendar.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datagrid/datagrid.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 import '../getUserImage.dart';
 import 'Views/activityView.dart';
 import 'Views/pipeLineView.dart';
@@ -129,6 +130,9 @@ class _MyactivityState extends State<Myactivity> {
   }
 
   Future<void> initializeOdooClient() async {
+    setState(() {
+      isLoading = true;
+    });
     final prefs = await SharedPreferences.getInstance();
     final baseUrl = prefs.getString("urldata") ?? "";
     final dbName = prefs.getString("selectedDatabase") ?? "";
@@ -469,9 +473,9 @@ class _MyactivityState extends State<Myactivity> {
   Future<void> fetchFilteredData() async {
     if (client == null) return;
 
-    setState(() {
-      isLoading = true;
-    });
+    // setState(() {
+    //   isLoading = true;
+    // });
 
     try {
       await pipe();
@@ -479,7 +483,7 @@ class _MyactivityState extends State<Myactivity> {
     } catch (e) {
       log("Error fetching filtered data: $e");
       setState(() {
-        isLoading = false;
+        // isLoading = false;
         showNoDataMessage = true;
       });
     }
@@ -761,6 +765,7 @@ class _MyactivityState extends State<Myactivity> {
             'type',
             'prorated_revenue',
             'user_id',
+            'phone',
           ],
         }
       });
@@ -1021,6 +1026,40 @@ class _MyactivityState extends State<Myactivity> {
       ),
     );
   }
+
+
+  void openEmail(BuildContext context, Map<String, dynamic> lead) {
+    if (lead['email_from'] != null && lead['email_from'].toString().isNotEmpty) {
+      final Uri params = Uri(
+        scheme: 'mailto',
+        path: lead['email_from'].toString(),
+        query:
+        'subject=Email Regarding Your Inquiry&body=Hi,\n\nPlease let me know if you need more information about the product.\n\nBest regards,\n[Name,Mobile]',
+      );
+      final url = params.toString();
+      launchUrlString(url);
+    } else {
+      var snackBar = SnackBar(content: Text('Email not Found'));
+      ScaffoldMessenger.of(context).showSnackBar(snackBar);
+    }
+  }
+  void openMessage(BuildContext context, Map<String, dynamic> lead) async {
+    if (lead['phone'] != null && lead['phone'].toString().isNotEmpty) {
+      final Uri params = Uri(
+        scheme: 'sms',
+        path: lead['phone'].toString(),
+        queryParameters: {
+          'body': 'Hello, I\'m following up on your recent inquiry. How can I assist you today?'
+        },
+      );
+      final url = params.toString();
+      await launchUrlString(url);
+    } else {
+      var snackBar = SnackBar(content: Text('Number not Found'));
+      ScaffoldMessenger.of(context).showSnackBar(snackBar);
+    }
+  }
+
 
   Widget listCard() {
     return activitiesList.isEmpty
@@ -1380,7 +1419,9 @@ class _MyactivityState extends State<Myactivity> {
                             color: Colors.black,
                           ),
                           label: Text('Email'),
-                          onPressed: () {},
+                          onPressed: () {
+                            openEmail(context, lead);
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor:
                             Color(0xFF9EA700).withOpacity(0.15),
@@ -1401,7 +1442,9 @@ class _MyactivityState extends State<Myactivity> {
                             color: Colors.black,
                           ),
                           label: Text('Message'),
-                          onPressed: () {},
+                          onPressed: () {
+                            openMessage(context, lead);
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor:
                             Color(0xFF9EA700).withOpacity(0.15),
@@ -3204,6 +3247,7 @@ class _MyactivityState extends State<Myactivity> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        iconTheme: IconThemeData(color: Colors.white),
         title: isSearching
             ? TextField(
           controller: searchController,
@@ -3221,12 +3265,12 @@ class _MyactivityState extends State<Myactivity> {
             contentPadding: const EdgeInsets.symmetric(horizontal: 16),
           ),
         )
-            : const Text("Activities"),
+            : const Text("Activities",style: TextStyle(color: Colors.white),),
         elevation: 0,
         backgroundColor: const Color(0xFF9EA700),
         actions: [
           IconButton(
-            icon: Icon(isSearching ? Icons.close : Icons.search),
+            icon: Icon(isSearching ? Icons.close : Icons.search,color: Colors.white,),
             onPressed: () {
               setState(() {
                 if (isSearching) {
@@ -3240,7 +3284,7 @@ class _MyactivityState extends State<Myactivity> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.filter_list),
+            icon: const Icon(Icons.filter_list,color: Colors.white,),
             onPressed: () => showFilterDialog(context),
           ),
         ],
@@ -3254,7 +3298,16 @@ class _MyactivityState extends State<Myactivity> {
         ),
       )
           : leadsList.isEmpty
-          ? const Center(child: Text('No data found'))
+          ? Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Center(child: Image.asset('assets/nodata.png')),
+          Text(
+            "No data to display",
+            style: TextStyle(color: Colors.blueGrey),
+          ),
+        ],
+      )
           :Column(
         children: [
           Divider(thickness: 2, color: Colors.grey.shade300),

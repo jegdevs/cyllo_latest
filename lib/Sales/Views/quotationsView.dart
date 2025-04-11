@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -66,6 +67,7 @@ class _QuotationPageState extends State<QuotationPage> {
   List<Map<String, dynamic>> mediums = [];
   List<Map<String, dynamic>> sources = [];
   List<Map<String, dynamic>> salesP = [];
+  List<Map<String, dynamic>> taxes = [];
 
   @override
   void initState() {
@@ -119,11 +121,12 @@ class _QuotationPageState extends State<QuotationPage> {
         await fetchDropdownData();
         _updateControllers();
         await _loadExistingSignature();
+        await fetchTaxes();
       } catch (e) {
         print("Odoo Authentication Failed: $e");
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Failed to connect to Odoo: $e")),
+            SnackBar(backgroundColor:Colors.red,content: Text("Failed to connect to Odoo: $e")),
           );
         }
       }
@@ -373,8 +376,6 @@ class _QuotationPageState extends State<QuotationPage> {
         'date_order': quotationDateController.text.isNotEmpty ? quotationDateController.text : false,
         'user_id': selectedSalesPersonId,
       };
-
-      // Conditionally include fields that can be updated in 'draft' or 'sent' states only
       if (orderState == 'draft' || orderState == 'sent') {
         updatedData.addAll({
           'pricelist_id': getIdFromList(pricelists,
@@ -434,14 +435,14 @@ class _QuotationPageState extends State<QuotationPage> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Changes saved successfully')),
+          const SnackBar(backgroundColor:Color(0xFF9EA700),content: Text('Changes saved successfully')),
         );
       }
     } catch (e) {
       log("Error saving changes: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving changes: $e')),
+          SnackBar(backgroundColor:Colors.red,content: Text('Error saving changes: $e')),
         );
       }
     } finally {
@@ -552,13 +553,26 @@ class _QuotationPageState extends State<QuotationPage> {
         'kwargs': {
           'fields': [
             'product_id', 'name', 'product_uom_qty', 'product_uom', 'product_packaging_qty',
-            'product_packaging_id', 'price_unit', 'tax_id', 'price_subtotal'
+            'product_packaging_id', 'price_unit', 'tax_id', 'price_subtotal','price_tax',
           ],
         },
       });
       if (response is List && mounted) {
         setState(() {
-          orderLines = List<Map<String, dynamic>>.from(response);
+          orderLines = List<Map<String, dynamic>>.from(response).map((line) {
+            if (line['product_id'] is int) {
+              line['product_id'] = [line['product_id'], 'N/A'];
+            }
+
+            if (line['tax_id'] is int) {
+              line['tax_id'] = [[line['tax_id'], 'N/A']];
+            } else if (line['tax_id'] is List && line['tax_id'].isNotEmpty && line['tax_id'][0] is int) {
+              line['tax_id'] = line['tax_id'].map((taxId) => [taxId, 'N/A']).toList(); // Fallback
+            }
+
+            return line;
+          }).toList();
+          updateTotals();
         });
       }
     } catch (e) {
@@ -573,7 +587,7 @@ class _QuotationPageState extends State<QuotationPage> {
         'method': 'search_read',
         'args': [],
         'kwargs': {
-          'fields': ['name', 'id', 'default_code'],
+          'fields': ['name', 'id', 'default_code','base_unit_price'],
           'limit': 50,
         },
       });
@@ -585,6 +599,34 @@ class _QuotationPageState extends State<QuotationPage> {
     } catch (e) {
       print("Error fetching products: $e");
     }
+  }
+
+  double calculateUntaxedAmount() {
+    return orderLines.fold(0.0, (sum, line) => sum + (line['price_subtotal'] ?? 0.0));
+  }
+
+  double calculateTaxAmount() {
+    double totalTax = 0.0;
+    for (var line in orderLines) {
+      totalTax += (line['price_tax'] ?? 0.0); // Sum the price_tax for each line
+    }
+    return double.parse(totalTax.toStringAsFixed(2));
+  }
+
+  double calculateTotalAmount() {
+    return calculateUntaxedAmount() + calculateTaxAmount();
+  }
+
+  double untaxedAmount = 0.0;
+  double taxAmount = 0.0;
+  double totalAmount = 0.0;
+
+  void updateTotals() {
+    setState(() {
+      untaxedAmount = calculateUntaxedAmount();
+      taxAmount = calculateTaxAmount();
+      totalAmount = calculateTotalAmount();
+    });
   }
 
   Future<void> fetchOptionalProducts() async {
@@ -647,6 +689,14 @@ class _QuotationPageState extends State<QuotationPage> {
   Future<void> addProductToOrderLine(String productId) async {
     if (client == null) return;
     try {
+
+      final product = products.firstWhere(
+            (p) => p['id'].toString() == productId,
+        orElse: () => throw Exception('Product not found'),
+      );
+
+      final basePrice = product['base_unit_price'] ?? 0.0;
+
       await client!.callKw({
         'model': 'sale.order.line',
         'method': 'create',
@@ -655,7 +705,7 @@ class _QuotationPageState extends State<QuotationPage> {
             'order_id': widget.quotationId,
             'product_id': int.parse(productId),
             'product_uom_qty': 1.0,
-            'price_unit': 0.0,
+            'price_unit': basePrice,
           }
         ],
         'kwargs': {},
@@ -666,6 +716,29 @@ class _QuotationPageState extends State<QuotationPage> {
       );
     } catch (e) {
       print("Error adding product to order line: $e");
+    }
+  }
+
+  Future<void> fetchTaxes() async {
+    if (client == null) return;
+    try {
+      final response = await client!.callKw({
+        'model': 'account.tax',
+        'method': 'search_read',
+        'args': [],
+        'kwargs': {
+          'fields': ['id', 'name', 'amount'],
+          'limit': 50,
+        },
+      });
+      print('taxxx$response');
+      if (response is List) {
+        setState(() {
+          taxes = List<Map<String, dynamic>>.from(response);
+        });
+      }
+    } catch (e) {
+      print("Error fetching taxes: $e");
     }
   }
 
@@ -697,6 +770,7 @@ class _QuotationPageState extends State<QuotationPage> {
       await saveChanges();
       if (selectedProductId != null) {
         await addProductToOrderLine(selectedProductId!);
+        await fetchOrderLines();
         setState(() => selectedProductId = null);
       }
       if (selectedOptionalProductId != null) {
@@ -741,7 +815,6 @@ class _QuotationPageState extends State<QuotationPage> {
     try {
       setState(() => isLoading = true);
 
-      // Ensure the quotation exists and is in draft state
       final quotationCheck = await client?.callKw({
         'model': 'sale.order',
         'method': 'read',
@@ -799,7 +872,7 @@ class _QuotationPageState extends State<QuotationPage> {
             'composition_mode': 'comment',
             'force_send': true,
             'email_layout_xmlid': 'mail.mail_notification_layout_with_responsible_signature',
-            'partner_ids': [[6, 0, [partnerId]]], // Use partner_id from sale.order
+            'partner_ids': [[6, 0, [partnerId]]],
           }
         ],
         'kwargs': {},
@@ -826,7 +899,7 @@ class _QuotationPageState extends State<QuotationPage> {
         );
       }
 
-      // If the quotation was in draft state, mark it as sent
+
       if (currentState == 'draft') {
         await client?.callKw({
           'model': 'sale.order',
@@ -951,7 +1024,9 @@ class _QuotationPageState extends State<QuotationPage> {
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF9EA700),
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
           child: const Text('CREATE INVOICE'),
         ),
@@ -966,8 +1041,12 @@ class _QuotationPageState extends State<QuotationPage> {
               );
             }
           },
-          style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.grey
+          style: ElevatedButton.styleFrom(
+            foregroundColor: Colors.grey,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           ),
           child: const Text('SEND BY EMAIL'),
         ),
@@ -979,8 +1058,11 @@ class _QuotationPageState extends State<QuotationPage> {
             //   const SnackBar(content: Text('Preview clicked')),
             // );
           },
-          style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.grey
+          style:OutlinedButton.styleFrom(
+            foregroundColor: Colors.grey,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
           child: const Text('PREVIEW'),
         ),
@@ -999,7 +1081,10 @@ class _QuotationPageState extends State<QuotationPage> {
             }
           },
           style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.grey
+            foregroundColor: Colors.grey,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
           child: const Text('CANCEL'),
         ),
@@ -1022,7 +1107,9 @@ class _QuotationPageState extends State<QuotationPage> {
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF9EA700),
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
           child: const Text('CONFIRM'),
         ),
@@ -1038,7 +1125,10 @@ class _QuotationPageState extends State<QuotationPage> {
             }
           },
           style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.grey
+            foregroundColor: Colors.grey,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
           child: const Text('SEND BY EMAIL'),
         ),
@@ -1051,7 +1141,10 @@ class _QuotationPageState extends State<QuotationPage> {
             // );
           },
           style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.grey
+            foregroundColor: Colors.grey,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
           child: const Text('PREVIEW'),
         ),
@@ -1070,7 +1163,10 @@ class _QuotationPageState extends State<QuotationPage> {
             }
           },
           style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.grey
+            foregroundColor: Colors.grey,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
           child: const Text('CANCEL'),
         ),
@@ -1079,9 +1175,9 @@ class _QuotationPageState extends State<QuotationPage> {
       buttons.addAll([
         OutlinedButton(
           onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Preview clicked')),
-            );
+            // ScaffoldMessenger.of(context).showSnackBar(
+            //   const SnackBar(content: Text('Preview clicked')),
+            // );
           },
           child: const Text('PREVIEW'),
         ),
@@ -1095,7 +1191,7 @@ class _QuotationPageState extends State<QuotationPage> {
               }
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Odoo client not initialized')),
+                const SnackBar(backgroundColor:Colors.red,content: Text('Odoo client not initialized')),
               );
             }
           },
@@ -1187,7 +1283,7 @@ class _QuotationPageState extends State<QuotationPage> {
       log(" Error in Cancel Order: $e");
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error cancelling sale order: $e')),
+          SnackBar(backgroundColor:Colors.red,content: Text('Error cancelling sale order: $e')),
         );
       }
       return false;
@@ -1241,7 +1337,7 @@ class _QuotationPageState extends State<QuotationPage> {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error confirming sale order: $e')),
+          SnackBar(backgroundColor:Colors.red,content: Text('Error confirming sale order: $e')),
         );
       }
       return false;
@@ -1297,7 +1393,7 @@ class _QuotationPageState extends State<QuotationPage> {
       log(" Error setting order to draft: $e");
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error setting order to draft: $e')),
+          SnackBar(backgroundColor:Colors.red,content: Text('Error setting order to draft: $e')),
         );
       }
       return false;
@@ -1422,7 +1518,7 @@ class _QuotationPageState extends State<QuotationPage> {
                         if (context.mounted) {
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Invoice created successfully'), backgroundColor: Color(0xFF9EA700)),
+                            const SnackBar(backgroundColor:Color(0xFF9EA700),content: Text('Invoice created successfully')),
                           );
                         }
                         await fetchQuotationDetails();
@@ -1431,13 +1527,13 @@ class _QuotationPageState extends State<QuotationPage> {
                         if (context.mounted) {
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Invalid Operation \n Cannot create an invoice.No items are available')),
+                            SnackBar(backgroundColor:Colors.red,content: Text('Invalid Operation \n Cannot create an invoice.No items are available')),
                           );
                         }
                       }
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Odoo client not initialized')),
+                        const SnackBar(backgroundColor:Colors.red,content: Text('Odoo client not initialized')),
                       );
                     }
                   },
@@ -1457,19 +1553,24 @@ class _QuotationPageState extends State<QuotationPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
+        iconTheme: IconThemeData(color: Colors.white),
         backgroundColor: const Color(0xFF9EA700),
         elevation: 0,
-        title: const Text('Quotation Details'),
+        title: const Text('Quotation Details',style: TextStyle(color: Colors.white),),
         actions: [
           IconButton(
             icon: Icon(isEditMode ? Icons.save : Icons.edit),
             onPressed: toggleEditMode,
-            color: Colors.black,
           ),
         ],
       ),
       body: isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF9EA700)))
+          ? Center(
+        child: LoadingAnimationWidget.fourRotatingDots(
+          color: Color(0xFF9EA700),
+          size: 100,
+        ),
+      )
           : SafeArea(
         child: SingleChildScrollView(
           child: Column(
@@ -1637,20 +1738,79 @@ class _QuotationPageState extends State<QuotationPage> {
                   ],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    const Text('TOTAL:', style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(width: 8),
-                    Text(
-                      '\$${_toString(quotationData['amount_total'], defaultValue: '0.00')}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.2),
+                      spreadRadius: 2,
+                      blurRadius: 5,
+                      offset: const Offset(0, 2),
                     ),
                   ],
                 ),
-              ),
+                padding: const EdgeInsets.all(20.0),
+                margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const SizedBox(height: 7),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Untaxed Amount',
+                          style: TextStyle(color: Colors.black54),
+                        ),
+                        Text(
+                          '\$${untaxedAmount.toStringAsFixed(2)}',
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Tax (15%)',
+                          style: TextStyle(color: Colors.black54),
+                        ),
+                        Text(
+                          '\$${taxAmount.toStringAsFixed(2)}',
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12.0),
+                      child: Divider(thickness: 1),
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Total',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        Text(
+                          '\$${totalAmount.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            color: Color(0xFF9EA700),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              )
             ],
           ),
         ),
@@ -1690,6 +1850,19 @@ class _QuotationPageState extends State<QuotationPage> {
               ),
               if (orderLines.isNotEmpty)
                 ...orderLines.map((line) {
+                  String taxPercentage = '0.00%';
+                  if (line['tax_id'] is List && line['tax_id'].isNotEmpty) {
+                    double totalTaxRate = 0.0;
+                    for (var taxId in line['tax_id']) {
+                      final tax = taxes.firstWhere(
+                            (t) => t['id'] == taxId[0],
+                        orElse: () => {'amount': 0.0},
+                      );
+                      totalTaxRate += tax['amount'] ?? 0.0;
+                    }
+                    taxPercentage = '${(totalTaxRate / (line['tax_id'].length)).toStringAsFixed(2)}%';
+                  }
+                  print("Displaying order line: $line");
                   return Container(
                     padding: const EdgeInsets.symmetric(vertical: 12.0),
                     decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Colors.grey.shade200))),
@@ -1713,11 +1886,7 @@ class _QuotationPageState extends State<QuotationPage> {
                             child: Text(_toString(line['price_unit'], defaultValue: '0.00'),
                                 style: const TextStyle(fontSize: 14))),
                         Expanded(
-                            child: Text(
-                                line['tax_id'] is List
-                                    ? line['tax_id'].map((tax) => _toString(tax)).join(', ')
-                                    : 'N/A',
-                                style: const TextStyle(fontSize: 14))),
+                            child: Text(taxPercentage, style: const TextStyle(fontSize: 14))),
                         Expanded(
                             child: Text('\$${_toString(line['price_subtotal'], defaultValue: '0.00')}',
                                 style: const TextStyle(fontSize: 14))),
@@ -1770,11 +1939,6 @@ class _QuotationPageState extends State<QuotationPage> {
                       Expanded(child: Container()),
                       Expanded(child: Container()),
                       Expanded(child: Container()),
-                      Expanded(
-                          child: const Text('Add a note',
-                              style: TextStyle(color: Color(0xFF9EA700), fontWeight: FontWeight.w500))),
-                      const Text('Catalog',
-                          style: TextStyle(color: Color(0xFF9EA700), fontWeight: FontWeight.w500)),
                     ],
                   ),
                 ),
@@ -2134,30 +2298,6 @@ class _QuotationPageState extends State<QuotationPage> {
 
   File? _signatureImage;
 
-  // Widget _buildCustomerSignatureTab() {
-  //   return Padding(
-  //     padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-  //     child: Column(
-  //       crossAxisAlignment: CrossAxisAlignment.start,
-  //       children: [
-  //         const Text('Customer Signature', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-  //         const SizedBox(height: 16),
-  //         Container(
-  //           height: 150,
-  //           width: double.infinity,
-  //           decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(8)),
-  //           child: const Center(child: Text('Signature area (Not implemented)', style: TextStyle(color: Colors.black54))),
-  //         ),
-  //         const SizedBox(height: 16),
-  //         ElevatedButton(
-  //           onPressed: () {},
-  //           style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9EA700), foregroundColor: Colors.white),
-  //           child: const Text('Add Signature'),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
   Widget _buildCustomerSignatureTab() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),

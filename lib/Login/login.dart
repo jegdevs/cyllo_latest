@@ -154,6 +154,7 @@ class _LoginState extends State<Login> {
       final baseUrl = urlController.text.trim();
       client = OdooClient(baseUrl);
       final response = await client!.callRPC('/web/database/list', 'call', {});
+      print('Response from server: $response');
       final dbList = response as List<dynamic>;
       setState(() {
         dropdownItems = dbList

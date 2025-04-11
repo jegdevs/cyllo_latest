@@ -1010,6 +1010,7 @@ class _CustomersState extends State<Customers> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
+        iconTheme: IconThemeData(color: Colors.white),
         title: isSearching
             ? TextField(
           controller: searchController,
@@ -1027,12 +1028,12 @@ class _CustomersState extends State<Customers> {
             contentPadding: const EdgeInsets.symmetric(horizontal: 16),
           ),
         )
-            : const Text("Customers"),
+            : const Text("Customers",style: TextStyle(color: Colors.white),),
         elevation: 0,
         backgroundColor: const Color(0xFF9EA700),
         actions: [
           IconButton(
-            icon: Icon(isSearching ? Icons.close : Icons.search),
+            icon: Icon(isSearching ? Icons.close : Icons.search,color: Colors.white,),
             onPressed: () {
               setState(() {
                 if (isSearching) {
@@ -1046,7 +1047,7 @@ class _CustomersState extends State<Customers> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.filter_list),
+            icon: const Icon(Icons.filter_list,color: Colors.white,),
             onPressed: () => showFilterDialog(context),
           ),
         ],

@@ -150,6 +150,7 @@ class _SalesTeamState extends State<SalesTeam> {
           'fields': ['id', 'name', 'invoiced_target'],
         },
       });
+      print("ckkkkk$teamsResponse");
 
       if (teamsResponse != null) {
         List<dynamic> updatedTeams = [];
@@ -430,6 +431,7 @@ class _SalesTeamState extends State<SalesTeam> {
         'start': startDate,
         'end': endDate.add(Duration(days: 1)),
       });
+      print('date ranegeee$label');
     }
 
     return result;
@@ -539,6 +541,7 @@ class _SalesTeamState extends State<SalesTeam> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        iconTheme: IconThemeData(color: Colors.white),
         // title: const Text('Sales Teams'),
         backgroundColor: Color(0xFF9EA700),
         elevation: 4,
@@ -563,13 +566,13 @@ class _SalesTeamState extends State<SalesTeam> {
             : Text(
                 'Sales Teams', // Creative title
                 style: TextStyle(
-                  color: Colors.black,
+                  color: Colors.white,
                   letterSpacing: 1.2,
                 ),
               ),
         actions: [
           IconButton(
-            icon: Icon(isSearching ? Icons.close : Icons.search),
+            icon: Icon(isSearching ? Icons.close : Icons.search,color: Colors.white,),
             color: Colors.black,
             onPressed: () {
               setState(() {
@@ -583,7 +586,7 @@ class _SalesTeamState extends State<SalesTeam> {
             },
           ),
           IconButton(
-            icon: Icon(Icons.filter_list),
+            icon: Icon(Icons.filter_list,color: Colors.white,),
             color: Colors.black,
             onPressed: () => showFilterDialog(context),
           ),
@@ -606,7 +609,16 @@ class _SalesTeamState extends State<SalesTeam> {
               ),
             )
           : salesTeams.isEmpty
-              ? const Center(child: Text('No sales teams found'))
+              ? Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Center(child: Image.asset('assets/nodata.png')),
+          Text(
+            "No sales team found",
+            style: TextStyle(color: Colors.blueGrey),
+          ),
+        ],
+      )
               : SingleChildScrollView(
                   child: Column(
                     children: salesTeams
@@ -624,12 +636,16 @@ class _SalesTeamState extends State<SalesTeam> {
     final teamData = team as Map<String, dynamic>;
     print('Building team section with data: $teamData');
 
+    final barGroups = teamData['barGroups'] as List<BarChartGroupData>? ?? [];
+    final hasGraphData = barGroups.isNotEmpty &&
+        barGroups.any((group) => group.barRods.any((rod) => rod.toY > 0));
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         buildSalesCard(teamData),
         const SizedBox(height: 16),
-        if (teamData['hasBarData'] == true) buildGraphCard(teamData),
+        if (hasGraphData) buildGraphCard(teamData),
         const SizedBox(height: 16),
         buildInvoicingCard(
           teamData['name'] ?? 'Unknown Team',
@@ -881,7 +897,7 @@ class _SalesTeamState extends State<SalesTeam> {
           children: [
             Text(
               title,
-              style: TextStyle(color: Colors.grey[700]),
+              style: TextStyle(color:  Color(0xFF9EA700),),
             ),
             Text(
               amount,

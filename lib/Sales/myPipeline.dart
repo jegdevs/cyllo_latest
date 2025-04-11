@@ -137,6 +137,7 @@ class _MypipelineState extends State<Mypipeline> {
   }
 
   Future<void> initializeOdooClient() async {
+    setState(() => isLoading = true);
     final prefs = await SharedPreferences.getInstance();
     final baseUrl = prefs.getString("urldata") ?? "";
     final dbName = prefs.getString("selectedDatabase") ?? "";
@@ -493,9 +494,9 @@ class _MypipelineState extends State<Mypipeline> {
   Future<void> fetchFilteredData() async {
     if (client == null) return;
 
-    setState(() {
-      isLoading = true;
-    });
+    // setState(() {
+    //   isLoading = true;
+    // });
 
     try {
       await pipe();
@@ -504,7 +505,7 @@ class _MypipelineState extends State<Mypipeline> {
     } catch (e) {
       log("Error fetching filtered data: $e");
       setState(() {
-        isLoading = false;
+        // isLoading = false;
         showNoDataMessage = true;
       });
     }
@@ -1141,18 +1142,21 @@ class _MypipelineState extends State<Mypipeline> {
     }
 
     return leadsList.isEmpty
-        ? Center(
-            child: Text(
-              "No leads found",
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-          )
+        ? Column(
+      children: [
+        Center(child: Image.asset('assets/nodata.png')),
+        Text(
+          "No data to display",
+          style: TextStyle(color: Colors.blueGrey),
+        ),
+      ],
+    )
         : ListView.builder(
             itemCount: leadsList.length,
             padding: EdgeInsets.all(8),
             itemBuilder: (context, index) {
               final lead = leadsList[index];
-              
+
               final leadId = lead['id'];
               final name = lead['name'] ?? '';
               final revenue = lead['expected_revenue']?.toString() ?? '';
@@ -1592,7 +1596,7 @@ class _MypipelineState extends State<Mypipeline> {
     final TextEditingController emailController = TextEditingController();
     final TextEditingController phoneController = TextEditingController();
     final TextEditingController revenueController = TextEditingController();
-    String? selectedFrequency; // Maps to recurring_plan
+    String? selectedFrequency;
     final TextEditingController recurringRevenueController = TextEditingController(text: "0.00");
 
     // Fetch partners for the dropdown
@@ -1648,7 +1652,8 @@ class _MypipelineState extends State<Mypipeline> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        int starRating = 0; // Local state for star rating
+        int starRating = 0;
+        bool isLoading = false;
         return Dialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           child: Container(
@@ -1973,7 +1978,11 @@ class _MypipelineState extends State<Mypipeline> {
                             children: [
                               Expanded(
                                 child: ElevatedButton(
-                                  onPressed: () async {
+                                  onPressed: isLoading? null: () async {
+                                    setState(() {
+                                      isLoading = true;  // Show loading indicator
+                                    });
+
                                     // Fetch stage_id based on group name
                                     int? stageId = await _getStageId(columnData.headerData.groupName);
                                     if (stageId == null) {
@@ -2015,13 +2024,25 @@ class _MypipelineState extends State<Mypipeline> {
                                     };
                                     log('New Lead: $newLead');
                                     final response = await _addLeadToOdoo(newLead);
+                                    setState(() {
+                                      isLoading = false;  // Hide loading indicator
+                                    });
                                     Navigator.pop(context); // Close the dialog after adding
                                   },
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Color(0xFFAFBA00),
                                     padding: EdgeInsets.symmetric(vertical: 12),
                                   ),
-                                  child: Text(
+                                  child: isLoading
+                                      ? SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                      : Text(
                                     "Add",
                                     style: TextStyle(color: Colors.white),
                                   ),
@@ -3459,6 +3480,7 @@ class _MypipelineState extends State<Mypipeline> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        iconTheme: IconThemeData(color: Colors.white),
         title: isSearching
             ? TextField(
           controller: searchController,
@@ -3476,12 +3498,12 @@ class _MypipelineState extends State<Mypipeline> {
             contentPadding: const EdgeInsets.symmetric(horizontal: 16),
           ),
         )
-            : const Text("Pipeline"),
+            : const Text("Pipeline",style: TextStyle(color: Colors.white),),
         elevation: 0,
         backgroundColor: const Color(0xFF9EA700),
         actions: [
           IconButton(
-            icon: Icon(isSearching ? Icons.close : Icons.search),
+            icon: Icon(isSearching ? Icons.close : Icons.search,color: Colors.white,),
             onPressed: () {
               setState(() {
                 if (isSearching) {
@@ -3495,7 +3517,7 @@ class _MypipelineState extends State<Mypipeline> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.filter_list),
+            icon: const Icon(Icons.filter_list,color: Colors.white,),
             onPressed: () => showFilterDialog(context),
           ),
         ],
@@ -3509,7 +3531,16 @@ class _MypipelineState extends State<Mypipeline> {
         ),
       )
           : leadsList.isEmpty
-          ? const Center(child: Text('No data found'))
+          ? Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Center(child: Image.asset('assets/nodata.png')),
+          Text(
+            "No data to display",
+            style: TextStyle(color: Colors.blueGrey),
+          ),
+        ],
+      )
           :
       Column(
         children: [
@@ -3740,7 +3771,12 @@ class _SalesDataGridWidgetState extends State<SalesDataGridWidget> {
       processing = false;
     }
     if (isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(
+        child: LoadingAnimationWidget.fourRotatingDots(
+          color: Color(0xFF9EA700),
+          size: 65,
+        ),
+      );
     }
 
     return SfDataGrid(

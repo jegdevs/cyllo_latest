@@ -2557,7 +2557,7 @@ class _MyquotationsState extends State<Myquotations> {
     return SfDataGrid(
       rowHeight: 60,
       source:
-          QuotationsDataSource(filteredQuotations, activityTypes, profileImage),
+          QuotationsDataSource(filteredQuotations, activityTypes, profileImage,context),
       columnWidthMode: ColumnWidthMode.fill,
       gridLinesVisibility: GridLinesVisibility.both,
       headerGridLinesVisibility: GridLinesVisibility.both,
@@ -2606,6 +2606,7 @@ class _MyquotationsState extends State<Myquotations> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        iconTheme: IconThemeData(color: Colors.white),
         title: isSearching
             ? TextField(
           controller: searchController,
@@ -2623,12 +2624,12 @@ class _MyquotationsState extends State<Myquotations> {
             contentPadding: const EdgeInsets.symmetric(horizontal: 16),
           ),
         )
-            : const Text("Quotations"),
+            : const Text("Quotations",style: TextStyle(color: Colors.white),),
         elevation: 0,
         backgroundColor: const Color(0xFF9EA700),
         actions: [
           IconButton(
-            icon: Icon(isSearching ? Icons.close : Icons.search),
+            icon: Icon(isSearching ? Icons.close : Icons.search,color: Colors.white,),
             onPressed: () {
               setState(() {
                 if (isSearching) {
@@ -2642,13 +2643,31 @@ class _MyquotationsState extends State<Myquotations> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.filter_list),
+            icon: const Icon(Icons.filter_list,color: Colors.white,),
             onPressed: () => showFilterDialog(context),
           ),
         ],
       ),
       backgroundColor: Colors.white,
-      body: Column(
+      body: isLoading
+          ? Center(
+        child: LoadingAnimationWidget.fourRotatingDots(
+          color: Color(0xFF9EA700),
+          size: 100,
+        ),
+      )
+          : leadsList.isEmpty
+          ? Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Center(child: Image.asset('assets/nodata.png')),
+          Text(
+            "No data to display",
+            style: TextStyle(color: Colors.blueGrey),
+          ),
+        ],
+      ):
+      Column(
         children: [
           Divider(thickness: 2, color: Colors.grey.shade300),
           Padding(
@@ -2734,9 +2753,10 @@ class QuotationsDataSource extends DataGridSource {
   List<DataGridRow> dataGridRows = [];
   final List<String> activityTypes;
   final Uint8List? currentUserImage;
+  final BuildContext context;
 
   QuotationsDataSource(List<Map<String, dynamic>> quotationsList,
-      this.activityTypes, this.currentUserImage) {
+      this.activityTypes, this.currentUserImage,this.context,) {
     dataGridRows = quotationsList.map<DataGridRow>((quotation) {
       Map<String, dynamic> quotationData = {
         'name': quotation['name'] ?? 'None',
@@ -2748,6 +2768,7 @@ class QuotationsDataSource extends DataGridSource {
             quotation['partner_id'] != null && quotation['partner_id'] is List
                 ? quotation['partner_id'][1].toString()
                 : 'None',
+        'id': quotation['id'],
       };
 
       for (var type in activityTypes) {
@@ -2857,71 +2878,81 @@ class QuotationsDataSource extends DataGridSource {
         break;
     }
 
-    return Container(
-      padding: const EdgeInsets.all(8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      quotationData['name'],
-                      style: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w500),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(right: 7),
-                      child: Text(
-                        quotationData['amount_total'],
+    return InkWell(
+      onTap: (){
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => QuotationPage(quotationId: quotationData['id'],),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        quotationData['name'],
                         style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
+                            fontSize: 14, fontWeight: FontWeight.w500),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      quotationData['partner_id'],
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8.0, top: 2.0),
-                      child: Container(
-                        height: 25,
-                        width: 80,
-                        color: Colors.grey.shade300,
-                        padding: const EdgeInsets.all(5),
-                        child: Center(
-                          child: Text(
-                            status,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: statusColor,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                      Padding(
+                        padding: const EdgeInsets.only(right: 7),
+                        child: Text(
+                          quotationData['amount_total'],
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
                           ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        quotationData['partner_id'],
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8.0, top: 2.0),
+                        child: Container(
+                          height: 25,
+                          width: 80,
+                          color: Colors.grey.shade300,
+                          padding: const EdgeInsets.all(5),
+                          child: Center(
+                            child: Text(
+                              status,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: statusColor,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
