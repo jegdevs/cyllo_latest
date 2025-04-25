@@ -24,6 +24,12 @@ class _LoginState extends State<Login> {
   TextEditingController urlController = TextEditingController();
   TextEditingController emailController = TextEditingController();
   TextEditingController passwordController = TextEditingController();
+  bool showUrlValidation = false;
+  bool showEmailValidation = false;
+  bool showPasswordValidation = false;
+
+
+
 
   Future<void> login() async {
     if (formKey.currentState?.validate() ?? false) {
@@ -36,7 +42,6 @@ class _LoginState extends State<Login> {
         final prefs = await SharedPreferences.getInstance();
         client = OdooClient(urlController.text.trim());
 
-        // Use the Database variable directly if available, fallback to SharedPreferences
         final selectedDb = Database ?? prefs.getString('database');
         if (selectedDb == null || selectedDb.isEmpty) {
           setState(() {
@@ -115,6 +120,7 @@ class _LoginState extends State<Login> {
     await prefs.setInt('partnerId', session.partnerId ?? 0);
     await prefs.setBool('isSystem', session.isSystem ?? false);
     await prefs.setString('userTimezone', session.userTz);
+    await prefs.setBool('isLoggedIn', true);
   }
 
   Future<void> saveLogin() async {
@@ -187,256 +193,299 @@ class _LoginState extends State<Login> {
         fetchDatabaseList();
       }
     });
+    urlController.addListener(() {
+      if (showUrlValidation) {
+        setState(() {
+          showUrlValidation = false;
+        });
+        formKey.currentState?.validate();
+      }
+    });
+
+    emailController.addListener(() {
+      if (showEmailValidation) {
+        setState(() {
+          showEmailValidation = false;
+        });
+        formKey.currentState?.validate();
+      }
+    });
+
+    passwordController.addListener(() {
+      if (showPasswordValidation) {
+        setState(() {
+          showPasswordValidation = false;
+        });
+        formKey.currentState?.validate();
+      }
+    });
+
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      body: Stack(children: [
-        Positioned(
-          top: -80,
-          left: -80,
-          child: Container(
-            width: 200,
-            height: 200,
-            decoration: BoxDecoration(
-              color: Color(0xFF9EA700),
-              shape: BoxShape.circle,
+      body: Stack(
+        children: [
+          Positioned(
+            top: -80,
+            left: -80,
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                color: Color(0xFF9EA700),
+                shape: BoxShape.circle,
+              ),
             ),
           ),
-        ),
-        Positioned(
-          bottom: -130,
-          right: -130,
-          child: Container(
-            width: 250,
-            height: 250,
-            decoration: BoxDecoration(
-              color: Color(0xFF9EA700),
-              shape: BoxShape.circle,
+          Positioned(
+            bottom: -130,
+            right: -130,
+            child: Container(
+              width: 250,
+              height: 250,
+              decoration: BoxDecoration(
+                color: Color(0xFF9EA700),
+                shape: BoxShape.circle,
+              ),
             ),
           ),
-        ),
-        Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Image.asset(
-                  'assets/images.png',
-                  width: 170,
-                ),
-                SizedBox(height: 30),
-                Container(
-                  padding: EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 10,
-                        offset: Offset(0, 5),
-                      ),
-                    ],
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    'assets/images.png',
+                    width: 170,
                   ),
-                  child: Form(
-                    key: formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Login",
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF9EA700),
-                          ),
-                        ),
-                        SizedBox(height: 15),
-                        if (frstLogin == true) ...[
-                          TextFormField(
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Enter a URL';
-                              }
-                              final RegExp newReg = RegExp(
-                                r'^(https?:\/\/)'
-                                r'(([a-zA-Z0-9-_]+\.)+[a-zA-Z]{2,}'
-                                r'|(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}))'
-                                r'(:\d{1,5})?'
-                                r'(\/[^\s]*)?$',
-                                caseSensitive: false,
-                              );
-                              if (!newReg.hasMatch(value)) {
-                                return 'Enter a valid URL';
-                              }
-                              return null;
-                            },
-                            controller: urlController,
-                            decoration: InputDecoration(
-                              filled: true,
-                              fillColor: Colors.grey[100],
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide.none,
-                              ),
-                              hintText: 'Url',
-                              prefixIcon: Icon(Icons.link, color: Colors.grey),
-                            ),
-                            onChanged: (value) {
-                              fetchDatabaseList();
-                            },
-                            enabled: !disableFields,
-                          ),
-                          SizedBox(height: 15),
-                          DropdownButtonFormField<String>(
-                            decoration: InputDecoration(
-                              filled: true,
-                              fillColor: Colors.grey[100],
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide.none,
-                              ),
-                              prefixIcon: const Icon(
-                                Icons.storage,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            dropdownColor: Colors.white,
-                            hint: const Text("Choose Database"),
-                            value: Database,
-                            items: urlCheck ? dropdownItems : [],
-                            onChanged: disableFields
-                                ? null
-                                : (value) {
-                              setState(() {
-                                Database = value;
-                              });
-                            },
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return "Database is required";
-                              }
-                              return null;
-                            },
-                          ),
-                          SizedBox(height: 15),
-                        ],
-                        TextFormField(
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return "Email is required";
-                            }
-                            return null;
-                          },
-                          controller: emailController,
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: Colors.grey[100],
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide.none,
-                            ),
-                            hintText: 'Email',
-                            prefixIcon: Icon(Icons.email, color: Colors.grey),
-                          ),
-                          enabled: !disableFields,
-                        ),
-                        SizedBox(height: 15),
-                        TextFormField(
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return "Password is required";
-                            }
-                            return null;
-                          },
-                          controller: passwordController,
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: Colors.grey[100],
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide.none,
-                            ),
-                            hintText: 'Password',
-                            prefixIcon: Icon(Icons.lock, color: Colors.grey),
-                          ),
-                          enabled: !disableFields,
-                        ),
-                        SizedBox(height: 20),
-                        ElevatedButton(
-                          onPressed: isLoading
-                              ? null
-                              : () async {
-                            if (Database == null && frstLogin == true) {
-                              errorMessage = 'Choose Database first';
-                              final snackBar = Customsnackbar().showSnackBar(
-                                  "error", '$errorMessage', "error", () {});
-                              ScaffoldMessenger.of(context).showSnackBar(snackBar);
-                              print(errorMessage);
-                              return;
-                            }
-                            await saveLogin(); // Wait for saveLogin to complete
-                            await login();     // Then proceed to login
-                          },
-                          style: ElevatedButton.styleFrom(
-                            padding: EdgeInsets.symmetric(vertical: 15),
-                            backgroundColor: Color(0xFF9EA700),
-                            foregroundColor: Colors.white,
-                            minimumSize: Size(400, 50),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          child: isLoading
-                              ? CircularProgressIndicator(color: Colors.white)
-                              : Text(
-                            'Login',
-                            style: TextStyle(fontSize: 18),
-                          ),
-                        ),
-                        SizedBox(height: 24),
-                        // Center(
-                        //   child: TextButton(
-                        //     onPressed: () {},
-                        //     child: Text(
-                        //       'Forgot Password?',
-                        //       style: TextStyle(
-                        //         fontSize: 16,
-                        //         color: Color(0xFF9EA700),
-                        //       ),
-                        //     ),
-                        //   ),
-                        // ),
-                        if (frstLogin == false )
-                        Center(
-                          child: GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                frstLogin = true;
-                              });
-                            },
-                            child: Text(
-                              'Manage Credentials?',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Color(0xFF9EA700),
-                              ),
-                            ),
-                          ),
+                  SizedBox(height: 30),
+                  Container(
+                    padding: EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(15),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: Offset(0, 5),
                         ),
                       ],
                     ),
+                    child: Form(
+                      key: formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Login",
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF9EA700),
+                            ),
+                          ),
+                          SizedBox(height: 15),
+                          // URL Field (shown for first login or when managing credentials)
+                          if (frstLogin == true) ...[
+                            TextFormField(
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Enter a URL';
+                                }
+                                final RegExp newReg = RegExp(
+                                  r'^(https?:\/\/)'
+                                  r'(([a-zA-Z0-9-_]+\.)+[a-zA-Z]{2,}'
+                                  r'|(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}))'
+                                  r'(:\d{1,5})?'
+                                  r'(\/[^\s]*)?$',
+                                  caseSensitive: false,
+                                );
+                                if (!newReg.hasMatch(value)) {
+                                  return 'Enter a valid URL';
+                                }
+                                return null;
+                              },
+                              controller: urlController,
+                              decoration: InputDecoration(
+                                filled: true,
+                                fillColor: Colors.grey[100],
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide.none,
+                                ),
+                                hintText: 'Url',
+                                prefixIcon: Icon(Icons.link, color: Colors.grey),
+                              ),
+                              onChanged: (value) {
+                                // formKey.currentState?.validate();
+                                if (value.isNotEmpty) {
+                                  fetchDatabaseList();
+                                } else {
+                                  setState(() {
+                                    urlCheck = false;
+                                    dropdownItems = [];
+                                    Database = null;
+                                  });
+                                }
+                              },
+                              enabled: !disableFields,
+                            ),
+                            SizedBox(height: 15),
+                          ],
+                          // Database Dropdown (shown only when urlCheck is true and it's first login)
+                          if (frstLogin == true && urlCheck) ...[
+                            DropdownButtonFormField<String>(
+                              decoration: InputDecoration(
+                                filled: true,
+                                fillColor: Colors.grey[100],
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide.none,
+                                ),
+                                prefixIcon: const Icon(
+                                  Icons.storage,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              dropdownColor: Colors.white,
+                              hint: const Text("Choose Database"),
+                              value: Database,
+                              items: dropdownItems,
+                              onChanged: disableFields
+                                  ? null
+                                  : (value) {
+                                setState(() {
+                                  Database = value;
+                                });
+                              },
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return "Database is required";
+                                }
+                                return null;
+                              },
+                            ),
+                            SizedBox(height: 15),
+                          ],
+                          // Email Field
+                          TextFormField(
+                            validator: (value) {
+                              if (showEmailValidation && (value == null || value.isEmpty)) {
+                                return "Email is required";
+                              }
+                              return null;
+                            },
+                            controller: emailController,
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: Colors.grey[100],
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide.none,
+                              ),
+                              hintText: 'Email',
+                              prefixIcon: Icon(Icons.email, color: Colors.grey),
+                            ),
+                            enabled: !disableFields,
+                          ),
+                          SizedBox(height: 15),
+                          // Password Field
+                          TextFormField(
+                            validator: (value) {
+                              if (showPasswordValidation && (value == null || value.isEmpty)) {
+                                return "Password is required";
+                              }
+                              return null;
+                            },
+                            controller: passwordController,
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: Colors.grey[100],
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide.none,
+                              ),
+                              hintText: 'Password',
+                              prefixIcon: Icon(Icons.lock, color: Colors.grey),
+                            ),
+                            enabled: !disableFields,
+                          ),
+                          SizedBox(height: 20),
+                          // Login Button
+                          ElevatedButton(
+                            onPressed: isLoading
+                                ? null
+                                : () async {
+                              setState(() {
+                                showUrlValidation = true;
+                                showEmailValidation = true;
+                                showPasswordValidation = true;
+                              });
+
+                              if (frstLogin == true && urlCheck && Database == null) {
+                                errorMessage = 'Choose Database first';
+                                final snackBar = Customsnackbar().showSnackBar(
+                                    "error", '$errorMessage', "error", () {});
+                                ScaffoldMessenger.of(context).showSnackBar(snackBar);
+                                print(errorMessage);
+                                return;
+                              }
+
+                              if (formKey.currentState?.validate() ?? false) {
+                                await saveLogin();
+                                await login();
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(vertical: 15),
+                              backgroundColor: Color(0xFF9EA700),
+                              foregroundColor: Colors.white,
+                              minimumSize: Size(400, 50),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: isLoading
+                                ? CircularProgressIndicator(color: Colors.white)
+                                : Text(
+                              'Login',
+                              style: TextStyle(fontSize: 18),
+                            ),
+                          ),
+                          SizedBox(height: 24),
+                          // Manage Credentials Link (for non-first login)
+                          if (frstLogin == false)
+                            Center(
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    frstLogin = true;
+                                  });
+                                },
+                                child: Text(
+                                  'Manage Credentials?',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Color(0xFF9EA700),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-      ]),
+        ],
+      ),
     );
   }
 }

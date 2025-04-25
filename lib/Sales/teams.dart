@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:isar/isar.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
-
+import '../isarModel/teamsModel.dart';
+import '../main.dart';
 import 'myPipeline.dart';
 import 'myQuotations.dart';
 
@@ -30,6 +32,7 @@ class _SalesTeamState extends State<SalesTeam> {
   @override
   void initState() {
     super.initState();
+    loadSalesTeamsFromIsar();
     initializeOdooClient();
     searchController.addListener(_onSearchChanged);
   }
@@ -115,11 +118,13 @@ class _SalesTeamState extends State<SalesTeam> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Failed to connect to Odoo: $e")),
         );
+        await loadSalesTeamsFromIsar();
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Missing connection details")),
       );
+      await loadSalesTeamsFromIsar();
     }
     setState(() => isLoading = false);
   }
@@ -136,6 +141,10 @@ class _SalesTeamState extends State<SalesTeam> {
   }
 
   Future<void> fetchAllSalesTeamsData() async {
+    if (client == null) {
+      await loadSalesTeamsFromIsar();
+      return;
+    }
     try {
       List domain = [];
       domain.add(['use_opportunities', '=', true]);
@@ -168,6 +177,7 @@ class _SalesTeamState extends State<SalesTeam> {
         setState(() {
           salesTeams = updatedTeams;
         });
+        await saveSalesTeamsToIsar(updatedTeams);
       }
     } catch (e) {
       print('Error fetching sales teams: $e');
@@ -404,6 +414,200 @@ class _SalesTeamState extends State<SalesTeam> {
     }
   }
 
+  Future<void> saveSalesTeamsToIsar(List<dynamic> teams) async {
+    try {
+      await isar.writeTxn(() async {
+        
+        await isar.salesTeamIsars.clear();
+
+        for (var team in teams) {
+          try {
+            if (team['id'] == null) {
+              print('Skipping team with null ID: $team');
+              continue;
+            }
+
+            // Serialize barGroups to a simpler format
+            final List<Map<String, dynamic>> serializedBarGroups = [];
+            if (team['barGroups'] != null) {
+              for (var group in team['barGroups']) {
+                if (group is BarChartGroupData) {
+                  final Map<String, dynamic> serializedGroup = {
+                    'x': group.x,
+                    'barRods': group.barRods.map((rod) => {
+                      'toY': rod.toY,
+                      'color': rod.color?.value,
+                      'width': rod.width,
+                      'borderRadius': {
+                        'topLeft': rod.borderRadius?.topLeft.x,
+                        'topRight': rod.borderRadius?.topRight.x,
+                      }
+                    }).toList(),
+                  };
+                  serializedBarGroups.add(serializedGroup);
+                }
+              }
+            }
+
+            // Convert date ranges to a serializable format
+            final List<Map<String, dynamic>> serializedDateRanges = [];
+            if (team['dateRanges'] != null) {
+              for (var range in team['dateRanges']) {
+                if (range is Map) {
+                  serializedDateRanges.add({
+                    'label': range['label'],
+                    'start': range['start'] is DateTime
+                        ? range['start'].toIso8601String()
+                        : range['start'].toString(),
+                    'end': range['end'] is DateTime
+                        ? range['end'].toIso8601String()
+                        : range['end'].toString(),
+                  });
+                }
+              }
+            }
+
+            // Convert weekly opportunity data to a serializable format
+            Map<String, dynamic> serializedWeeklyData = {};
+            if (team['weeklyOpportunityData'] != null) {
+              team['weeklyOpportunityData'].forEach((key, value) {
+                serializedWeeklyData[key.toString()] = value;
+              });
+            }
+
+            final salesTeamIsar = SalesTeamIsar()
+              ..teamId = team['id']
+              ..name = team['name']?.toString() ?? 'Unknown'
+              ..invoicedTarget = team['invoiced_target'] is num
+                  ? (team['invoiced_target'] as num).toDouble()
+                  : null
+              ..unassignedLeads = team['unassignedLeads'] as int? ?? 0
+              ..openOpportunities = team['openOpportunities'] as int? ?? 0
+              ..openOpportunitiesAmount = team['openOpportunitiesAmount'] as double? ?? 0.0
+              ..overdueOpportunities = team['overdueOpportunities'] as int? ?? 0
+              ..overdueOpportunitiesAmount = team['overdueOpportunitiesAmount'] as double? ?? 0.0
+              ..quotationsCount = team['quotationsCount'] as int? ?? 0
+              ..quotationsAmount = team['quotationsAmount'] as double? ?? 0.0
+              ..ordersToInvoice = team['ordersToInvoice'] as int? ?? 0
+              ..invoicingCurrent = team['invoicingCurrent'] as double? ?? 0.0
+              ..weeklyOpportunityDataJson = jsonEncode(serializedWeeklyData)
+              ..dateRangesJson = jsonEncode(serializedDateRanges)
+              ..barGroupsJson = jsonEncode(serializedBarGroups)
+              ..hasBarData = team['hasBarData'] as bool? ?? false;
+
+            await isar.salesTeamIsars.put(salesTeamIsar);
+            print('Successfully saved team ID: ${team['id']} to Isar');
+          } catch (e) {
+            print('Error saving team ID: ${team['id']}: $e');
+          }
+        }
+      });
+      print('Completed saving all teams to Isar');
+    } catch (e) {
+      print('Error in saveSalesTeamsToIsar transaction: $e');
+    }
+  }
+
+  Future<void> loadSalesTeamsFromIsar() async {
+    setState(() => isLoading = true);
+    try {
+      final teams = await isar.salesTeamIsars.where().findAll();
+      print('Loaded ${teams.length} teams from Isar');
+
+      if (teams.isNotEmpty) {
+        List<dynamic> loadedTeams = [];
+
+        for (var team in teams) {
+          try {
+            // Parse the JSON strings back to maps/lists
+            final weeklyOpportunityData =
+            jsonDecode(team.weeklyOpportunityDataJson ?? '{}') as Map<String, dynamic>;
+
+            // Cast correctly after decoding
+            final List<dynamic> dateRangesRaw =
+            jsonDecode(team.dateRangesJson ?? '[]') as List<dynamic>;
+
+            // Convert each item explicitly to Map<String, dynamic>
+            final List<Map<String, dynamic>> dateRanges = dateRangesRaw
+                .map((item) => Map<String, dynamic>.from(item as Map))
+                .toList();
+
+            final List<dynamic> barGroupsRaw =
+            jsonDecode(team.barGroupsJson ?? '[]') as List<dynamic>;
+
+            // Convert barGroupsData back to BarChartGroupData objects
+            List<BarChartGroupData> barGroups = [];
+            for (var groupData in barGroupsRaw) {
+              // Convert to Map<String, dynamic>
+              final groupMap = Map<String, dynamic>.from(groupData as Map);
+              List<BarChartRodData> rods = [];
+
+              if (groupMap['barRods'] != null) {
+                final rodsList = groupMap['barRods'] as List<dynamic>;
+                for (var rod in rodsList) {
+                  final rodMap = Map<String, dynamic>.from(rod as Map);
+                  final borderRadiusMap = Map<String, dynamic>.from(rodMap['borderRadius'] as Map);
+
+                  rods.add(BarChartRodData(
+                    toY: (rodMap['toY'] as num).toDouble(),
+                    color: rodMap['color'] != null ? Color(rodMap['color'] as int) : Colors.blue,
+                    width: (rodMap['width'] as num).toDouble(),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular((borderRadiusMap['topLeft'] as num).toDouble()),
+                      topRight: Radius.circular((borderRadiusMap['topRight'] as num).toDouble()),
+                    ),
+                  ));
+                }
+              }
+
+              barGroups.add(BarChartGroupData(
+                x: groupMap['x'] as int,
+                barRods: rods,
+              ));
+            }
+
+            // Build the complete team data
+            loadedTeams.add({
+              'id': team.teamId,
+              'name': team.name,
+              'invoiced_target': team.invoicedTarget,
+              'unassignedLeads': team.unassignedLeads,
+              'openOpportunities': team.openOpportunities,
+              'openOpportunitiesAmount': team.openOpportunitiesAmount,
+              'overdueOpportunities': team.overdueOpportunities,
+              'overdueOpportunitiesAmount': team.overdueOpportunitiesAmount,
+              'quotationsCount': team.quotationsCount,
+              'quotationsAmount': team.quotationsAmount,
+              'ordersToInvoice': team.ordersToInvoice,
+              'invoicingCurrent': team.invoicingCurrent,
+              'weeklyOpportunityData': weeklyOpportunityData,
+              'dateRanges': dateRanges,
+              'barGroups': barGroups,
+              'hasBarData': team.hasBarData,
+            });
+          } catch (e) {
+            print('Error processing team from Isar: ${team.teamId}: $e');
+          }
+        }
+
+        setState(() {
+          salesTeams = loadedTeams;
+          isLoading = false;
+        });
+      } else {
+        setState(() {
+          salesTeams = [];
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading sales teams from Isar: $e');
+      setState(() {
+        salesTeams = [];
+        isLoading = false;
+      });
+    }
+  }
   List<Map<String, dynamic>> generateDateRanges(int numberOfWeeks) {
     List<Map<String, dynamic>> result = [];
     final now = DateTime.now();
@@ -601,7 +805,7 @@ class _SalesTeamState extends State<SalesTeam> {
           ),
         ),
       ),
-      body: isLoading
+      body: isLoading && salesTeams.isEmpty
           ? Center(
               child: LoadingAnimationWidget.fourRotatingDots(
                 color: Color(0xFF9EA700),

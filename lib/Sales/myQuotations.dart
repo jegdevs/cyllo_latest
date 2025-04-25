@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'dart:typed_data';
+import 'package:cyllo_mobile/isarModel/quotationsModel.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:isar/isar.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,6 +14,7 @@ import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datagrid/datagrid.dart';
 
 import '../getUserImage.dart';
+import '../main.dart';
 import 'Views/quotationsView.dart';
 
 class Myquotations extends StatefulWidget {
@@ -56,6 +59,7 @@ class _MyquotationsState extends State<Myquotations> {
     } else {
       selectedFilters = {};
     }
+    loadFromIsar();
     searchController.addListener(_onSearchChanged);
     initializeOdooClient();
   }
@@ -77,6 +81,68 @@ class _MyquotationsState extends State<Myquotations> {
     super.dispose();
   }
 
+
+  Future<void> loadFromIsar() async {
+    setState(() => isLoading = true);
+    try {
+      final saleOrders = await isar.saleOrders.where().findAll();
+
+      if (saleOrders.isNotEmpty) {
+        leadsList = saleOrders.map((order) {
+          return {
+            'name': order.name,
+            'partner_id': order.partnerId != null && order.partnerName != null
+                ? [order.partnerId![0], order.partnerName]
+                : null,
+            'create_date': order.createDate,
+            'user_id': order.userId != null && order.userName != null
+                ? [order.userId![0], order.userName]
+                : null,
+            'company_id': order.companyId != null && order.companyName != null
+                ? [order.companyId![0], order.companyName]
+                : null,
+            'amount_total': order.amountTotal ?? 0.0,
+            'state': order.state,
+            'activity_type_id': order.activityTypeId != null && order.activityTypeName != null
+                ? [order.activityTypeId![0], order.activityTypeName]
+                : null,
+            'activity_summary': order.activitySummary,
+            'activity_date_deadline': order.activityDateDeadline,
+            'date_order': order.dateOrder,
+            'amount_to_invoice': order.amountToInvoice,
+            'currency_rate': order.currencyRate,
+            'prepayment_percent': order.prepaymentPercent,
+            'shipping_weight': order.shippingWeight,
+            'amount_tax': order.amountTax,
+            'amount_untaxed': order.amountUntaxed,
+            // Placeholder for type; adjust based on your logic
+            'type': order.state == 'sale' ? 'opportunity' : null,
+          };
+        }).toList();
+
+        // Filter opportunities (assuming state == 'sale' indicates opportunities)
+        opportunitiesList = leadsList.where((lead) => lead['type'] == "opportunity").toList();
+
+        setState(() {
+          chartDatavalues = prepareChartData(leadsList);
+          showNoDataMessage = chartDatavalues.isEmpty;
+          isLoading = false;
+        });
+
+        print("Loaded ${leadsList.length} quotations from Isar");
+      } else {
+        // If no data in Isar, fetch from Odoo
+        await initializeOdooClient();
+      }
+    } catch (e) {
+      log("Isar Load Failed: $e");
+      setState(() {
+        isLoading = false;
+        showNoDataMessage = true;
+      });
+    }
+  }
+
   Future<void> initializeOdooClient() async {
     setState(() => isLoading = true);
     final prefs = await SharedPreferences.getInstance();
@@ -96,10 +162,11 @@ class _MyquotationsState extends State<Myquotations> {
             await client!.authenticate(dbName, userLogin, userPassword);
         print("Odoo Authenticated: $auth");
         await userImage();
-        await fetchLeadsData();
+        await fetchLeadsData(savetoIsar:true);
         await tag();
         await act();
       } catch (e) {
+        await loadFromIsar();
         print("Odoo Authentication Failed: $e");
       }
     }
@@ -131,7 +198,7 @@ class _MyquotationsState extends State<Myquotations> {
       },
     };
   }
-  Future<void> fetchLeadsData({String query=""}) async {
+  Future<void> fetchLeadsData({String query="",bool savetoIsar = false}) async {
     if (client == null || currentUserId == null) {
       print("Client or user ID is null");
       return;
@@ -254,8 +321,101 @@ class _MyquotationsState extends State<Myquotations> {
       });
 
       log("Leads fetched: ${response}");
-
       if (response != null && mounted) {
+        if(savetoIsar) {
+          await isar.writeTxn(() async {
+            await isar.saleOrders.clear();
+            print('Cleared SaleOrder collection');
+
+            // Save new leads to Isar
+            for (var lead in response) {
+              try {
+                if (lead['name'] == null) {
+                  print('Skipping lead with null name: $lead');
+                  continue;
+                }
+
+                final saleOrder = SaleOrder()
+                  ..name = lead['name']?.toString()
+                  ..partnerId = lead['partner_id'] is List &&
+                      lead['partner_id'].isNotEmpty
+                      ? [lead['partner_id'][0]]
+                      : null
+                  ..partnerName = lead['partner_id'] is List &&
+                      lead['partner_id'].length > 1
+                      ? lead['partner_id'][1]?.toString()
+                      : null
+                  ..createDate = lead['create_date']?.toString()
+                  ..userId = lead['user_id'] is List &&
+                      lead['user_id'].isNotEmpty
+                      ? [lead['user_id'][0]]
+                      : null
+                  ..userName = lead['user_id'] is List &&
+                      lead['user_id'].length > 1
+                      ? lead['user_id'][1]?.toString()
+                      : null
+                  ..companyId = lead['company_id'] is List &&
+                      lead['company_id'].isNotEmpty
+                      ? [lead['company_id'][0]]
+                      : null
+                  ..companyName = lead['company_id'] is List &&
+                      lead['company_id'].length > 1
+                      ? lead['company_id'][1]?.toString()
+                      : null
+                  ..amountTotal = lead['amount_total'] is double
+                      ? lead['amount_total']
+                      : (lead['amount_total'] is int ? lead['amount_total']
+                      .toDouble() : null)
+                  ..state = lead['state']?.toString()
+                  ..activityTypeId = lead['activity_type_id'] is List &&
+                      lead['activity_type_id'].isNotEmpty
+                      ? [lead['activity_type_id'][0]]
+                      : null
+                  ..activityTypeName = lead['activity_type_id'] is List &&
+                      lead['activity_type_id'].length > 1
+                      ? lead['activity_type_id'][1]?.toString()
+                      : null
+                  ..activitySummary = lead['activity_summary']?.toString()
+                  ..activityDateDeadline = lead['activity_date_deadline']
+                      ?.toString()
+                  ..dateOrder = lead['date_order']?.toString()
+                  ..amountToInvoice = lead['amount_to_invoice'] is double
+                      ? lead['amount_to_invoice']
+                      : (lead['amount_to_invoice'] is int
+                      ? lead['amount_to_invoice'].toDouble()
+                      : null)
+                  ..currencyRate = lead['currency_rate'] is double
+                      ? lead['currency_rate']
+                      : (lead['currency_rate'] is int ? lead['currency_rate']
+                      .toDouble() : null)
+                  ..prepaymentPercent = lead['prepayment_percent'] is double
+                      ? lead['prepayment_percent']
+                      : (lead['prepayment_percent'] is int
+                      ? lead['prepayment_percent'].toDouble()
+                      : null)
+                  ..shippingWeight = lead['shipping_weight'] is double
+                      ? lead['shipping_weight']
+                      : (lead['shipping_weight'] is int
+                      ? lead['shipping_weight'].toDouble()
+                      : null)
+                  ..amountTax = lead['amount_tax'] is double
+                      ? lead['amount_tax']
+                      : (lead['amount_tax'] is int ? lead['amount_tax']
+                      .toDouble() : null)
+                  ..amountUntaxed = lead['amount_untaxed'] is double
+                      ? lead['amount_untaxed']
+                      : (lead['amount_untaxed'] is int ? lead['amount_untaxed']
+                      .toDouble() : null);
+
+                await isar.saleOrders.put(saleOrder);
+                print('Saved sale order: ${lead['name']}');
+              } catch (e) {
+                print('Error saving sale order: ${lead['name']}, Error: $e');
+                print('Lead data: $lead');
+              }
+            }
+          });
+        }
         setState(() {
           leadsList = List<Map<String, dynamic>>.from(response);
           opportunitiesList = leadsList.where((lead) => lead['type'] == "opportunity").toList();
@@ -273,7 +433,7 @@ class _MyquotationsState extends State<Myquotations> {
       }
     }
   }
-  void showFilterDialog(BuildContext context) {
+  void showFilterDialog(BuildContext context){
     final currentFilters = getFilters();
     Set<String> tempSelectedFilters = Set.from(selectedFilters);
     String? tempCreationDate = selectedCreationDate;
@@ -425,7 +585,7 @@ class _MyquotationsState extends State<Myquotations> {
   }
   Widget ChartSelection() {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 15),
+      padding: EdgeInsets.symmetric(horizontal: 50),
       child: Container(
         width: double.infinity,
         height: 50,
@@ -473,18 +633,18 @@ class _MyquotationsState extends State<Myquotations> {
                   color: selectedView == 2 ? Color(0xFF9EA700) : Colors.black,
                 ),
               ),
-              VerticalDivider(thickness: 2, color: Colors.white),
-              IconButton(
-                onPressed: () {
-                  setState(() {
-                    selectedView = 3;
-                  });
-                },
-                icon: Icon(
-                  Icons.table_rows_outlined,
-                  color: selectedView == 3 ? Color(0xFF9EA700) : Colors.black,
-                ),
-              ),
+              // VerticalDivider(thickness: 2, color: Colors.white),
+              // IconButton(
+              //   onPressed: () {
+              //     setState(() {
+              //       selectedView = 3;
+              //     });
+              //   },
+              //   icon: Icon(
+              //     Icons.table_rows_outlined,
+              //     color: selectedView == 3 ? Color(0xFF9EA700) : Colors.black,
+              //   ),
+              // ),
               VerticalDivider(thickness: 2, color: Colors.white),
               IconButton(
                 onPressed: () {
@@ -612,23 +772,23 @@ class _MyquotationsState extends State<Myquotations> {
   Widget listCard() {
     print('List card rendering with ${leadsList.length} leads');
 
-    if (isLoading) {
-      return Center(
-        child: LoadingAnimationWidget.fourRotatingDots(
-          color: Color(0xFF9EA700),
-          size: 100,
-        ),
-      );
-    }
+    // if (isLoading) {
+    //   return Center(
+    //     child: LoadingAnimationWidget.fourRotatingDots(
+    //       color: Color(0xFF9EA700),
+    //       size: 100,
+    //     ),
+    //   );
+    // }
 
-    if (leadsList.isEmpty) {
-      return Center(
-        child: Text(
-          "No leads found",
-          style: TextStyle(fontSize: 16, color: Colors.grey),
-        ),
-      );
-    }
+    // if (leadsList.isEmpty) {
+    //   return Center(
+    //     child: Text(
+    //       "No leads found",
+    //       style: TextStyle(fontSize: 16, color: Colors.grey),
+    //     ),
+    //   );
+    // }
 
     return ListView.builder(
       itemCount: leadsList.length,
@@ -932,62 +1092,13 @@ class _MyquotationsState extends State<Myquotations> {
                                 SizedBox(height: 6),
                                 Row(
                                   children: [
-                                    FutureBuilder<Uint8List?>(
-                                      future: salespersonId != null && client != null
-                                          ? GetImage().fetchImage(salespersonId, client!)
-                                          : Future.value(null),
-                                      builder: (context, snapshot) {
-                                        if (snapshot.connectionState == ConnectionState.waiting) {
-                                          return Container(
-                                            width: 28,
-                                            height: 28,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: Colors.blue,
-                                            ),
-                                          );
-                                        } else if (snapshot.hasData && snapshot.data != null) {
-                                          return Container(
-                                            width: 28,
-                                            height: 28,
-                                            decoration: BoxDecoration(
-                                              borderRadius: BorderRadius.circular(6),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: Colors.black.withOpacity(0.1),
-                                                  blurRadius: 4,
-                                                  offset: Offset(0, 2),
-                                                ),
-                                              ],
-                                              image: DecorationImage(
-                                                image: MemoryImage(snapshot.data!),
-                                                fit: BoxFit.cover,
-                                              ),
-                                            ),
-                                          );
-                                        } else {
-                                          return Container(
-                                            width: 28,
-                                            height: 28,
-                                            decoration: BoxDecoration(
-                                              borderRadius: BorderRadius.circular(6),
-                                              gradient: LinearGradient(
-                                                colors: [Colors.blue.shade700, Colors.blue.shade500],
-                                                begin: Alignment.topLeft,
-                                                end: Alignment.bottomRight,
-                                              ),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: Colors.blue.withOpacity(0.3),
-                                                  blurRadius: 4,
-                                                  offset: Offset(0, 2),
-                                                ),
-                                              ],
-                                            ),
-                                            child: Icon(Icons.person, size: 16, color: Colors.white),
-                                          );
-                                        }
-                                      },
+                                    OdooAvatar(
+                                      client: client,
+                                      model: 'res.users',
+                                      recordId: salespersonId!,
+                                      size: 28,
+                                      borderRadius: 5,
+                                      shape: BoxShape.rectangle,
                                     ),
                                     SizedBox(width: 8),
                                     Expanded(
@@ -1178,23 +1289,23 @@ class _MyquotationsState extends State<Myquotations> {
   Widget salesListCard() {
     print('Sales card rendering with ${leadsList.length} records');
 
-    if (isLoading) {
-      return Center(
-        child: LoadingAnimationWidget.fourRotatingDots(
-          color: Color(0xFF9EA700),
-          size: 100,
-        ),
-      );
-    }
-
-    if (leadsList.isEmpty) {
-      return Center(
-        child: Text(
-          "No sales records found",
-          style: TextStyle(fontSize: 16, color: Colors.grey),
-        ),
-      );
-    }
+    // if (isLoading) {
+    //   return Center(
+    //     child: LoadingAnimationWidget.fourRotatingDots(
+    //       color: Color(0xFF9EA700),
+    //       size: 100,
+    //     ),
+    //   );
+    // }
+    //
+    // if (leadsList.isEmpty) {
+    //   return Center(
+    //     child: Text(
+    //       "No sales records found",
+    //       style: TextStyle(fontSize: 16, color: Colors.grey),
+    //     ),
+    //   );
+    // }
 
     return ListView.builder(
       itemCount: leadsList.length,
@@ -2529,23 +2640,23 @@ class _MyquotationsState extends State<Myquotations> {
   }
 
   Widget buildDataGrid() {
-    if (isLoading) {
-      return Center(
-        child: LoadingAnimationWidget.fourRotatingDots(
-          color: Color(0xFF9EA700),
-          size: 100,
-        ),
-      );
-    }
-
-    if (leadsList.isEmpty) {
-      return Center(
-        child: Text(
-          "No quotations found",
-          style: TextStyle(fontSize: 16, color: Colors.grey),
-        ),
-      );
-    }
+    // if (isLoading) {
+    //   return Center(
+    //     child: LoadingAnimationWidget.fourRotatingDots(
+    //       color: Color(0xFF9EA700),
+    //       size: 100,
+    //     ),
+    //   );
+    // }
+    //
+    // if (leadsList.isEmpty) {
+    //   return Center(
+    //     child: Text(
+    //       "No quotations found",
+    //       style: TextStyle(fontSize: 16, color: Colors.grey),
+    //     ),
+    //   );
+    // }
 
     List<Map<String, dynamic>> filteredQuotations = leadsList
         .where((quotation) =>
@@ -2649,24 +2760,24 @@ class _MyquotationsState extends State<Myquotations> {
         ],
       ),
       backgroundColor: Colors.white,
-      body: isLoading
-          ? Center(
-        child: LoadingAnimationWidget.fourRotatingDots(
-          color: Color(0xFF9EA700),
-          size: 100,
-        ),
-      )
-          : leadsList.isEmpty
-          ? Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Center(child: Image.asset('assets/nodata.png')),
-          Text(
-            "No data to display",
-            style: TextStyle(color: Colors.blueGrey),
-          ),
-        ],
-      ):
+     body: isLoading && leadsList.isEmpty?
+     Center(
+       child: LoadingAnimationWidget.fourRotatingDots(
+         color: Color(0xFF9EA700),
+         size: 100,
+       ),
+     )
+         : leadsList.isEmpty
+         ? Column(
+       mainAxisAlignment: MainAxisAlignment.center,
+       children: [
+         Center(child: Image.asset('assets/nodata.png')),
+         Text(
+           "No data to display",
+           style: TextStyle(color: Colors.blueGrey),
+         ),
+       ],
+     ):
       Column(
         children: [
           Divider(thickness: 2, color: Colors.grey.shade300),

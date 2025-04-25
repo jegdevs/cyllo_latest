@@ -2,9 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'dart:typed_data';
+import 'package:cyllo_mobile/isarModel/activityModel.dart';
+import 'package:cyllo_mobile/isarModel/pipelineModel.dart';
 import 'package:flutter/material.dart';
 import 'package:appflowy_board/appflowy_board.dart';
 import 'package:intl/intl.dart';
+import 'package:isar/isar.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,6 +16,7 @@ import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datagrid/datagrid.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import '../getUserImage.dart';
+import '../main.dart';
 import 'Views/activityView.dart';
 import 'Views/pipeLineView.dart';
 import 'myPipeline.dart';
@@ -33,6 +37,9 @@ List<Map<String, dynamic>> leadsList = [];
 List<Map<String, dynamic>> activitiesList = [];
 
 class _MyactivityState extends State<Myactivity> {
+  List<String> _creationDates = [];
+  Map<int, String> tagMap = {};
+  List<String> _closedDates = [];
   List<ChartData> chartDatavalues = [];
   List<String> activityTypes = [];
   Uint8List? profileImage;
@@ -105,7 +112,7 @@ class _MyactivityState extends State<Myactivity> {
       'late_activities': {
         'name': 'Late Activities',
         'domain': [
-          ['activity_date_deadline', '<', todayDate]
+          ['my_activity_date_deadline', '<', todayDate]
         ]
       },
       'today_activities': {
@@ -149,18 +156,198 @@ class _MyactivityState extends State<Myactivity> {
         final auth = await client!.authenticate(dbName, userLogin, userPassword);
         print("Odoo Authenticated: $auth");
         await userImage();
-        await pipe();
+        await pipe(savetoIsar: true);
         await tag();
         await iconSelectedView();
         await fetchData();
         await buildChart();
         await fetchFilteredData();
         await act();
+        final dates = await fetchAllDates();
+        setState(() {
+          _creationDates = dates['creationDates']!;
+          _closedDates = dates['closedDates']!;
+        });
       } catch (e) {
+        await loadFromIsar();
         print("Odoo Authentication Failed: $e");
       }
     }
     setState(() => isLoading = false);
+  }
+
+  Future<void> loadFromIsar() async {
+    setState(() {
+      isLoading = true;
+      selectedView = 0;
+    });
+    try {
+      final tags = await isar.tags.where().findAll();
+      tagMap = {for (var tag in tags) tag.tagId!: tag.name ?? ''};
+      final pipes = await isar.newacts.where().findAll();
+
+      if (pipes.isNotEmpty) {
+        leadsList = pipes.map((pipe) {
+          return {
+            'id': pipe.leadId,
+            'name': pipe.name,
+            'expected_revenue': pipe.expectedRevenue ?? 0.0,
+            'stage_id': pipe.stageId != null && pipe.stageName != null
+                ? [pipe.stageId![0], pipe.stageName]
+                : null,
+            'partner_id': pipe.partnerId != null && pipe.partnerName != null
+                ? [pipe.partnerId![0], pipe.partnerName]
+                : null,
+            'tag_ids': pipe.tagIds,
+            'priority': pipe.priority,
+            'activity_state': pipe.activityState,
+            'activity_type_id': pipe.activityTypeId != null && pipe.activityTypeName != null
+                ? [pipe.activityTypeId![0], pipe.activityTypeName]
+                : null,
+            'email_from': pipe.emailFrom,
+            'recurring_revenue_monthly': pipe.recurringRevenueMonthly,
+            'contact_name': pipe.contactName,
+            'activity_ids': pipe.activityIds,
+            'activity_date_deadline': pipe.activityDateDeadline,
+            'create_date': pipe.createDate,
+            'day_open': pipe.dayOpen,
+            'day_close': pipe.dayClose,
+            'probability': pipe.probability,
+            'recurring_revenue_monthly_prorated': pipe.recurringRevenueMonthlyProrated,
+            'recurring_revenue_prorated': pipe.recurringRevenueProrated,
+            'prorated_revenue': pipe.proratedRevenue,
+            'recurring_revenue': pipe.recurringRevenue,
+            'activity_user_id': pipe.activityUserId,
+            'date_closed': pipe.dateClosed,
+            'type': pipe.type,
+            'user_id': pipe.userId,
+            'phone': pipe.phone,
+          };
+        }).toList();
+
+        // opportunitiesList = leadsList.where((lead) => lead['type'] == "opportunity").toList();
+
+        controller.clear();
+        // Group pipes by stage_id instead of stageName
+        Map<int, List<Newact>> groupedPipes = {};
+        for (var pipe in pipes) {
+          if (pipe.stageId != null && pipe.stageName != null) {
+            groupedPipes.putIfAbsent(pipe.stageId![0], () => []).add(pipe);
+          }
+        }
+
+        // Sort groups by stage_id
+        var sortedStageIds = groupedPipes.keys.toList()..sort();
+        for (var stageId in sortedStageIds) {
+          var pipesInStage = groupedPipes[stageId]!;
+          // Use stageName for display, but order by stageId
+          String stageName = pipesInStage.first.stageName ?? 'Unknown';
+          final groupData = AppFlowyGroupData(
+            id: stageId.toString(),
+            name: stageName,
+            items: pipesInStage.map((pipe) {
+              int priorityValue;
+              switch (pipe.priority ?? '0') {
+                case '0':
+                  priorityValue = 0; // Low
+                  break;
+                case '1':
+                  priorityValue = 1; // Medium
+                  break;
+                case '2':
+                  priorityValue = 2; // High
+                  break;
+                case '3':
+                  priorityValue = 3; // High
+                  break;
+                default:
+                  priorityValue = 0; // Default to Low
+              }
+              return LeadItem(
+                leadId: pipe.leadId ?? 0,
+                name: pipe.name ?? '',
+                revenue: pipe.expectedRevenue?.toString() ?? '0',
+                customerName: pipe.partnerName ?? 'None',
+                priority: priorityValue,
+                tags: pipe.tagIds?.map((id) => tagMap[id] ?? '').toList() as List<String> ?? [],
+                activityState: pipe.activityState ?? '',
+                activityType: pipe.activityTypeName ?? '',
+                hasActivity: pipe.activityIds?.isNotEmpty ?? false,
+                activityIds: pipe.activityIds?.map((id) => id.toString()).toList() ?? [],
+                salespersonId: pipe.userId,
+                imageData: null, // Handle profile image if stored in Isar
+              );
+            }).toList(),
+          );
+          controller.addGroup(groupData);
+        }
+
+        // Calculate chart data
+        Map<String, double> stageValues = {};
+        Map<String, int> stageIdToName = {};
+        for (var item in opportunitiesList) {
+          if (item['stage_id'] != null &&
+              item['stage_id'] is List &&
+              item['stage_id'].length > 1) {
+            String stageName = item['stage_id'][1].toString();
+            int stageId = item['stage_id'][0] as int;
+            stageIdToName[stageName] = stageId;
+            double value;
+            if (selectedFilter == "count") {
+              value = (stageValues[stageName] ?? 0) + 1;
+            } else if (selectedFilter == "day_open" && item['day_open'] != null && item['day_open'] != false) {
+              value = (stageValues[stageName] ?? 0) + (item['day_open'] as double);
+            } else if (selectedFilter == "day_close" && item['day_close'] != null && item['day_close'] != false) {
+              value = (stageValues[stageName] ?? 0) + (item['day_close'] as double);
+            } else if (selectedFilter == "recurring_revenue_monthly" && item['recurring_revenue_monthly'] != null && item['recurring_revenue_monthly'] != false) {
+              value = (stageValues[stageName] ?? 0) + (item['recurring_revenue_monthly'] as double);
+            } else if (selectedFilter == "expected_revenue" && item['expected_revenue'] != null && item['expected_revenue'] != false) {
+              value = (stageValues[stageName] ?? 0) + (item['expected_revenue'] as double);
+            } else if (selectedFilter == "probability" && item['probability'] != null && item['probability'] != false) {
+              value = (stageValues[stageName] ?? 0) + (item['probability'] as double);
+            } else if (selectedFilter == "recurring_revenue_monthly_prorated" && item['recurring_revenue_monthly_prorated'] != null && item['recurring_revenue_monthly_prorated'] != false) {
+              value = (stageValues[stageName] ?? 0) + (item['recurring_revenue_monthly_prorated'] as double);
+            } else if (selectedFilter == "recurring_revenue_prorated" && item['recurring_revenue_prorated'] != null && item['recurring_revenue_prorated'] != false) {
+              value = (stageValues[stageName] ?? 0) + (item['recurring_revenue_prorated'] as double);
+            } else if (selectedFilter == "prorated_revenue" && item['prorated_revenue'] != null && item['prorated_revenue'] != false) {
+              value = (stageValues[stageName] ?? 0) + (item['prorated_revenue'] as double);
+            } else if (selectedFilter == "recurring_revenue" && item['recurring_revenue'] != null && item['recurring_revenue'] != false) {
+              value = (stageValues[stageName] ?? 0) + (item['recurring_revenue'] as double);
+            } else {
+              value = 0;
+            }
+            stageValues[stageName] = value;
+          }
+        }
+
+        setState(() {
+          chartDatavalues.clear();
+          // Sort chart data by stage_id
+          List<String> stageNames = stageValues.keys.toList();
+          stageNames.sort((a, b) => stageIdToName[a]!.compareTo(stageIdToName[b]!));
+          List<ChartData> sortedData = stageNames
+              .where((stage) => stageValues.containsKey(stage))
+              .map((stage) => ChartData(stage, stageValues[stage]!))
+              .toList();
+          chartDatavalues = sortedData;
+
+          if (stageNames.isEmpty || sortedData.every((data) => data.y == 0)) {
+            showNoDataMessage = true;
+          } else {
+            showNoDataMessage = false;
+          }
+          isLoading = false;
+        });
+      } else {
+        await initializeOdooClient();
+      }
+    } catch (e) {
+      log("Isar Load Failed: $e");
+      setState(() {
+        isLoading = false;
+        showNoDataMessage = true;
+      });
+    }
   }
 
   void showFilterDialog(BuildContext context) {
@@ -185,25 +372,15 @@ class _MyactivityState extends State<Myactivity> {
           ),
           content: StatefulBuilder(
             builder: (context, setDialogState) {
-              return FutureBuilder<Map<String, List<String>>>(
-                future: fetchAllDates(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return SizedBox(
-                      height: 100,
-                      child: Center(child: CircularProgressIndicator(color: Colors.blue)),
-                    );
-                  }
+        List<String> creationDates = _creationDates;
+        List<String> closedDates = _closedDates;
 
-                  List<String> creationDates = snapshot.data!['creationDates']!;
-                  List<String> closedDates = snapshot.data!['closedDates']!;
-
-                  if (!creationDates.contains("None")) {
-                    creationDates.insert(0, "None");
-                  }
-                  if (!closedDates.contains("None")) {
-                    closedDates.insert(0, "None");
-                  }
+        if (!creationDates.contains("None")) {
+        creationDates = ["None", ...creationDates];
+        }
+        if (!closedDates.contains("None")) {
+        closedDates = ["None", ...closedDates];
+        }
 
                   return Container(
                     width: double.maxFinite,
@@ -350,8 +527,6 @@ class _MyactivityState extends State<Myactivity> {
                       ),
                     ),
                   );
-                },
-              );
             },
           ),
           actionsPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -575,7 +750,7 @@ class _MyactivityState extends State<Myactivity> {
     }
   }
 
-  Future<void> pipe({String query=""}) async {
+  Future<void> pipe({String query="",bool savetoIsar = false}) async {
     final prefs = await SharedPreferences.getInstance();
     final userid = prefs.getInt("userId") ?? "";
     try {
@@ -785,6 +960,119 @@ class _MyactivityState extends State<Myactivity> {
         } else {
           activitiesList = leadsList; // Use all leads from the filtered leadsList
         }
+        if(savetoIsar) {
+          await isar.writeTxn(() async {
+            print('Clearing Newpipe collection');
+            await isar.newacts.clear();
+
+            for (var lead in activitiesList) {
+              try {
+                if (lead['id'] == null) {
+                  print('Skipping lead with null ID: $lead');
+                  continue;
+                }
+
+
+                final newpipe = Newact()
+                  ..leadId = lead['id']
+                  ..name = lead['name']?.toString()
+                  ..type = lead['type']?.toString()
+                  ..expectedRevenue = lead['expected_revenue'] is double
+                      ? lead['expected_revenue']
+                      : (lead['expected_revenue'] is int
+                      ? lead['expected_revenue'].toDouble()
+                      : 0.0)
+                  ..stageId = lead['stage_id'] is List &&
+                      lead['stage_id'].isNotEmpty ? [lead['stage_id'][0]] : null
+                  ..stageName = lead['stage_id'] is List &&
+                      lead['stage_id'].length > 1 ? lead['stage_id'][1]
+                      ?.toString() : null
+                  ..partnerId = lead['partner_id'] is List &&
+                      lead['partner_id'].isNotEmpty
+                      ? [lead['partner_id'][0]]
+                      : null
+                  ..partnerName = lead['partner_id'] is List &&
+                      lead['partner_id'].length > 1 ? lead['partner_id'][1]
+                      ?.toString() : null
+                  ..tagIds = lead['tag_ids'] is List ? List<int>.from(
+                      lead['tag_ids']) : null
+                  ..priority = lead['priority']?.toString() ??
+                      '0' // Store as string ('0', '1', '2')
+                  ..activityState = lead['activity_state']?.toString()
+                  ..activityTypeId = lead['activity_type_id'] is List &&
+                      lead['activity_type_id'].isNotEmpty ? [
+                    lead['activity_type_id'][0]
+                  ] : null
+                  ..activityTypeName = lead['activity_type_id'] is List &&
+                      lead['activity_type_id'].length > 1
+                      ? lead['activity_type_id'][1]?.toString()
+                      : null
+                  ..emailFrom = lead['email_from']?.toString()
+                  ..recurringRevenueMonthly = lead['recurring_revenue_monthly'] is double
+                      ? lead['recurring_revenue_monthly']
+                      : (lead['recurring_revenue_monthly'] is int
+                      ? lead['recurring_revenue_monthly'].toDouble()
+                      : null)
+                  ..contactName = lead['contact_name']?.toString()
+                  ..activityIds = lead['activity_ids'] is List ? List<int>.from(
+                      lead['activity_ids']) : null
+                  ..activityDateDeadline = lead['activity_date_deadline']
+                      ?.toString()
+                  ..createDate = lead['create_date']?.toString()
+                  ..dayOpen = lead['day_open'] is double
+                      ? lead['day_open']
+                      : (lead['day_open'] is int
+                      ? lead['day_open'].toDouble()
+                      : null)
+                  ..dayClose = lead['day_close'] is double
+                      ? lead['day_close']
+                      : (lead['day_close'] is int
+                      ? lead['day_close'].toDouble()
+                      : null)
+                  ..probability = lead['probability'] is double
+                      ? lead['probability']
+                      : (lead['probability'] is int ? lead['probability']
+                      .toDouble() : null)
+                  ..recurringRevenueMonthlyProrated = lead['recurring_revenue_monthly_prorated'] is double
+                      ? lead['recurring_revenue_monthly_prorated']
+                      : (lead['recurring_revenue_monthly_prorated'] is int
+                      ? lead['recurring_revenue_monthly_prorated'].toDouble()
+                      : null)
+                  ..recurringRevenueProrated = lead['recurring_revenue_prorated'] is double
+                      ? lead['recurring_revenue_prorated']
+                      : (lead['recurring_revenue_prorated'] is int
+                      ? lead['recurring_revenue_prorated'].toDouble()
+                      : null)
+                  ..proratedRevenue = lead['prorated_revenue'] is double
+                      ? lead['prorated_revenue']
+                      : (lead['prorated_revenue'] is int
+                      ? lead['prorated_revenue'].toDouble()
+                      : null)
+                  ..recurringRevenue = lead['recurring_revenue'] is double
+                      ? lead['recurring_revenue']
+                      : (lead['recurring_revenue'] is int
+                      ? lead['recurring_revenue'].toDouble()
+                      : null)
+                  ..activityUserId = lead['activity_user_id'] is List &&
+                      lead['activity_user_id'].isNotEmpty ? [
+                    lead['activity_user_id'][0]
+                  ] : null
+                  ..dateClosed = lead['date_closed']?.toString()
+                  ..userId = lead['user_id'] is int
+                      ? lead['user_id'] as int?
+                      : (lead['user_id'] is List && lead['user_id'].isNotEmpty
+                      ? lead['user_id'][0] as int?
+                      : null)
+                  ..phone = lead['phone']?.toString();
+                await isar.newacts.put(newpipe);
+                print('Saved lead ID: ${lead['id']}');
+              } catch (e) {
+                print('Error saving lead ID: ${lead['id']}, Error: $e');
+                print('Lead data: $lead');
+              }
+            }
+          });
+        }
 
         Map<String, List<Map<String, dynamic>>> groupedLeads = {};
 
@@ -936,7 +1224,7 @@ class _MyactivityState extends State<Myactivity> {
   }
   Widget ChartSelection() {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 15),
+      padding: EdgeInsets.symmetric(horizontal: 40),
       child: Container(
         width: double.infinity,
         height: 50,
@@ -984,18 +1272,18 @@ class _MyactivityState extends State<Myactivity> {
                   color: selectedView == 2 ? Color(0xFF9EA700) : Colors.black,
                 ),
               ),
-              VerticalDivider(thickness: 2, color: Colors.white),
-              IconButton(
-                onPressed: () {
-                  setState(() {
-                    selectedView = 3;
-                  });
-                },
-                icon: Icon(
-                  Icons.table_rows_outlined,
-                  color: selectedView == 3 ? Color(0xFF9EA700) : Colors.black,
-                ),
-              ),
+              // VerticalDivider(thickness: 2, color: Colors.white),
+              // IconButton(
+              //   onPressed: () {
+              //     setState(() {
+              //       selectedView = 3;
+              //     });
+              //   },
+              //   icon: Icon(
+              //     Icons.table_rows_outlined,
+              //     color: selectedView == 3 ? Color(0xFF9EA700) : Colors.black,
+              //   ),
+              // ),
               VerticalDivider(thickness: 2, color: Colors.white),
               IconButton(
                 onPressed: () {
@@ -3175,51 +3463,13 @@ class _MyactivityState extends State<Myactivity> {
                         const SizedBox(width: 8),
                         ActivityIconDesign(item.activityState, item.activityType),
                         SizedBox(width: 58),
-                        FutureBuilder<Uint8List?>(
-                          future: item.salespersonId != null && client != null
-                              ? GetImage().fetchImage(item.salespersonId!, client!)
-                              : Future.value(null),
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState == ConnectionState.waiting) {
-                              return Container(
-                                width: 24,
-                                height: 24,
-                                margin: EdgeInsets.only(left: 8),
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.grey,
-                                ),
-                              );
-                            } else if (snapshot.hasData && snapshot.data != null) {
-                              return Container(
-                                width: 24,
-                                height: 24,
-                                margin: EdgeInsets.only(left: 8),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(4),
-                                  image: DecorationImage(
-                                    image: MemoryImage(snapshot.data!),
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                              );
-                            } else {
-                              return Container(
-                                width: 24,
-                                height: 24,
-                                margin: EdgeInsets.only(left: 8),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Colors.grey.shade300,
-                                ),
-                                child: Icon(
-                                  Icons.person,
-                                  size: 16,
-                                  color: Colors.grey.shade700,
-                                ),
-                              );
-                            }
-                          },
+                        OdooAvatar(
+                          client: client,
+                          model: 'res.users',
+                          recordId: item.salespersonId!,
+                          size: 24,
+                          borderRadius: 5,
+                          shape: BoxShape.rectangle,
                         ),
                       ],
                     ),
@@ -3238,6 +3488,7 @@ class _MyactivityState extends State<Myactivity> {
   void initState() {
     super.initState();
     selectedFilters = {'my_activities'};
+    loadFromIsar();
     initializeOdooClient();
     boardController = AppFlowyBoardScrollController();
     searchController.addListener(_onSearchChanged);
@@ -3290,25 +3541,27 @@ class _MyactivityState extends State<Myactivity> {
         ],
       ),
       backgroundColor: Colors.white,
-      body: isLoading
-          ? Center(
-        child: LoadingAnimationWidget.fourRotatingDots(
-          color: Color(0xFF9EA700),
-          size: 100,
-        ),
-      )
-          : leadsList.isEmpty
-          ? Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Center(child: Image.asset('assets/nodata.png')),
-          Text(
-            "No data to display",
-            style: TextStyle(color: Colors.blueGrey),
+        body :
+        isLoading && leadsList.isEmpty?
+        Center(
+          child: LoadingAnimationWidget.fourRotatingDots(
+            color: Color(0xFF9EA700),
+            size: 100,
           ),
-        ],
-      )
-          :Column(
+        )
+            : leadsList.isEmpty
+            ? Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Center(child: Image.asset('assets/nodata.png')),
+            Text(
+              "No data to display",
+              style: TextStyle(color: Colors.blueGrey),
+            ),
+          ],
+        )
+            :
+        Column(
         children: [
           Divider(thickness: 2, color: Colors.grey.shade300),
           Padding(

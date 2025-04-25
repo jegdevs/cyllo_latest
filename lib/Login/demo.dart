@@ -87,6 +87,8 @@ class _DemoState extends State<Demo> {
     final userLogin = prefs.getString("userLogin") ?? "";
     final userPassword = prefs.getString("password") ?? "";
 
+
+
     if (baseUrl.isNotEmpty &&
         dbName.isNotEmpty &&
         userLogin.isNotEmpty &&
@@ -98,8 +100,10 @@ class _DemoState extends State<Demo> {
         print("Odoo Authenticated: $auth");
         await getChartData();
         await imageData();
+
       } catch (e) {
         print("Odoo Authentication Failed: $e");
+
       }
     }
     setState(() => isLoading = false);

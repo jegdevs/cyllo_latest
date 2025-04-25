@@ -642,6 +642,7 @@ class _EditprofileState extends State<Editprofile> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
+        iconTheme: IconThemeData(color: Colors.white),
         leading: IconButton(
             onPressed: () {
               Navigator.push(context,
@@ -650,7 +651,7 @@ class _EditprofileState extends State<Editprofile> {
             },
             icon: Icon(Icons.navigate_before)),
         backgroundColor:Color(0xFF9EA700),
-        title: Text('Edit Profile'),
+        title: Text('Edit Profile',style: TextStyle(color: Colors.white),),
         centerTitle: true,
       ),
       resizeToAvoidBottomInset: true,

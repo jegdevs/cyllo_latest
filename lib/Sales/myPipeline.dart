@@ -2,28 +2,31 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'dart:typed_data';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cyllo_mobile/getUserImage.dart';
+import 'package:cyllo_mobile/isarModel/pipelineModel.dart';
 import 'package:flutter/material.dart';
 import 'package:appflowy_board/appflowy_board.dart';
 import 'package:intl/intl.dart';
+import 'package:isar/isar.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:syncfusion_flutter_calendar/calendar.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datagrid/datagrid.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
+import '../main.dart';
 import 'Views/pipeLineView.dart';
 
 class Mypipeline extends StatefulWidget {
-
   final int? teamId;
-  final List<List< Object>>? domain;
+  final List<List<Object>>? domain;
   final String? title;
 
-
-  const Mypipeline({super.key,  this.teamId , this.domain,this.title});
+  const Mypipeline({super.key, this.teamId, this.domain, this.title});
 
   @override
   State<Mypipeline> createState() => _MypipelineState();
@@ -39,6 +42,9 @@ List<Map<String, dynamic>> opportunitiesList = [];
 
 class _MypipelineState extends State<Mypipeline> {
   List<ChartData> chartDatavalues = [];
+  List<String> _creationDates = [];
+  List<String> _closedDates = [];
+  Map<int, String> tagMap = {};
   List<String> activityTypes = [];
   Uint8List? profileImage;
   String? userName;
@@ -70,16 +76,14 @@ class _MypipelineState extends State<Mypipeline> {
     });
   }
 
-
-
   Map<String, Map<String, dynamic>> getFilters() {
     return {
-        'my_pipeline': {
-          'name': 'My Pipeline',
-          'domain': [
-            ['user_id', '=', currentUserId]
-          ]
-        },
+      'my_pipeline': {
+        'name': 'My Pipeline',
+        'domain': [
+          ['user_id', '=', currentUserId]
+        ]
+      },
       'unassigned': {
         'name': 'Unassigned',
         'domain': [
@@ -152,23 +156,28 @@ class _MypipelineState extends State<Mypipeline> {
       client = OdooClient(baseUrl);
       try {
         final auth =
-        await client!.authenticate(dbName, userLogin, userPassword);
+            await client!.authenticate(dbName, userLogin, userPassword);
         print("Odoo Authenticated: $auth");
         await userImage();
-        await pipe();
+        await pipe(savetoIsar: true);
         await tag();
         await iconSelectedView();
         await fetchData();
         await buildChart();
         await fetchFilteredData();
         await act();
+        final dates = await fetchAllDates();
+        setState(() {
+          _creationDates = dates['creationDates']!;
+          _closedDates = dates['closedDates']!;
+        });
       } catch (e) {
+        await loadFromIsar();
         print("Odoo Authentication Failed: $e");
       }
     }
     setState(() => isLoading = false);
   }
-
 
   void showFilterDialog(BuildContext context) {
     final currentFilters = getFilters();
@@ -180,7 +189,8 @@ class _MypipelineState extends State<Mypipeline> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           backgroundColor: Colors.white,
           title: Text(
             "Select Filters",
@@ -192,172 +202,164 @@ class _MypipelineState extends State<Mypipeline> {
           ),
           content: StatefulBuilder(
             builder: (context, setDialogState) {
-              return FutureBuilder<Map<String, List<String>>>(
-                future: fetchAllDates(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return SizedBox(
-                      height: 100,
-                      child: Center(child: CircularProgressIndicator(color: Colors.blue)),
-                    );
-                  }
+              List<String> creationDates = _creationDates;
+              List<String> closedDates = _closedDates;
 
-                  List<String> creationDates = snapshot.data!['creationDates']!;
-                  List<String> closedDates = snapshot.data!['closedDates']!;
+              if (!creationDates.contains("None")) {
+                creationDates = ["None", ...creationDates];
+              }
+              if (!closedDates.contains("None")) {
+                closedDates = ["None", ...closedDates];
+              }
 
-                  if (!creationDates.contains("None")) {
-                    creationDates.insert(0, "None");
-                  }
-                  if (!closedDates.contains("None")) {
-                    closedDates.insert(0, "None");
-                  }
-
-                  return Container(
-                    width: double.maxFinite,
-                    constraints: BoxConstraints(maxHeight: 400),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (currentFilters.isEmpty)
-                            Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Text(
-                                "No filters available",
-                                style: TextStyle(color: Colors.grey[600]),
-                              ),
-                            ),
-                          ...currentFilters.entries.map((entry) {
-                            if (entry.key == 'created_on') {
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 12.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      entry.value['name'],
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.blueGrey[700],
-                                      ),
-                                    ),
-                                    SizedBox(height: 8),
-                                    Container(
-                                      padding: EdgeInsets.symmetric(horizontal: 12),
-                                      decoration: BoxDecoration(
-                                        border: Border.all(color: Colors.grey[300]!),
-                                        borderRadius: BorderRadius.circular(8),
-                                        color: Colors.grey[50],
-                                      ),
-                                      child: DropdownButton<String>(
-                                        value: tempSelectedCreationDate ?? "None",
-                                        hint: Text("Select a month"),
-                                        isExpanded: true,
-                                        underline: SizedBox(),
-                                        items: creationDates.map((String date) {
-                                          return DropdownMenuItem<String>(
-                                            value: date,
-                                            child: Text(date),
-                                          );
-                                        }).toList(),
-                                        onChanged: (String? newValue) {
-                                          setDialogState(() {
-                                            if (newValue == "None") {
-                                              tempSelectedCreationDate = null;
-                                              tempSelectedFilters.remove('created_on');
-                                            } else {
-                                              tempSelectedCreationDate = newValue;
-                                              tempSelectedFilters.add('created_on');
-                                            }
-                                          });
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            } else if (entry.key == 'closed_on') {
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 12.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      entry.value['name'],
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.blueGrey[700],
-                                      ),
-                                    ),
-                                    SizedBox(height: 8),
-                                    Container(
-                                      padding: EdgeInsets.symmetric(horizontal: 12),
-                                      decoration: BoxDecoration(
-                                        border: Border.all(color: Colors.grey[300]!),
-                                        borderRadius: BorderRadius.circular(8),
-                                        color: Colors.grey[50],
-                                      ),
-                                      child: DropdownButton<String>(
-                                        value: tempSelectedClosedDate ?? "None",
-                                        hint: Text("Select a month"),
-                                        isExpanded: true,
-                                        underline: SizedBox(),
-                                        items: closedDates.map((String date) {
-                                          return DropdownMenuItem<String>(
-                                            value: date,
-                                            child: Text(date),
-                                          );
-                                        }).toList(),
-                                        onChanged: (String? newValue) {
-                                          setDialogState(() {
-                                            if (newValue == "None") {
-                                              tempSelectedClosedDate = null;
-                                              tempSelectedFilters.remove('closed_on');
-                                            } else {
-                                              tempSelectedClosedDate = newValue;
-                                              tempSelectedFilters.add('closed_on');
-                                            }
-                                          });
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }
-                            return Card(
-                              elevation: 0,
-                              color: Colors.grey[50],
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: CheckboxListTile(
-                                title: Text(
+              return Container(
+                width: double.maxFinite,
+                constraints: BoxConstraints(maxHeight: 400),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (currentFilters.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Text(
+                            "No filters available",
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                        ),
+                      ...currentFilters.entries.map((entry) {
+                        if (entry.key == 'created_on') {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
                                   entry.value['name'],
-                                  style: TextStyle(color: Colors.blueGrey[800]),
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.blueGrey[700],
+                                  ),
                                 ),
-                                value: tempSelectedFilters.contains(entry.key),
-                                activeColor: Colors.blue,
-                                onChanged: (bool? value) {
-                                  setDialogState(() {
-                                    if (value == true) {
-                                      tempSelectedFilters.add(entry.key);
-                                    } else {
-                                      tempSelectedFilters.remove(entry.key);
-                                    }
-                                  });
-                                },
-                              ),
-                            );
-                          }).toList(),
-                        ],
-                      ),
-                    ),
-                  );
-                },
+                                SizedBox(height: 8),
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 12),
+                                  decoration: BoxDecoration(
+                                    border:
+                                        Border.all(color: Colors.grey[300]!),
+                                    borderRadius: BorderRadius.circular(8),
+                                    color: Colors.grey[50],
+                                  ),
+                                  child: DropdownButton<String>(
+                                    value: tempSelectedCreationDate ?? "None",
+                                    hint: Text("Select a month"),
+                                    isExpanded: true,
+                                    underline: SizedBox(),
+                                    items: creationDates.map((String date) {
+                                      return DropdownMenuItem<String>(
+                                        value: date,
+                                        child: Text(date),
+                                      );
+                                    }).toList(),
+                                    onChanged: (String? newValue) {
+                                      setDialogState(() {
+                                        if (newValue == "None") {
+                                          tempSelectedCreationDate = null;
+                                          tempSelectedFilters
+                                              .remove('created_on');
+                                        } else {
+                                          tempSelectedCreationDate = newValue;
+                                          tempSelectedFilters.add('created_on');
+                                        }
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        } else if (entry.key == 'closed_on') {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  entry.value['name'],
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.blueGrey[700],
+                                  ),
+                                ),
+                                SizedBox(height: 8),
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 12),
+                                  decoration: BoxDecoration(
+                                    border:
+                                        Border.all(color: Colors.grey[300]!),
+                                    borderRadius: BorderRadius.circular(8),
+                                    color: Colors.grey[50],
+                                  ),
+                                  child: DropdownButton<String>(
+                                    value: tempSelectedClosedDate ?? "None",
+                                    hint: Text("Select a month"),
+                                    isExpanded: true,
+                                    underline: SizedBox(),
+                                    items: closedDates.map((String date) {
+                                      return DropdownMenuItem<String>(
+                                        value: date,
+                                        child: Text(date),
+                                      );
+                                    }).toList(),
+                                    onChanged: (String? newValue) {
+                                      setDialogState(() {
+                                        if (newValue == "None") {
+                                          tempSelectedClosedDate = null;
+                                          tempSelectedFilters
+                                              .remove('closed_on');
+                                        } else {
+                                          tempSelectedClosedDate = newValue;
+                                          tempSelectedFilters.add('closed_on');
+                                        }
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                        return Card(
+                          elevation: 0,
+                          color: Colors.grey[50],
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: CheckboxListTile(
+                            title: Text(
+                              entry.value['name'],
+                              style: TextStyle(color: Colors.blueGrey[800]),
+                            ),
+                            value: tempSelectedFilters.contains(entry.key),
+                            activeColor: Colors.blue,
+                            onChanged: (bool? value) {
+                              setDialogState(() {
+                                if (value == true) {
+                                  tempSelectedFilters.add(entry.key);
+                                } else {
+                                  tempSelectedFilters.remove(entry.key);
+                                }
+                              });
+                            },
+                          ),
+                        );
+                      }).toList(),
+                    ],
+                  ),
+                ),
               );
             },
           ),
@@ -379,8 +381,9 @@ class _MypipelineState extends State<Mypipeline> {
                 fetchFilteredData();
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFF9EA700) ,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                backgroundColor: Color(0xFF9EA700),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
               ),
               child: Text("Apply", style: TextStyle(color: Colors.white)),
             ),
@@ -404,9 +407,7 @@ class _MypipelineState extends State<Mypipeline> {
       final response = await client!.callKw({
         'model': 'crm.lead',
         'method': 'search_read',
-        'args': [
-          []
-        ],
+        'args': [[]],
         'kwargs': {
           'fields': ['date_closed'],
         },
@@ -418,7 +419,9 @@ class _MypipelineState extends State<Mypipeline> {
 
       Set<String> uniqueDates = {};
       for (var lead in response) {
-        if (lead['date_closed'] != null && lead['date_closed'] != false && lead['date_closed'] is String) {
+        if (lead['date_closed'] != null &&
+            lead['date_closed'] != false &&
+            lead['date_closed'] is String) {
           print("Found date_closed value: ${lead['date_closed']}");
           try {
             DateTime date = DateTime.parse(lead['date_closed']);
@@ -457,9 +460,7 @@ class _MypipelineState extends State<Mypipeline> {
       final response = await client!.callKw({
         'model': 'crm.lead',
         'method': 'search_read',
-        'args': [
-          []
-        ],
+        'args': [[]],
         'kwargs': {
           'fields': ['create_date'],
         },
@@ -475,7 +476,6 @@ class _MypipelineState extends State<Mypipeline> {
           uniqueDates.add(formattedDate);
         }
       }
-
 
       List<String> sortedDates = uniqueDates.toList()
         ..sort((a, b) {
@@ -501,7 +501,6 @@ class _MypipelineState extends State<Mypipeline> {
     try {
       await pipe();
       await buildChart();
-
     } catch (e) {
       log("Error fetching filtered data: $e");
       setState(() {
@@ -511,29 +510,35 @@ class _MypipelineState extends State<Mypipeline> {
     }
   }
 
-
   Future<Map<int, String>> tag() async {
-    Map<int, String> tagMap = {};
     try {
       final response = await client?.callKw({
         'model': 'crm.tag',
         'method': 'search_read',
-        'args': [],
+        'args': [[]],
         'kwargs': {
-          'fields': ['id', 'name', 'color'],
-        }
+          'fields': ['id', 'name'],
+        },
       });
-      print('lolkoko$response');
+      Map<int, String> tagMap = {};
       if (response != null) {
-        for (var tag in response) {
-          tagMap[tag['id']] = tag['name'];
-        }
+        List<Map<String, dynamic>> tags = List.from(response);
+        await isar.writeTxn(() async {
+          for (var tag in tags) {
+            tagMap[tag['id']] = tag['name'];
+            final isarTag = Tag()
+              ..tagId = tag['id']
+              ..name = tag['name'];
+            await isar.tags.put(isarTag);
+          }
+        });
       }
-      print('Tags fetched: $tagMap');
       return tagMap;
     } catch (e) {
-      print("Failed to fetch tags: $e");
-      return {};
+      log("Failed to fetch tags: $e");
+      // Load tags from Isar in case of failure
+      final tags = await isar.tags.where().findAll();
+      return {for (var tag in tags) tag.tagId!: tag.name ?? ''};
     }
   }
 
@@ -544,7 +549,9 @@ class _MypipelineState extends State<Mypipeline> {
         'method': 'search_read',
         'args': [],
         'kwargs': {
-          'fields': ['name',],
+          'fields': [
+            'name',
+          ],
         }
       });
 
@@ -552,10 +559,10 @@ class _MypipelineState extends State<Mypipeline> {
 
       if (response != null && response is List) {
         setState(() {
-          activityTypes = response.map((item) => item['name'].toString()).toList();
+          activityTypes =
+              response.map((item) => item['name'].toString()).toList();
         });
       }
-
     } catch (e) {
       print("Failed to fetch tags: $e");
     }
@@ -583,7 +590,7 @@ class _MypipelineState extends State<Mypipeline> {
       print('imggg$response');
       if (response == null || response.isEmpty || response is! List) {
         print('No data received or invalid format');
-        setState(() => isLoading = false);
+        // setState(() => isLoading = false);
         return;
       }
       try {
@@ -606,197 +613,434 @@ class _MypipelineState extends State<Mypipeline> {
     }
   }
 
-      Future<void> pipe({String query=""}) async {
-        final prefs = await SharedPreferences.getInstance();
-        final userid = prefs.getInt("userId") ?? "";
-        print('iddddd$userid');
-        try {
-          Map<int, String> tagMap = await tag();
-          final currentFilters = getFilters();
-          List<dynamic> finalFilter = [];
-          List<dynamic> domain = [
-            ['type', '=', 'opportunity']
-          ];
+  Future<void> loadFromIsar() async {
+    setState(() {
+      isLoading = true;
+      selectedView = 0;
+    });
+    try {
+      final tags = await isar.tags.where().findAll();
+      tagMap = {for (var tag in tags) tag.tagId!: tag.name ?? ''};
+      final pipes = await isar.newpipes.where().findAll();
 
-          bool hasMyPipeline = selectedFilters.contains('my_pipeline');
-          bool hasUnassigned = selectedFilters.contains('unassigned');
-          bool hasMyAssignedPartners = selectedFilters.contains('my_assigned_partners');
-          bool hasOpenOpportunities = selectedFilters.contains('open_opportunties');
-          bool hasWon = selectedFilters.contains('won');
-          bool hasLost = selectedFilters.contains('lost');
-          bool hasArchived = selectedFilters.contains('archived');
-          log('selytt$selectedFilters');
+      if (pipes.isNotEmpty) {
+        // Convert Isar data to leadsList format for consistency
+        leadsList = pipes.map((pipe) {
+          return {
+            'id': pipe.leadId,
+            'name': pipe.name,
+            'expected_revenue': pipe.expectedRevenue ?? 0.0,
+            'stage_id': pipe.stageId != null && pipe.stageName != null
+                ? [pipe.stageId![0], pipe.stageName]
+                : null,
+            'partner_id': pipe.partnerId != null && pipe.partnerName != null
+                ? [pipe.partnerId![0], pipe.partnerName]
+                : null,
+            'tag_ids': pipe.tagIds,
+            'priority': pipe.priority,
+            'activity_state': pipe.activityState,
+            'activity_type_id':
+                pipe.activityTypeId != null && pipe.activityTypeName != null
+                    ? [pipe.activityTypeId![0], pipe.activityTypeName]
+                    : null,
+            'email_from': pipe.emailFrom,
+            'recurring_revenue_monthly': pipe.recurringRevenueMonthly,
+            'contact_name': pipe.contactName,
+            'activity_ids': pipe.activityIds,
+            'activity_date_deadline': pipe.activityDateDeadline,
+            'create_date': pipe.createDate,
+            'day_open': pipe.dayOpen,
+            'day_close': pipe.dayClose,
+            'probability': pipe.probability,
+            'recurring_revenue_monthly_prorated':
+                pipe.recurringRevenueMonthlyProrated,
+            'recurring_revenue_prorated': pipe.recurringRevenueProrated,
+            'prorated_revenue': pipe.proratedRevenue,
+            'recurring_revenue': pipe.recurringRevenue,
+            'activity_user_id': pipe.activityUserId,
+            'date_closed': pipe.dateClosed,
+            'type': pipe.type,
+            'user_id': pipe.userId,
+            'phone': pipe.phone,
+          };
+        }).toList();
 
-          // Temporary list for "My Pipeline or Unassigned or My Assigned Partners or Open Opportunities"
-          List<dynamic> pipelineDomain = [];
+        opportunitiesList =
+            leadsList.where((lead) => lead['type'] == "opportunity").toList();
 
-          // Handle "My Pipeline or Unassigned or My Assigned Partners or Open Opportunities" with OR logic
-          if (hasMyPipeline && hasUnassigned && hasMyAssignedPartners && hasOpenOpportunities) {
-            pipelineDomain.add('|');
-            pipelineDomain.add('|');
-            pipelineDomain.add('|');
-            pipelineDomain.addAll(currentFilters['my_pipeline']!['domain']);
-            pipelineDomain.addAll(currentFilters['unassigned']!['domain']);
-            pipelineDomain.addAll(currentFilters['my_assigned_partners']!['domain']);
-            pipelineDomain.addAll(currentFilters['open_opportunties']!['domain']);
-          } else if (hasMyPipeline && hasUnassigned && hasMyAssignedPartners) {
-            pipelineDomain.add('|');
-            pipelineDomain.add('|');
-            pipelineDomain.addAll(currentFilters['my_pipeline']!['domain']);
-            pipelineDomain.addAll(currentFilters['unassigned']!['domain']);
-            pipelineDomain.addAll(currentFilters['my_assigned_partners']!['domain']);
-          } else if (hasMyPipeline && hasUnassigned && hasOpenOpportunities) {
-            pipelineDomain.add('|');
-            pipelineDomain.add('|');
-            pipelineDomain.addAll(currentFilters['my_pipeline']!['domain']);
-            pipelineDomain.addAll(currentFilters['unassigned']!['domain']);
-            pipelineDomain.addAll(currentFilters['open_opportunties']!['domain']);
-          } else if (hasMyPipeline && hasMyAssignedPartners && hasOpenOpportunities) {
-            pipelineDomain.add('|');
-            pipelineDomain.add('|');
-            pipelineDomain.addAll(currentFilters['my_pipeline']!['domain']);
-            pipelineDomain.addAll(currentFilters['my_assigned_partners']!['domain']);
-            pipelineDomain.addAll(currentFilters['open_opportunties']!['domain']);
-          } else if (hasUnassigned && hasMyAssignedPartners && hasOpenOpportunities) {
-            pipelineDomain.add('|');
-            pipelineDomain.add('|');
-            pipelineDomain.addAll(currentFilters['unassigned']!['domain']);
-            pipelineDomain.addAll(currentFilters['my_assigned_partners']!['domain']);
-            pipelineDomain.addAll(currentFilters['open_opportunties']!['domain']);
-          } else if (hasMyPipeline && hasUnassigned) {
-            pipelineDomain.add('|');
-            pipelineDomain.addAll(currentFilters['my_pipeline']!['domain']);
-            pipelineDomain.addAll(currentFilters['unassigned']!['domain']);
-          } else if (hasMyPipeline && hasMyAssignedPartners) {
-            pipelineDomain.add('|');
-            pipelineDomain.addAll(currentFilters['my_pipeline']!['domain']);
-            pipelineDomain.addAll(currentFilters['my_assigned_partners']!['domain']);
-          } else if (hasMyPipeline && hasOpenOpportunities) {
-            pipelineDomain.add('|');
-            pipelineDomain.addAll(currentFilters['my_pipeline']!['domain']);
-            pipelineDomain.addAll(currentFilters['open_opportunties']!['domain']);
-          } else if (hasUnassigned && hasMyAssignedPartners) {
-            pipelineDomain.add('|');
-            pipelineDomain.addAll(currentFilters['unassigned']!['domain']);
-            pipelineDomain.addAll(currentFilters['my_assigned_partners']!['domain']);
-          } else if (hasUnassigned && hasOpenOpportunities) {
-            pipelineDomain.add('|');
-            pipelineDomain.addAll(currentFilters['unassigned']!['domain']);
-            pipelineDomain.addAll(currentFilters['open_opportunties']!['domain']);
-          } else if (hasMyAssignedPartners && hasOpenOpportunities) {
-            pipelineDomain.add('|');
-            pipelineDomain.addAll(currentFilters['my_assigned_partners']!['domain']);
-            pipelineDomain.addAll(currentFilters['open_opportunties']!['domain']);
-          } else if (hasMyPipeline) {
-            pipelineDomain.addAll(currentFilters['my_pipeline']!['domain']);
-          } else if (hasUnassigned) {
-            pipelineDomain.addAll(currentFilters['unassigned']!['domain']);
-          } else if (hasMyAssignedPartners) {
-            pipelineDomain.addAll(currentFilters['my_assigned_partners']!['domain']);
-          } else if (hasOpenOpportunities) {
-            pipelineDomain.addAll(currentFilters['open_opportunties']!['domain']);
+        controller.clear();
+        // Group pipes by stage_id instead of stageName
+        Map<int, List<Newpipe>> groupedPipes = {};
+        for (var pipe in pipes) {
+          if (pipe.stageId != null && pipe.stageName != null) {
+            groupedPipes.putIfAbsent(pipe.stageId![0], () => []).add(pipe);
           }
-
-          // Temporary list for "Won or Lost"
-          List<dynamic> wonLostDomain = [];
-
-          // Handle "Won or Lost" with OR logic
-          if (hasWon && hasLost) {
-            wonLostDomain.add('|');
-            wonLostDomain.addAll(currentFilters['won']!['domain']);
-            wonLostDomain.addAll(currentFilters['lost']!['domain']);
-          } else if (hasWon) {
-            wonLostDomain.addAll(currentFilters['won']!['domain']);
-          } else if (hasLost) {
-            wonLostDomain.addAll(currentFilters['lost']!['domain']);
-          }
-
-          // Handle date filters
-          bool hasDateFilter = false;
-          for (String filterKey in selectedFilters) {
-            if (filterKey == 'created_on' && selectedCreationDate != null) {
-              DateTime selectedMonth = DateFormat('MMMM yyyy').parse(selectedCreationDate!);
-              String startDate = DateFormat('yyyy-MM-01').format(selectedMonth);
-              String endDate = DateFormat('yyyy-MM-dd')
-                  .format(DateTime(selectedMonth.year, selectedMonth.month + 1, 0));
-
-              domain = [
-                '&',
-                ...domain,
-                ['create_date', '>=', startDate],
-                ['create_date', '<=', endDate],
-              ];
-              hasDateFilter = true;
-            } else if (filterKey == 'closed_on' && selectedClosedDate != null) {
-              DateTime selectedMonth = DateFormat('MMMM yyyy').parse(selectedClosedDate!);
-              String startDate = DateFormat('yyyy-MM-01').format(selectedMonth);
-              String endDate = DateFormat('yyyy-MM-dd')
-                  .format(DateTime(selectedMonth.year, selectedMonth.month + 1, 0));
-
-              domain = [
-                '&',
-                ...domain,
-                ['date_closed', '>=', startDate],
-                ['date_closed', '<=', endDate],
-              ];
-              hasDateFilter = true;
-            }
-          }
-
-          // Combine pipeline domain
-          if (pipelineDomain.isNotEmpty) {
-            if (hasDateFilter) {
-              domain = ['&', ...domain, ...pipelineDomain];
-            } else {
-              domain = [...domain, ...pipelineDomain];
-            }
-          }
-
-          // Combine won/lost domain
-          if (wonLostDomain.isNotEmpty) {
-            if (pipelineDomain.isNotEmpty || hasDateFilter) {
-              domain = ['&', ...domain, ...wonLostDomain];
-            } else {
-              domain = [...domain, ...wonLostDomain];
-            }
-          }
-
-
-          if (hasArchived) {
-            // Explicitly create a properly formatted domain
-            List<dynamic> archivedCondition = [['active', '=', false]];
-
-            if (domain.length > 1) {  // If domain already has conditions
-              domain = ['&', ...domain, ...archivedCondition];
-            } else {  // If domain only has the initial ['type', '=', 'opportunity']
-              domain = [['type', '=', 'opportunity'], ...archivedCondition];
-            }
-          }
-
-        // Add widget domain/team_id if present
-        if (widget.domain != null && widget.domain!.isNotEmpty) {
-        domain = ['&', ...widget.domain!, ...domain];
-        } else if (widget.teamId != null) {
-        domain = ['&', ['team_id', '=', widget.teamId], ...domain];
         }
 
-          if(query.isNotEmpty){
-            List<dynamic> searchDomain = [
-              "|",
-              "|",
-              "|",
-              "|",
-              ["partner_id", "ilike", query],
-              ["partner_name", "ilike", query],
-              ["email_from", "ilike", query],
-              ["name", "ilike", query],
-              ["contact_name", "ilike", query],
-            ];
+        // Sort groups by stage_id
+        var sortedStageIds = groupedPipes.keys.toList()..sort();
+        for (var stageId in sortedStageIds) {
+          var pipesInStage = groupedPipes[stageId]!;
+          // Use stageName for display, but order by stageId
+          String stageName = pipesInStage.first.stageName ?? 'Unknown';
+          final groupData = AppFlowyGroupData(
+            id: stageId.toString(),
+            name: stageName,
+            items: pipesInStage.map((pipe) {
+              int priorityValue;
+              switch (pipe.priority ?? '0') {
+                case '0':
+                  priorityValue = 0; // Low
+                  break;
+                case '1':
+                  priorityValue = 1; // Medium
+                  break;
+                case '2':
+                  priorityValue = 2; // High
+                  break;
+                case '3':
+                  priorityValue = 3; // High
+                  break;
+                default:
+                  priorityValue = 0; // Default to Low
+              }
+              return LeadItem(
+                leadId: pipe.leadId ?? 0,
+                name: pipe.name ?? '',
+                revenue: pipe.expectedRevenue?.toString() ?? '0',
+                customerName: pipe.partnerName ?? 'None',
+                priority: priorityValue,
+                tags: pipe.tagIds?.map((id) => tagMap[id] ?? '').toList()
+                        as List<String> ??
+                    [],
+                activityState: pipe.activityState ?? '',
+                activityType: pipe.activityTypeName ?? '',
+                hasActivity: pipe.activityIds?.isNotEmpty ?? false,
+                activityIds:
+                    pipe.activityIds?.map((id) => id.toString()).toList() ?? [],
+                salespersonId: pipe.userId,
+                imageData: null, // Handle profile image if stored in Isar
+              );
+            }).toList(),
+          );
+          controller.addGroup(groupData);
+        }
 
-            domain=[...domain,...searchDomain];
+        // Calculate chart data
+        Map<String, double> stageValues = {};
+        Map<String, int> stageIdToName = {};
+        for (var item in opportunitiesList) {
+          if (item['stage_id'] != null &&
+              item['stage_id'] is List &&
+              item['stage_id'].length > 1) {
+            String stageName = item['stage_id'][1].toString();
+            int stageId = item['stage_id'][0] as int;
+            stageIdToName[stageName] = stageId;
+            double value;
+            if (selectedFilter == "count") {
+              value = (stageValues[stageName] ?? 0) + 1;
+            } else if (selectedFilter == "day_open" &&
+                item['day_open'] != null &&
+                item['day_open'] != false) {
+              value =
+                  (stageValues[stageName] ?? 0) + (item['day_open'] as double);
+            } else if (selectedFilter == "day_close" &&
+                item['day_close'] != null &&
+                item['day_close'] != false) {
+              value =
+                  (stageValues[stageName] ?? 0) + (item['day_close'] as double);
+            } else if (selectedFilter == "recurring_revenue_monthly" &&
+                item['recurring_revenue_monthly'] != null &&
+                item['recurring_revenue_monthly'] != false) {
+              value = (stageValues[stageName] ?? 0) +
+                  (item['recurring_revenue_monthly'] as double);
+            } else if (selectedFilter == "expected_revenue" &&
+                item['expected_revenue'] != null &&
+                item['expected_revenue'] != false) {
+              value = (stageValues[stageName] ?? 0) +
+                  (item['expected_revenue'] as double);
+            } else if (selectedFilter == "probability" &&
+                item['probability'] != null &&
+                item['probability'] != false) {
+              value = (stageValues[stageName] ?? 0) +
+                  (item['probability'] as double);
+            } else if (selectedFilter == "recurring_revenue_monthly_prorated" &&
+                item['recurring_revenue_monthly_prorated'] != null &&
+                item['recurring_revenue_monthly_prorated'] != false) {
+              value = (stageValues[stageName] ?? 0) +
+                  (item['recurring_revenue_monthly_prorated'] as double);
+            } else if (selectedFilter == "recurring_revenue_prorated" &&
+                item['recurring_revenue_prorated'] != null &&
+                item['recurring_revenue_prorated'] != false) {
+              value = (stageValues[stageName] ?? 0) +
+                  (item['recurring_revenue_prorated'] as double);
+            } else if (selectedFilter == "prorated_revenue" &&
+                item['prorated_revenue'] != null &&
+                item['prorated_revenue'] != false) {
+              value = (stageValues[stageName] ?? 0) +
+                  (item['prorated_revenue'] as double);
+            } else if (selectedFilter == "recurring_revenue" &&
+                item['recurring_revenue'] != null &&
+                item['recurring_revenue'] != false) {
+              value = (stageValues[stageName] ?? 0) +
+                  (item['recurring_revenue'] as double);
+            } else {
+              value = 0;
+            }
+            stageValues[stageName] = value;
           }
+        }
 
-        log('aasas${finalFilter.toString()}');
+        setState(() {
+          chartDatavalues.clear();
+          // Sort chart data by stage_id
+          List<String> stageNames = stageValues.keys.toList();
+          stageNames
+              .sort((a, b) => stageIdToName[a]!.compareTo(stageIdToName[b]!));
+          List<ChartData> sortedData = stageNames
+              .where((stage) => stageValues.containsKey(stage))
+              .map((stage) => ChartData(stage, stageValues[stage]!))
+              .toList();
+          chartDatavalues = sortedData;
+
+          if (stageNames.isEmpty || sortedData.every((data) => data.y == 0)) {
+            showNoDataMessage = true;
+          } else {
+            showNoDataMessage = false;
+          }
+          isLoading = false;
+        });
+      } else {
+        await initializeOdooClient();
+      }
+    } catch (e) {
+      log("Isar Load Failed: $e");
+      setState(() {
+        isLoading = false;
+        showNoDataMessage = true;
+      });
+    }
+  }
+
+  Future<void> pipe({String query = "", bool savetoIsar = false}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userid = prefs.getInt("userId") ?? "";
+    print('iddddd$userid');
+    try {
+      Map<int, String> tagMap = await tag();
+      final currentFilters = getFilters();
+      List<dynamic> finalFilter = [];
+      List<dynamic> domain = [
+        ['type', '=', 'opportunity']
+      ];
+
+      bool hasMyPipeline = selectedFilters.contains('my_pipeline');
+      bool hasUnassigned = selectedFilters.contains('unassigned');
+      bool hasMyAssignedPartners =
+          selectedFilters.contains('my_assigned_partners');
+      bool hasOpenOpportunities = selectedFilters.contains('open_opportunties');
+      bool hasWon = selectedFilters.contains('won');
+      bool hasLost = selectedFilters.contains('lost');
+      bool hasArchived = selectedFilters.contains('archived');
+      log('selytt$selectedFilters');
+
+      // Temporary list for "My Pipeline or Unassigned or My Assigned Partners or Open Opportunities"
+      List<dynamic> pipelineDomain = [];
+
+      // Handle "My Pipeline or Unassigned or My Assigned Partners or Open Opportunities" with OR logic
+      if (hasMyPipeline &&
+          hasUnassigned &&
+          hasMyAssignedPartners &&
+          hasOpenOpportunities) {
+        pipelineDomain.add('|');
+        pipelineDomain.add('|');
+        pipelineDomain.add('|');
+        pipelineDomain.addAll(currentFilters['my_pipeline']!['domain']);
+        pipelineDomain.addAll(currentFilters['unassigned']!['domain']);
+        pipelineDomain
+            .addAll(currentFilters['my_assigned_partners']!['domain']);
+        pipelineDomain.addAll(currentFilters['open_opportunties']!['domain']);
+      } else if (hasMyPipeline && hasUnassigned && hasMyAssignedPartners) {
+        pipelineDomain.add('|');
+        pipelineDomain.add('|');
+        pipelineDomain.addAll(currentFilters['my_pipeline']!['domain']);
+        pipelineDomain.addAll(currentFilters['unassigned']!['domain']);
+        pipelineDomain
+            .addAll(currentFilters['my_assigned_partners']!['domain']);
+      } else if (hasMyPipeline && hasUnassigned && hasOpenOpportunities) {
+        pipelineDomain.add('|');
+        pipelineDomain.add('|');
+        pipelineDomain.addAll(currentFilters['my_pipeline']!['domain']);
+        pipelineDomain.addAll(currentFilters['unassigned']!['domain']);
+        pipelineDomain.addAll(currentFilters['open_opportunties']!['domain']);
+      } else if (hasMyPipeline &&
+          hasMyAssignedPartners &&
+          hasOpenOpportunities) {
+        pipelineDomain.add('|');
+        pipelineDomain.add('|');
+        pipelineDomain.addAll(currentFilters['my_pipeline']!['domain']);
+        pipelineDomain
+            .addAll(currentFilters['my_assigned_partners']!['domain']);
+        pipelineDomain.addAll(currentFilters['open_opportunties']!['domain']);
+      } else if (hasUnassigned &&
+          hasMyAssignedPartners &&
+          hasOpenOpportunities) {
+        pipelineDomain.add('|');
+        pipelineDomain.add('|');
+        pipelineDomain.addAll(currentFilters['unassigned']!['domain']);
+        pipelineDomain
+            .addAll(currentFilters['my_assigned_partners']!['domain']);
+        pipelineDomain.addAll(currentFilters['open_opportunties']!['domain']);
+      } else if (hasMyPipeline && hasUnassigned) {
+        pipelineDomain.add('|');
+        pipelineDomain.addAll(currentFilters['my_pipeline']!['domain']);
+        pipelineDomain.addAll(currentFilters['unassigned']!['domain']);
+      } else if (hasMyPipeline && hasMyAssignedPartners) {
+        pipelineDomain.add('|');
+        pipelineDomain.addAll(currentFilters['my_pipeline']!['domain']);
+        pipelineDomain
+            .addAll(currentFilters['my_assigned_partners']!['domain']);
+      } else if (hasMyPipeline && hasOpenOpportunities) {
+        pipelineDomain.add('|');
+        pipelineDomain.addAll(currentFilters['my_pipeline']!['domain']);
+        pipelineDomain.addAll(currentFilters['open_opportunties']!['domain']);
+      } else if (hasUnassigned && hasMyAssignedPartners) {
+        pipelineDomain.add('|');
+        pipelineDomain.addAll(currentFilters['unassigned']!['domain']);
+        pipelineDomain
+            .addAll(currentFilters['my_assigned_partners']!['domain']);
+      } else if (hasUnassigned && hasOpenOpportunities) {
+        pipelineDomain.add('|');
+        pipelineDomain.addAll(currentFilters['unassigned']!['domain']);
+        pipelineDomain.addAll(currentFilters['open_opportunties']!['domain']);
+      } else if (hasMyAssignedPartners && hasOpenOpportunities) {
+        pipelineDomain.add('|');
+        pipelineDomain
+            .addAll(currentFilters['my_assigned_partners']!['domain']);
+        pipelineDomain.addAll(currentFilters['open_opportunties']!['domain']);
+      } else if (hasMyPipeline) {
+        pipelineDomain.addAll(currentFilters['my_pipeline']!['domain']);
+      } else if (hasUnassigned) {
+        pipelineDomain.addAll(currentFilters['unassigned']!['domain']);
+      } else if (hasMyAssignedPartners) {
+        pipelineDomain
+            .addAll(currentFilters['my_assigned_partners']!['domain']);
+      } else if (hasOpenOpportunities) {
+        pipelineDomain.addAll(currentFilters['open_opportunties']!['domain']);
+      }
+
+      // Temporary list for "Won or Lost"
+      List<dynamic> wonLostDomain = [];
+
+      // Handle "Won or Lost" with OR logic
+      if (hasWon && hasLost) {
+        wonLostDomain.add('|');
+        wonLostDomain.addAll(currentFilters['won']!['domain']);
+        wonLostDomain.addAll(currentFilters['lost']!['domain']);
+      } else if (hasWon) {
+        wonLostDomain.addAll(currentFilters['won']!['domain']);
+      } else if (hasLost) {
+        wonLostDomain.addAll(currentFilters['lost']!['domain']);
+      }
+
+      // Handle date filters
+      bool hasDateFilter = false;
+      for (String filterKey in selectedFilters) {
+        if (filterKey == 'created_on' && selectedCreationDate != null) {
+          DateTime selectedMonth =
+              DateFormat('MMMM yyyy').parse(selectedCreationDate!);
+          String startDate = DateFormat('yyyy-MM-01').format(selectedMonth);
+          String endDate = DateFormat('yyyy-MM-dd')
+              .format(DateTime(selectedMonth.year, selectedMonth.month + 1, 0));
+
+          domain = [
+            '&',
+            ...domain,
+            ['create_date', '>=', startDate],
+            ['create_date', '<=', endDate],
+          ];
+          hasDateFilter = true;
+        } else if (filterKey == 'closed_on' && selectedClosedDate != null) {
+          DateTime selectedMonth =
+              DateFormat('MMMM yyyy').parse(selectedClosedDate!);
+          String startDate = DateFormat('yyyy-MM-01').format(selectedMonth);
+          String endDate = DateFormat('yyyy-MM-dd')
+              .format(DateTime(selectedMonth.year, selectedMonth.month + 1, 0));
+
+          domain = [
+            '&',
+            ...domain,
+            ['date_closed', '>=', startDate],
+            ['date_closed', '<=', endDate],
+          ];
+          hasDateFilter = true;
+        }
+      }
+
+      // Combine pipeline domain
+      if (pipelineDomain.isNotEmpty) {
+        if (hasDateFilter) {
+          domain = ['&', ...domain, ...pipelineDomain];
+        } else {
+          domain = [...domain, ...pipelineDomain];
+        }
+      }
+
+      // Combine won/lost domain
+      if (wonLostDomain.isNotEmpty) {
+        if (pipelineDomain.isNotEmpty || hasDateFilter) {
+          domain = ['&', ...domain, ...wonLostDomain];
+        } else {
+          domain = [...domain, ...wonLostDomain];
+        }
+      }
+
+      if (hasArchived) {
+        // Explicitly create a properly formatted domain
+        List<dynamic> archivedCondition = [
+          ['active', '=', false]
+        ];
+
+        if (domain.length > 1) {
+          // If domain already has conditions
+          domain = ['&', ...domain, ...archivedCondition];
+        } else {
+          // If domain only has the initial ['type', '=', 'opportunity']
+          domain = [
+            ['type', '=', 'opportunity'],
+            ...archivedCondition
+          ];
+        }
+      }
+
+      // Add widget domain/team_id if present
+      if (widget.domain != null && widget.domain!.isNotEmpty) {
+        domain = ['&', ...widget.domain!, ...domain];
+      } else if (widget.teamId != null) {
+        domain = [
+          '&',
+          ['team_id', '=', widget.teamId],
+          ...domain
+        ];
+      }
+
+      if (query.isNotEmpty) {
+        List<dynamic> searchDomain = [
+          "|",
+          "|",
+          "|",
+          "|",
+          ["partner_id", "ilike", query],
+          ["partner_name", "ilike", query],
+          ["email_from", "ilike", query],
+          ["name", "ilike", query],
+          ["contact_name", "ilike", query],
+        ];
+
+        domain = [...domain, ...searchDomain];
+      }
+
+      log('aasas${finalFilter.toString()}');
       final response = await client?.callKw({
         'model': 'crm.lead',
         'method': 'search_read',
@@ -831,7 +1075,6 @@ class _MypipelineState extends State<Mypipeline> {
             'user_id',
             'team_id',
             'phone',
-
           ],
         }
       });
@@ -839,15 +1082,139 @@ class _MypipelineState extends State<Mypipeline> {
       log('ressss$response');
       if (response != null) {
         leadsList = List<Map<String, dynamic>>.from(response);
-        opportunitiesList = leadsList
-            .where((lead) => lead['type'] == "opportunity")
-            .toList();
+        opportunitiesList =
+            leadsList.where((lead) => lead['type'] == "opportunity").toList();
+        if (savetoIsar) {
+          await isar.writeTxn(() async {
+            print('Clearing Newpipe collection');
+            await isar.newpipes.clear();
 
+            print('Saving ${opportunitiesList.length} leads to Newpipe');
+            for (var lead in opportunitiesList) {
+              try {
+                if (lead['id'] == null) {
+                  print('Skipping lead with null ID: $lead');
+                  continue;
+                }
+
+                final newpipe = Newpipe()
+                  ..leadId = lead['id']
+                  ..name = lead['name']?.toString()
+                  ..type = lead['type']?.toString()
+                  ..expectedRevenue = lead['expected_revenue'] is double
+                      ? lead['expected_revenue']
+                      : (lead['expected_revenue'] is int
+                          ? lead['expected_revenue'].toDouble()
+                          : 0.0)
+                  ..stageId =
+                      lead['stage_id'] is List && lead['stage_id'].isNotEmpty
+                          ? [lead['stage_id'][0]]
+                          : null
+                  ..stageName =
+                      lead['stage_id'] is List && lead['stage_id'].length > 1
+                          ? lead['stage_id'][1]?.toString()
+                          : null
+                  ..partnerId = lead['partner_id'] is List &&
+                          lead['partner_id'].isNotEmpty
+                      ? [lead['partner_id'][0]]
+                      : null
+                  ..partnerName = lead['partner_id'] is List &&
+                          lead['partner_id'].length > 1
+                      ? lead['partner_id'][1]?.toString()
+                      : null
+                  ..tagIds = lead['tag_ids'] is List
+                      ? List<int>.from(lead['tag_ids'])
+                      : null
+                  ..priority = lead['priority']?.toString() ??
+                      '0' // Store as string ('0', '1', '2')
+                  ..activityState = lead['activity_state']?.toString()
+                  ..activityTypeId = lead['activity_type_id'] is List &&
+                          lead['activity_type_id'].isNotEmpty
+                      ? [lead['activity_type_id'][0]]
+                      : null
+                  ..activityTypeName = lead['activity_type_id'] is List &&
+                          lead['activity_type_id'].length > 1
+                      ? lead['activity_type_id'][1]?.toString()
+                      : null
+                  ..emailFrom = lead['email_from']?.toString()
+                  ..recurringRevenueMonthly =
+                      lead['recurring_revenue_monthly'] is double
+                          ? lead['recurring_revenue_monthly']
+                          : (lead['recurring_revenue_monthly'] is int
+                              ? lead['recurring_revenue_monthly'].toDouble()
+                              : null)
+                  ..contactName = lead['contact_name']?.toString()
+                  ..activityIds = lead['activity_ids'] is List
+                      ? List<int>.from(lead['activity_ids'])
+                      : null
+                  ..activityDateDeadline =
+                      lead['activity_date_deadline']?.toString()
+                  ..createDate = lead['create_date']?.toString()
+                  ..dayOpen = lead['day_open'] is double
+                      ? lead['day_open']
+                      : (lead['day_open'] is int
+                          ? lead['day_open'].toDouble()
+                          : null)
+                  ..dayClose = lead['day_close'] is double
+                      ? lead['day_close']
+                      : (lead['day_close'] is int
+                          ? lead['day_close'].toDouble()
+                          : null)
+                  ..probability = lead['probability'] is double
+                      ? lead['probability']
+                      : (lead['probability'] is int
+                          ? lead['probability'].toDouble()
+                          : null)
+                  ..recurringRevenueMonthlyProrated =
+                      lead['recurring_revenue_monthly_prorated'] is double
+                          ? lead['recurring_revenue_monthly_prorated']
+                          : (lead['recurring_revenue_monthly_prorated'] is int
+                              ? lead['recurring_revenue_monthly_prorated']
+                                  .toDouble()
+                              : null)
+                  ..recurringRevenueProrated =
+                      lead['recurring_revenue_prorated'] is double
+                          ? lead['recurring_revenue_prorated']
+                          : (lead['recurring_revenue_prorated'] is int
+                              ? lead['recurring_revenue_prorated'].toDouble()
+                              : null)
+                  ..proratedRevenue = lead['prorated_revenue'] is double
+                      ? lead['prorated_revenue']
+                      : (lead['prorated_revenue'] is int
+                          ? lead['prorated_revenue'].toDouble()
+                          : null)
+                  ..recurringRevenue = lead['recurring_revenue'] is double
+                      ? lead['recurring_revenue']
+                      : (lead['recurring_revenue'] is int
+                          ? lead['recurring_revenue'].toDouble()
+                          : null)
+                  ..activityUserId = lead['activity_user_id'] is List &&
+                          lead['activity_user_id'].isNotEmpty
+                      ? [lead['activity_user_id'][0]]
+                      : null
+                  ..dateClosed = lead['date_closed']?.toString()
+                  ..userId = lead['user_id'] is int
+                      ? lead['user_id'] as int?
+                      : (lead['user_id'] is List && lead['user_id'].isNotEmpty
+                          ? lead['user_id'][0] as int?
+                          : null)
+                  ..phone = lead['phone']?.toString();
+                await isar.newpipes.put(newpipe);
+                print('Saved lead ID: ${lead['id']}');
+              } catch (e) {
+                print('Error saving lead ID: ${lead['id']}, Error: $e');
+                print('Lead data: $lead');
+              }
+            }
+          });
+        }
         Map<String, List<Map<String, dynamic>>> groupedLeads = {};
         Map<String, int> stageIdMap = {};
 
         for (var lead in opportunitiesList) {
-          if (lead['stage_id'] != null && lead['stage_id'] is List && lead['stage_id'].length > 1) {
+          if (lead['stage_id'] != null &&
+              lead['stage_id'] is List &&
+              lead['stage_id'].length > 1) {
             int stageId = lead['stage_id'][0]; // Numeric ID
             String stageName = lead['stage_id'][1] ?? ''; // Stage name
             stageIdMap[stageName] = stageId; // Map stage name to its ID
@@ -856,12 +1223,13 @@ class _MypipelineState extends State<Mypipeline> {
         }
 
         // Sort groups by stage_id
-        List<MapEntry<String, List<Map<String, dynamic>>>> sortedGroups = groupedLeads.entries.toList()
-          ..sort((a, b) {
-            int stageIdA = stageIdMap[a.key] ?? 0;
-            int stageIdB = stageIdMap[b.key] ?? 0;
-            return stageIdA.compareTo(stageIdB); // Sort by stage_id
-          });
+        List<MapEntry<String, List<Map<String, dynamic>>>> sortedGroups =
+            groupedLeads.entries.toList()
+              ..sort((a, b) {
+                int stageIdA = stageIdMap[a.key] ?? 0;
+                int stageIdB = stageIdMap[b.key] ?? 0;
+                return stageIdA.compareTo(stageIdB); // Sort by stage_id
+              });
 
         controller.clear();
 
@@ -879,12 +1247,12 @@ class _MypipelineState extends State<Mypipeline> {
                 }
               }
               return LeadItem(
-                leadId : lead['id'],
+                leadId: lead['id'],
                 name: lead['name'],
                 revenue: lead['expected_revenue'].toString(),
                 customerName: lead['partner_id'] != null &&
-                    lead['partner_id'] is List &&
-                    lead['partner_id'].length > 1
+                        lead['partner_id'] is List &&
+                        lead['partner_id'].length > 1
                     ? lead['partner_id'][1]
                     : "None",
                 priority: (lead['priority'] is int)
@@ -893,29 +1261,29 @@ class _MypipelineState extends State<Mypipeline> {
                 tags: tagNames,
                 activityState: lead['activity_state'] != null
                     ? (lead['activity_state'] is bool
-                    ? (lead['activity_state'] ? "true" : "false")
-                    : lead['activity_state'].toString())
+                        ? (lead['activity_state'] ? "true" : "false")
+                        : lead['activity_state'].toString())
                     : '',
                 activityType: lead['activity_type_id'] != null &&
-                    lead['activity_type_id'] is List &&
-                    lead['activity_type_id'].length > 1
+                        lead['activity_type_id'] is List &&
+                        lead['activity_type_id'].length > 1
                     ? lead['activity_type_id'][1]
                     : "",
                 hasActivity: lead['activity_ids'] != null &&
                     lead['activity_ids'] is List &&
                     lead['activity_ids'].isNotEmpty,
                 activityIds:
-                lead['activity_ids'] != null && lead['activity_ids'] is List
-                    ? List<String>.from(
-                    lead['activity_ids'].map((e) => e.toString()))
-                    : [],
+                    lead['activity_ids'] != null && lead['activity_ids'] is List
+                        ? List<String>.from(
+                            lead['activity_ids'].map((e) => e.toString()))
+                        : [],
                 salespersonId: lead['user_id'] != null && // Added this
-                    lead['user_id'] is List &&
-                    lead['user_id'].length > 0
+                        lead['user_id'] is List &&
+                        lead['user_id'].length > 0
                     ? lead['user_id'][0]
                     : null,
                 imageData:
-                profileImage != null ? base64Encode(profileImage!) : null,
+                    profileImage != null ? base64Encode(profileImage!) : null,
               );
             }).toList(),
           );
@@ -955,7 +1323,7 @@ class _MypipelineState extends State<Mypipeline> {
                 value = (stageValues[stageName] ?? 0) +
                     (item['probability'] as double);
               } else if (selectedFilter ==
-                  "recurring_revenue_monthly_prorated" &&
+                      "recurring_revenue_monthly_prorated" &&
                   item['recurring_revenue_monthly_prorated'] != false) {
                 value = (stageValues[stageName] ?? 0) +
                     (item['recurring_revenue_monthly_prorated'] as double);
@@ -1013,9 +1381,10 @@ class _MypipelineState extends State<Mypipeline> {
       });
     }
   }
+
   Widget ChartSelection() {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 15),
+      padding: EdgeInsets.symmetric(horizontal: 40),
       child: Container(
         width: double.infinity,
         height: 50,
@@ -1058,19 +1427,21 @@ class _MypipelineState extends State<Mypipeline> {
                     selectedView = 2;
                   });
                 },
-                icon: Icon(Icons.calendar_month,
-                  color: selectedView == 2 ? Color(0xFF9EA700) : Colors.black,),
+                icon: Icon(
+                  Icons.calendar_month,
+                  color: selectedView == 2 ? Color(0xFF9EA700) : Colors.black,
+                ),
               ),
-              VerticalDivider(thickness: 2, color: Colors.white),
-              IconButton(
-                onPressed: () {
-                  setState(() {
-                    selectedView = 3;
-                  });
-                },
-                icon: Icon(Icons.table_rows_outlined,
-                  color: selectedView == 3 ? Color(0xFF9EA700) : Colors.black,),
-              ),
+              // VerticalDivider(thickness: 2, color: Colors.white),
+              // IconButton(
+              //   onPressed: () {
+              //     setState(() {
+              //       selectedView = 3;
+              //     });
+              //   },
+              //   icon: Icon(Icons.table_rows_outlined,
+              //     color: selectedView == 3 ? Color(0xFF9EA700) : Colors.black,),
+              // ),
               VerticalDivider(thickness: 2, color: Colors.white),
               IconButton(
                 onPressed: () {
@@ -1078,8 +1449,10 @@ class _MypipelineState extends State<Mypipeline> {
                     selectedView = 4;
                   });
                 },
-                icon: Icon(Icons.graphic_eq_rounded,
-                  color: selectedView == 4 ? Color(0xFF9EA700) : Colors.black,),
+                icon: Icon(
+                  Icons.graphic_eq_rounded,
+                  color: selectedView == 4 ? Color(0xFF9EA700) : Colors.black,
+                ),
               ),
               VerticalDivider(thickness: 2, color: Colors.white),
               IconButton(
@@ -1088,8 +1461,10 @@ class _MypipelineState extends State<Mypipeline> {
                     selectedView = 5;
                   });
                 },
-                icon: Icon(Icons.access_time,
-                  color: selectedView == 5 ? Color(0xFF9EA700) : Colors.black,),
+                icon: Icon(
+                  Icons.access_time,
+                  color: selectedView == 5 ? Color(0xFF9EA700) : Colors.black,
+                ),
               ),
             ],
           ),
@@ -1100,37 +1475,40 @@ class _MypipelineState extends State<Mypipeline> {
 
   Widget listCard() {
     print('ghghghhg$leadsList');
-    if (isLoading) {
-      return Center(
-        child: LoadingAnimationWidget.fourRotatingDots(
-          color: Color(0xFF9EA700),
-          size: 100,
-        ),
-      );
-    }
+    // if (isLoading) {
+    //   return Center(
+    //     child: LoadingAnimationWidget.fourRotatingDots(
+    //       color: Color(0xFF9EA700),
+    //       size: 100,
+    //     ),
+    //   );
+    // }
 
     void openEmail(BuildContext context, Map<String, dynamic> lead) {
-      if (lead['email_from'] != null && lead['email_from'].toString().isNotEmpty) {
+      if (lead['email_from'] != null &&
+          lead['email_from'].toString().isNotEmpty) {
         final Uri params = Uri(
           scheme: 'mailto',
           path: lead['email_from'].toString(),
           query:
-          'subject=Email Regarding Your Inquiry&body=Hi,\n\nPlease let me know if you need more information about the product.\n\nBest regards,\n[Name,Mobile]',
+              'subject=Email Regarding Your Inquiry&body=Hi,\n\nPlease let me know if you need more information about the product.\n\nBest regards,\n[Name,Mobile]',
         );
         final url = params.toString();
         launchUrlString(url);
       } else {
-       var snackBar = SnackBar(content: Text('Email not Found'));
+        var snackBar = SnackBar(content: Text('Email not Found'));
         ScaffoldMessenger.of(context).showSnackBar(snackBar);
       }
     }
+
     void openMessage(BuildContext context, Map<String, dynamic> lead) async {
       if (lead['phone'] != null && lead['phone'].toString().isNotEmpty) {
         final Uri params = Uri(
           scheme: 'sms',
           path: lead['phone'].toString(),
           queryParameters: {
-            'body': 'Hello, I\'m following up on your recent inquiry. How can I assist you today?'
+            'body':
+                'Hello, I\'m following up on your recent inquiry. How can I assist you today?'
           },
         );
         final url = params.toString();
@@ -1143,14 +1521,14 @@ class _MypipelineState extends State<Mypipeline> {
 
     return leadsList.isEmpty
         ? Column(
-      children: [
-        Center(child: Image.asset('assets/nodata.png')),
-        Text(
-          "No data to display",
-          style: TextStyle(color: Colors.blueGrey),
-        ),
-      ],
-    )
+            children: [
+              Center(child: Image.asset('assets/nodata.png')),
+              Text(
+                "No data to display",
+                style: TextStyle(color: Colors.blueGrey),
+              ),
+            ],
+          )
         : ListView.builder(
             itemCount: leadsList.length,
             padding: EdgeInsets.all(8),
@@ -1163,7 +1541,8 @@ class _MypipelineState extends State<Mypipeline> {
               final customerName = lead['contact_name'] == false
                   ? 'None'
                   : lead['contact_name']?.toString() ?? 'None';
-              final email = lead['email_from'] == false ? 'None'
+              final email = lead['email_from'] == false
+                  ? 'None'
                   : lead['email_from']?.toString() ?? 'None';
               final stageName = lead['stage_id'] != null &&
                       lead['stage_id'] is List &&
@@ -1208,21 +1587,23 @@ class _MypipelineState extends State<Mypipeline> {
                       size: 100,
                     ))
                   : GestureDetector(
-                  onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => LeadDetailPage(leadId: leadId),
-                  ),
-                );
-              },
-                    child: Card(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                LeadDetailPage(leadId: leadId),
+                          ),
+                        );
+                      },
+                      child: Card(
                         color: Colors.white,
                         elevation: 4,
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12)),
                         // Rounded corners
-                        margin: EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                        margin:
+                            EdgeInsets.symmetric(vertical: 10, horizontal: 8),
                         child: Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12),
@@ -1244,7 +1625,8 @@ class _MypipelineState extends State<Mypipeline> {
                                         shape: BoxShape.circle,
                                         boxShadow: [
                                           BoxShadow(
-                                              color: stageColor.withOpacity(0.3),
+                                              color:
+                                                  stageColor.withOpacity(0.3),
                                               blurRadius: 4,
                                               offset: Offset(0, 2))
                                         ],
@@ -1294,7 +1676,8 @@ class _MypipelineState extends State<Mypipeline> {
                                         Border.all(color: Colors.grey.shade200),
                                   ),
                                   child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Expanded(
                                         flex: 2,
@@ -1359,13 +1742,15 @@ class _MypipelineState extends State<Mypipeline> {
                                                     ? Container(
                                                         width: 32,
                                                         height: 32,
-                                                        decoration: BoxDecoration(
+                                                        decoration:
+                                                            BoxDecoration(
                                                           borderRadius:
                                                               BorderRadius
                                                                   .circular(6),
                                                           boxShadow: [
                                                             BoxShadow(
-                                                              color: Colors.black
+                                                              color: Colors
+                                                                  .black
                                                                   .withOpacity(
                                                                       0.1),
                                                               blurRadius: 4,
@@ -1373,7 +1758,8 @@ class _MypipelineState extends State<Mypipeline> {
                                                                   Offset(0, 2),
                                                             ),
                                                           ],
-                                                          image: DecorationImage(
+                                                          image:
+                                                              DecorationImage(
                                                             image: MemoryImage(
                                                                 profileImage!),
                                                             fit: BoxFit.cover,
@@ -1383,19 +1769,21 @@ class _MypipelineState extends State<Mypipeline> {
                                                     : Container(
                                                         width: 32,
                                                         height: 32,
-                                                        decoration: BoxDecoration(
+                                                        decoration:
+                                                            BoxDecoration(
                                                           borderRadius:
                                                               BorderRadius
                                                                   .circular(6),
                                                           gradient:
                                                               LinearGradient(
                                                             colors: [
+                                                              Colors.blue
+                                                                  .shade700,
                                                               Colors
-                                                                  .blue.shade700,
-                                                              Colors.blue.shade500
+                                                                  .blue.shade500
                                                             ],
-                                                            begin:
-                                                                Alignment.topLeft,
+                                                            begin: Alignment
+                                                                .topLeft,
                                                             end: Alignment
                                                                 .bottomRight,
                                                           ),
@@ -1410,9 +1798,11 @@ class _MypipelineState extends State<Mypipeline> {
                                                             ),
                                                           ],
                                                         ),
-                                                        child: Icon(Icons.person,
+                                                        child: Icon(
+                                                            Icons.person,
                                                             size: 18,
-                                                            color: Colors.white),
+                                                            color:
+                                                                Colors.white),
                                                       ),
                                                 SizedBox(width: 8),
                                                 Expanded(
@@ -1420,8 +1810,10 @@ class _MypipelineState extends State<Mypipeline> {
                                                     userName ?? 'Loading...',
                                                     style: TextStyle(
                                                       fontSize: 14,
-                                                      fontWeight: FontWeight.w500,
-                                                      color: Colors.grey.shade800,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                      color:
+                                                          Colors.grey.shade800,
                                                     ),
                                                   ),
                                                 ),
@@ -1520,7 +1912,8 @@ class _MypipelineState extends State<Mypipeline> {
                                         padding: EdgeInsets.symmetric(
                                             horizontal: 16, vertical: 8),
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
                                           //   // side: BorderSide(color: Colors.green.shade200),
                                         ),
                                       ),
@@ -1544,14 +1937,16 @@ class _MypipelineState extends State<Mypipeline> {
                                         padding: EdgeInsets.symmetric(
                                             horizontal: 16, vertical: 8),
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
                                           // side: BorderSide(color: Colors.green.shade200),
                                         ),
                                       ),
                                     ),
                                     SizedBox(width: 12),
                                     if (hasActivity &&
-                                        activityState.toLowerCase() != "overdue")
+                                        activityState.toLowerCase() !=
+                                            "overdue")
                                       Expanded(
                                         child: ElevatedButton.icon(
                                           icon: Icon(
@@ -1561,8 +1956,7 @@ class _MypipelineState extends State<Mypipeline> {
                                           ),
                                           label: Text(
                                             'Snooze 7d',
-                                            overflow: TextOverflow
-                                                .ellipsis,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
                                           onPressed: () {},
                                           style: ElevatedButton.styleFrom(
@@ -1586,18 +1980,21 @@ class _MypipelineState extends State<Mypipeline> {
                           ),
                         ),
                       ),
-                  );
+                    );
             },
           );
   }
+
   void _showAddLeadDialog(BuildContext context, AppFlowyGroupData columnData) {
-    final TextEditingController organizationController = TextEditingController();
+    final TextEditingController organizationController =
+        TextEditingController();
     final TextEditingController opportunityController = TextEditingController();
     final TextEditingController emailController = TextEditingController();
     final TextEditingController phoneController = TextEditingController();
     final TextEditingController revenueController = TextEditingController();
     String? selectedFrequency;
-    final TextEditingController recurringRevenueController = TextEditingController(text: "0.00");
+    final TextEditingController recurringRevenueController =
+        TextEditingController(text: "0.00");
 
     // Fetch partners for the dropdown
     List<Map<String, dynamic>> partners = [];
@@ -1704,10 +2101,12 @@ class _MypipelineState extends State<Mypipeline> {
                                 height: 40,
                                 child: DropdownButtonFormField<String>(
                                   decoration: InputDecoration(
-                                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                                    contentPadding: EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 0),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(4),
-                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                      borderSide: BorderSide(
+                                          color: Colors.grey.shade300),
                                     ),
                                   ),
                                   items: partners.map((partner) {
@@ -1751,11 +2150,15 @@ class _MypipelineState extends State<Mypipeline> {
                                   controller: opportunityController,
                                   decoration: InputDecoration(
                                     hintText: "e.g. Product Pricing",
-                                    hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
-                                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                                    hintStyle: TextStyle(
+                                        color: Colors.grey.shade400,
+                                        fontSize: 13),
+                                    contentPadding: EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 0),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(4),
-                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                      borderSide: BorderSide(
+                                          color: Colors.grey.shade300),
                                     ),
                                   ),
                                 ),
@@ -1783,11 +2186,15 @@ class _MypipelineState extends State<Mypipeline> {
                                   controller: emailController,
                                   decoration: InputDecoration(
                                     hintText: 'e.g. "email@address.com"',
-                                    hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
-                                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                                    hintStyle: TextStyle(
+                                        color: Colors.grey.shade400,
+                                        fontSize: 13),
+                                    contentPadding: EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 0),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(4),
-                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                      borderSide: BorderSide(
+                                          color: Colors.grey.shade300),
                                     ),
                                   ),
                                 ),
@@ -1815,11 +2222,15 @@ class _MypipelineState extends State<Mypipeline> {
                                   controller: phoneController,
                                   decoration: InputDecoration(
                                     hintText: 'e.g. "0123456789"',
-                                    hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
-                                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                                    hintStyle: TextStyle(
+                                        color: Colors.grey.shade400,
+                                        fontSize: 13),
+                                    contentPadding: EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 0),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(4),
-                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                      borderSide: BorderSide(
+                                          color: Colors.grey.shade300),
                                     ),
                                   ),
                                 ),
@@ -1850,17 +2261,24 @@ class _MypipelineState extends State<Mypipeline> {
                                         controller: revenueController,
                                         decoration: InputDecoration(
                                           hintText: "0.00",
-                                          hintStyle: TextStyle(color: Colors.black87),
+                                          hintStyle:
+                                              TextStyle(color: Colors.black87),
                                           prefixIcon: Text(
                                             "\$ ",
-                                            style: TextStyle(fontSize: 16, color: Colors.black87),
+                                            style: TextStyle(
+                                                fontSize: 16,
+                                                color: Colors.black87),
                                             textAlign: TextAlign.center,
                                           ),
-                                          prefixIconConstraints: BoxConstraints(minWidth: 0, minHeight: 0),
-                                          contentPadding: EdgeInsets.only(left: 12, top: 10, bottom: 10),
+                                          prefixIconConstraints: BoxConstraints(
+                                              minWidth: 0, minHeight: 0),
+                                          contentPadding: EdgeInsets.only(
+                                              left: 12, top: 10, bottom: 10),
                                           border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(4),
-                                            borderSide: BorderSide(color: Colors.grey.shade300),
+                                            borderRadius:
+                                                BorderRadius.circular(4),
+                                            borderSide: BorderSide(
+                                                color: Colors.grey.shade300),
                                           ),
                                         ),
                                         keyboardType: TextInputType.number,
@@ -1875,8 +2293,12 @@ class _MypipelineState extends State<Mypipeline> {
                                         padding: EdgeInsets.zero,
                                         constraints: BoxConstraints(),
                                         icon: Icon(
-                                          index < starRating ? Icons.star : Icons.star_border,
-                                          color: index < starRating ? Colors.amber : Colors.grey,
+                                          index < starRating
+                                              ? Icons.star
+                                              : Icons.star_border,
+                                          color: index < starRating
+                                              ? Colors.amber
+                                              : Colors.grey,
                                           size: 20,
                                         ),
                                         onPressed: () {
@@ -1913,20 +2335,28 @@ class _MypipelineState extends State<Mypipeline> {
                                     height: 40,
                                     child: TextField(
                                       controller: recurringRevenueController,
-                                      enabled: selectedFrequency != null, // Enable only when frequency is selected
+                                      enabled: selectedFrequency != null,
+                                      // Enable only when frequency is selected
                                       decoration: InputDecoration(
                                         hintText: "0.00",
-                                        hintStyle: TextStyle(color: Colors.black87),
+                                        hintStyle:
+                                            TextStyle(color: Colors.black87),
                                         prefixIcon: Text(
                                           "\$ ",
-                                          style: TextStyle(fontSize: 16, color: Colors.black87),
+                                          style: TextStyle(
+                                              fontSize: 16,
+                                              color: Colors.black87),
                                           textAlign: TextAlign.center,
                                         ),
-                                        prefixIconConstraints: BoxConstraints(minWidth: 0, minHeight: 0),
-                                        contentPadding: EdgeInsets.only(left: 12, top: 10, bottom: 10),
+                                        prefixIconConstraints: BoxConstraints(
+                                            minWidth: 0, minHeight: 0),
+                                        contentPadding: EdgeInsets.only(
+                                            left: 12, top: 10, bottom: 10),
                                         border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(4),
-                                          borderSide: BorderSide(color: Colors.grey.shade300),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                          borderSide: BorderSide(
+                                              color: Colors.grey.shade300),
                                         ),
                                       ),
                                       keyboardType: TextInputType.number,
@@ -1938,10 +2368,13 @@ class _MypipelineState extends State<Mypipeline> {
                                       height: 40,
                                       child: DropdownButtonFormField<String>(
                                         decoration: InputDecoration(
-                                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                                          contentPadding: EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 0),
                                           border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(4),
-                                            borderSide: BorderSide(color: Colors.grey.shade300),
+                                            borderRadius:
+                                                BorderRadius.circular(4),
+                                            borderSide: BorderSide(
+                                                color: Colors.grey.shade300),
                                           ),
                                         ),
                                         items: recurringPlans.map((plan) {
@@ -1954,11 +2387,20 @@ class _MypipelineState extends State<Mypipeline> {
                                         onChanged: (value) {
                                           setState(() {
                                             selectedFrequency = value;
-                                            if (value != null && recurringRevenueController.text == "0.00") {
+                                            if (value != null &&
+                                                recurringRevenueController
+                                                        .text ==
+                                                    "0.00") {
                                               // Only set initial value if recurringRevenueController is still default
-                                              recurringRevenueController.text = revenueController.text.replaceAll('\$', '').trim().isNotEmpty
-                                                  ? revenueController.text.replaceAll('\$', '').trim()
-                                                  : "0.00";
+                                              recurringRevenueController.text =
+                                                  revenueController.text
+                                                          .replaceAll('\$', '')
+                                                          .trim()
+                                                          .isNotEmpty
+                                                      ? revenueController.text
+                                                          .replaceAll('\$', '')
+                                                          .trim()
+                                                      : "0.00";
                                             }
                                           });
                                         },
@@ -1978,81 +2420,109 @@ class _MypipelineState extends State<Mypipeline> {
                             children: [
                               Expanded(
                                 child: ElevatedButton(
-                                  onPressed: isLoading? null: () async {
-                                    setState(() {
-                                      isLoading = true;  // Show loading indicator
-                                    });
+                                  onPressed: isLoading
+                                      ? null
+                                      : () async {
+                                          setState(() {
+                                            isLoading =
+                                                true; // Show loading indicator
+                                          });
 
-                                    // Fetch stage_id based on group name
-                                    int? stageId = await _getStageId(columnData.headerData.groupName);
-                                    if (stageId == null) {
-                                      log("Stage not found for name: ${columnData.headerData.groupName}");
-                                      return;
-                                    }
+                                          // Fetch stage_id based on group name
+                                          int? stageId = await _getStageId(
+                                              columnData.headerData.groupName);
+                                          if (stageId == null) {
+                                            log("Stage not found for name: ${columnData.headerData.groupName}");
+                                            return;
+                                          }
 
-                                    // Map star rating to Odoo priority values
-                                    String priorityValue;
-                                    switch (starRating) {
-                                      case 1:
-                                        priorityValue = '0'; // Low
-                                        break;
-                                      case 2:
-                                        priorityValue = '1'; // Medium
-                                        break;
-                                      case 3:
-                                        priorityValue = '2'; // High
-                                        break;
-                                      default:
-                                        priorityValue = '0'; // Default to Low
-                                    }
+                                          // Map star rating to Odoo priority values
+                                          String priorityValue;
+                                          switch (starRating) {
+                                            case 1:
+                                              priorityValue = '0'; // Low
+                                              break;
+                                            case 2:
+                                              priorityValue = '1'; // Medium
+                                              break;
+                                            case 3:
+                                              priorityValue = '2'; // High
+                                              break;
+                                            default:
+                                              priorityValue =
+                                                  '0'; // Default to Low
+                                          }
 
-                                    // Handle the addition of the new lead
-                                    final newLead = {
-                                      'name': opportunityController.text,
-                                      'expected_revenue': double.tryParse(revenueController.text.replaceAll('\$', '').trim()) ?? 0.0,
-                                      'email_from': emailController.text,
-                                      'phone': phoneController.text,
-                                      'partner_id': int.tryParse(organizationController.text) ?? false,
-                                      'priority': priorityValue, // Use string value for priority
-                                      'recurring_plan': int.tryParse(selectedFrequency ?? '') ?? false,
-                                      'recurring_revenue': selectedFrequency != null
-                                          ? double.tryParse(recurringRevenueController.text) ?? 0.0
-                                          : 0.0,
-                                      'stage_id': stageId,
-                                      'activity_user_id': [currentUserId ?? 0, userName ?? ''],
-                                      'type': 'opportunity',
-                                    };
-                                    log('New Lead: $newLead');
-                                    final response = await _addLeadToOdoo(newLead);
-                                    setState(() {
-                                      isLoading = false;  // Hide loading indicator
-                                    });
-                                    Navigator.pop(context); // Close the dialog after adding
-                                  },
+                                          // Handle the addition of the new lead
+                                          final newLead = {
+                                            'name': opportunityController.text,
+                                            'expected_revenue': double.tryParse(
+                                                    revenueController.text
+                                                        .replaceAll('\$', '')
+                                                        .trim()) ??
+                                                0.0,
+                                            'email_from': emailController.text,
+                                            'phone': phoneController.text,
+                                            'partner_id': int.tryParse(
+                                                    organizationController
+                                                        .text) ??
+                                                false,
+                                            'priority': priorityValue,
+                                            // Use string value for priority
+                                            'recurring_plan': int.tryParse(
+                                                    selectedFrequency ?? '') ??
+                                                false,
+                                            'recurring_revenue':
+                                                selectedFrequency != null
+                                                    ? double.tryParse(
+                                                            recurringRevenueController
+                                                                .text) ??
+                                                        0.0
+                                                    : 0.0,
+                                            'stage_id': stageId,
+                                            'activity_user_id': [
+                                              currentUserId ?? 0,
+                                              userName ?? ''
+                                            ],
+                                            'type': 'opportunity',
+                                          };
+                                          log('New Lead: $newLead');
+                                          final response =
+                                              await _addLeadToOdoo(newLead);
+                                          setState(() {
+                                            isLoading =
+                                                false; // Hide loading indicator
+                                          });
+                                          Navigator.pop(
+                                              context); // Close the dialog after adding
+                                        },
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Color(0xFFAFBA00),
                                     padding: EdgeInsets.symmetric(vertical: 12),
                                   ),
                                   child: isLoading
                                       ? SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                      strokeWidth: 2,
-                                    ),
-                                  )
+                                          height: 20,
+                                          width: 20,
+                                          child: CircularProgressIndicator(
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                    Colors.white),
+                                            strokeWidth: 2,
+                                          ),
+                                        )
                                       : Text(
-                                    "Add",
-                                    style: TextStyle(color: Colors.white),
-                                  ),
+                                          "Add",
+                                          style: TextStyle(color: Colors.white),
+                                        ),
                                 ),
                               ),
                               SizedBox(width: 8),
                               ElevatedButton(
                                 onPressed: () async {
                                   // Check if any field has a value
-                                  bool hasValue = opportunityController.text.isNotEmpty ||
+                                  bool hasValue = opportunityController
+                                          .text.isNotEmpty ||
                                       emailController.text.isNotEmpty ||
                                       phoneController.text.isNotEmpty ||
                                       revenueController.text.isNotEmpty ||
@@ -2062,7 +2532,8 @@ class _MypipelineState extends State<Mypipeline> {
 
                                   if (hasValue) {
                                     // Fetch stage_id based on group name
-                                    int? stageId = await _getStageId(columnData.headerData.groupName);
+                                    int? stageId = await _getStageId(
+                                        columnData.headerData.groupName);
                                     if (stageId == null) {
                                       log("Stage not found for name: ${columnData.headerData.groupName}");
                                       return;
@@ -2087,27 +2558,45 @@ class _MypipelineState extends State<Mypipeline> {
                                     // Handle the addition of the new lead
                                     final newLead = {
                                       'name': opportunityController.text,
-                                      'expected_revenue': double.tryParse(revenueController.text.replaceAll('\$', '').trim()) ?? 0.0,
+                                      'expected_revenue': double.tryParse(
+                                              revenueController.text
+                                                  .replaceAll('\$', '')
+                                                  .trim()) ??
+                                          0.0,
                                       'email_from': emailController.text,
                                       'phone': phoneController.text,
-                                      'partner_id': int.tryParse(organizationController.text) ?? false,
-                                      'priority': priorityValue, // Use string value for priority
-                                      'recurring_plan': int.tryParse(selectedFrequency ?? '') ?? false,
-                                      'recurring_revenue': selectedFrequency != null
-                                          ? double.tryParse(recurringRevenueController.text) ?? 0.0
-                                          : 0.0,
+                                      'partner_id': int.tryParse(
+                                              organizationController.text) ??
+                                          false,
+                                      'priority': priorityValue,
+                                      // Use string value for priority
+                                      'recurring_plan': int.tryParse(
+                                              selectedFrequency ?? '') ??
+                                          false,
+                                      'recurring_revenue':
+                                          selectedFrequency != null
+                                              ? double.tryParse(
+                                                      recurringRevenueController
+                                                          .text) ??
+                                                  0.0
+                                              : 0.0,
                                       'stage_id': stageId,
-                                      'activity_user_id': [currentUserId ?? 0, userName ?? ''],
+                                      'activity_user_id': [
+                                        currentUserId ?? 0,
+                                        userName ?? ''
+                                      ],
                                       'type': 'opportunity',
                                     };
                                     log('New Lead: $newLead');
-                                    final response = await _addLeadToOdoo(newLead);
+                                    final response =
+                                        await _addLeadToOdoo(newLead);
                                     if (response != null) {
                                       // Navigate to LeadDetailPage with the leadId
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => LeadDetailPage(leadId: response as int),
+                                          builder: (context) => LeadDetailPage(
+                                              leadId: response as int),
                                         ),
                                       );
                                     }
@@ -2115,7 +2604,8 @@ class _MypipelineState extends State<Mypipeline> {
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.grey.shade200,
-                                  padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                  padding: EdgeInsets.symmetric(
+                                      vertical: 12, horizontal: 16),
                                 ),
                                 child: Text(
                                   "Edit",
@@ -2137,6 +2627,7 @@ class _MypipelineState extends State<Mypipeline> {
       },
     );
   }
+
 // Method to fetch stage_id based on stage name
   Future<int?> _getStageId(String stageName) async {
     if (client == null) return null;
@@ -2145,7 +2636,9 @@ class _MypipelineState extends State<Mypipeline> {
         'model': 'crm.stage',
         'method': 'search_read',
         'args': [
-          [['name', '=', stageName]]
+          [
+            ['name', '=', stageName]
+          ]
         ],
         'kwargs': {
           'fields': ['id'],
@@ -2161,8 +2654,9 @@ class _MypipelineState extends State<Mypipeline> {
       return null;
     }
   }
+
   Future<int?> _addLeadToOdoo(Map<String, dynamic> leadData) async {
-    if (client == null) return  null;
+    if (client == null) return null;
 
     try {
       final response = await client!.callKw({
@@ -2226,7 +2720,7 @@ class _MypipelineState extends State<Mypipeline> {
                   ),
                 ),
                 addIcon: const Icon(Icons.add, size: 20),
-                onAddButtonClick:() {
+                onAddButtonClick: () {
                   _showAddLeadDialog(context, columnData);
                 },
                 moreIcon: const Icon(Icons.more_horiz, size: 20),
@@ -2251,37 +2745,31 @@ class _MypipelineState extends State<Mypipeline> {
       case 5:
         return SalesDataGridWidget(
           opportunitiesList: opportunitiesList,
-            activityTypes: activityTypes,
+          activityTypes: activityTypes,
         );
       default:
         return Container();
     }
   }
 
-
-  Widget activityView(){
-
+  Widget activityView() {
     return Column(
       children: [
         Container(
           color: Colors.red,
           child: Text('data'),
         )
-
       ],
     );
   }
-
-
-
-
 
   Widget calendarView() {
     List<Appointment> appointments = [];
     Map<String, Map<String, dynamic>> appointmentLeadMap = {};
 
     for (var lead in leadsList) {
-      if (lead['activity_date_deadline'] != null && lead['activity_date_deadline'] != false) {
+      if (lead['activity_date_deadline'] != null &&
+          lead['activity_date_deadline'] != false) {
         DateTime deadlineDate;
         try {
           if (lead['activity_date_deadline'] is String) {
@@ -2292,16 +2780,14 @@ class _MypipelineState extends State<Mypipeline> {
 
           String appointmentId = "${lead['id']}_${deadlineDate.toString()}";
 
-
           appointments.add(
             Appointment(
-              startTime: deadlineDate,
-              endTime: deadlineDate.add(Duration(hours: 1)),
-              subject: lead['name'] ?? 'No Title',
-              color: Color(0xFF9EA700),
-              isAllDay: true,
-              id: appointmentId
-            ),
+                startTime: deadlineDate,
+                endTime: deadlineDate.add(Duration(hours: 1)),
+                subject: lead['name'] ?? 'No Title',
+                color: Color(0xFF9EA700),
+                isAllDay: true,
+                id: appointmentId),
           );
           appointmentLeadMap[appointmentId] = lead;
         } catch (e) {
@@ -2313,7 +2799,9 @@ class _MypipelineState extends State<Mypipeline> {
     return Container(
       child: SfCalendar(
         view: CalendarView.month,
-        headerStyle: CalendarHeaderStyle(backgroundColor:  Color(0x69EA700),),
+        headerStyle: CalendarHeaderStyle(
+          backgroundColor: Color(0x69EA700),
+        ),
         dataSource: AppointmentDataSource(appointments),
         monthViewSettings: MonthViewSettings(
           showAgenda: true,
@@ -2340,6 +2828,7 @@ class _MypipelineState extends State<Mypipeline> {
       ),
     );
   }
+
   Future<void> deleteLead(int leadId) async {
     try {
       if (client == null) {
@@ -2362,12 +2851,13 @@ class _MypipelineState extends State<Mypipeline> {
     }
   }
 
-  void calendarDialogue(BuildContext context, Map<String, dynamic> lead){
+  void calendarDialogue(BuildContext context, Map<String, dynamic> lead) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           title: Text(
             'Opportunity Details',
             style: TextStyle(
@@ -2419,8 +2909,8 @@ class _MypipelineState extends State<Mypipeline> {
                 SizedBox(height: 4),
                 Text(
                   lead['partner_id'] != null &&
-                      lead['partner_id'] is List &&
-                      lead['partner_id'].length > 1
+                          lead['partner_id'] is List &&
+                          lead['partner_id'].length > 1
                       ? lead['partner_id'][1]
                       : 'None',
                   style: TextStyle(
@@ -2438,14 +2928,18 @@ class _MypipelineState extends State<Mypipeline> {
                 ),
                 SizedBox(height: 4),
                 Text(
-                  lead['activity_date_deadline'] != null && lead['activity_date_deadline'] != false
+                  lead['activity_date_deadline'] != null &&
+                          lead['activity_date_deadline'] != false
                       ? lead['activity_date_deadline'] is DateTime
-                      ? lead['activity_date_deadline'].toString().split(' ')[0]
-                      : lead['activity_date_deadline'].toString()
+                          ? lead['activity_date_deadline']
+                              .toString()
+                              .split(' ')[0]
+                          : lead['activity_date_deadline'].toString()
                       : 'No deadline',
                   style: TextStyle(
                     fontSize: 16,
-                    color: lead['activity_state'] == 'overdue' ? Colors.red : null,
+                    color:
+                        lead['activity_state'] == 'overdue' ? Colors.red : null,
                   ),
                 ),
               ],
@@ -2456,14 +2950,18 @@ class _MypipelineState extends State<Mypipeline> {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 ElevatedButton.icon(
-                  icon: Icon(Icons.edit, size: 16, color: Colors.black,),
+                  icon: Icon(
+                    Icons.edit,
+                    size: 16,
+                    color: Colors.black,
+                  ),
                   label: Text('Edit'),
                   onPressed: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => LeadDetailPage(leadId: lead["id"]),
-
+                        builder: (context) =>
+                            LeadDetailPage(leadId: lead["id"]),
                       ),
                     );
                   },
@@ -2477,9 +2975,13 @@ class _MypipelineState extends State<Mypipeline> {
                   ),
                 ),
                 ElevatedButton.icon(
-                  icon: Icon(Icons.delete, size: 16,color: Colors.black,),
+                  icon: Icon(
+                    Icons.delete,
+                    size: 16,
+                    color: Colors.black,
+                  ),
                   label: Text('Delete'),
-                  onPressed: () async{
+                  onPressed: () async {
                     bool? confirmDelete = await showDialog<bool>(
                       context: context,
                       builder: (BuildContext context) {
@@ -2529,10 +3031,12 @@ class _MypipelineState extends State<Mypipeline> {
                               children: [
                                 ElevatedButton(
                                   onPressed: () {
-                                    Navigator.of(context).pop(true); // Confirm delete
+                                    Navigator.of(context)
+                                        .pop(true); // Confirm delete
                                   },
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Color(0xFF9EA700), // Green color for Delete
+                                    backgroundColor: Color(
+                                        0xFF9EA700), // Green color for Delete
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
@@ -2584,7 +3088,7 @@ class _MypipelineState extends State<Mypipeline> {
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:  Colors.grey[200],
+                    backgroundColor: Colors.grey[200],
                     foregroundColor: Color(0xFF9EA700),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
@@ -2599,7 +3103,6 @@ class _MypipelineState extends State<Mypipeline> {
       },
     );
   }
-
 
   Widget ActivityIconDesign(String activityState, String activityType) {
     IconData iconData;
@@ -2664,17 +3167,20 @@ class _MypipelineState extends State<Mypipeline> {
       String date = lead['create_date'] ?? "None";
       String formattedDate = formatDate(date);
       print('klkll$date');
-      double revenue = double.tryParse(lead['expected_revenue']?.toString() ?? "0") ?? 0.0;
+      double revenue =
+          double.tryParse(lead['expected_revenue']?.toString() ?? "0") ?? 0.0;
 
       // groupedData.putIfAbsent(formattedDate, () => {'date': formattedDate});
       if (!groupedData.containsKey(formattedDate)) {
         groupedData[formattedDate] = {'date': formattedDate};
       }
 
-      groupedData[formattedDate]![stage] =
-          ((double.tryParse(groupedData[formattedDate]![stage]?.toString() ?? "0") ?? 0.0) + revenue).toString();
-          columnTotals[stage] = (columnTotals[stage] ?? 0.0) + revenue;
-
+      groupedData[formattedDate]![stage] = ((double.tryParse(
+                      groupedData[formattedDate]![stage]?.toString() ?? "0") ??
+                  0.0) +
+              revenue)
+          .toString();
+      columnTotals[stage] = (columnTotals[stage] ?? 0.0) + revenue;
     }
 
     List<GridColumn> columns = [
@@ -2689,7 +3195,7 @@ class _MypipelineState extends State<Mypipeline> {
         ),
       ),
       ...uniqueStages.map(
-            (stage) => GridColumn(
+        (stage) => GridColumn(
           columnName: stage,
           label: Container(
             alignment: Alignment.center,
@@ -2707,7 +3213,7 @@ class _MypipelineState extends State<Mypipeline> {
         cells: [
           DataGridCell<String>(columnName: 'date', value: entry.value['date']),
           ...uniqueStages.map(
-                (stage) => DataGridCell<String>(
+            (stage) => DataGridCell<String>(
               columnName: stage,
               value: entry.value[stage] ?? "0",
             ),
@@ -2720,7 +3226,7 @@ class _MypipelineState extends State<Mypipeline> {
       cells: [
         DataGridCell<String>(columnName: 'date', value: "Total"),
         ...uniqueStages.map(
-              (stage) => DataGridCell<String>(
+          (stage) => DataGridCell<String>(
             columnName: stage,
             value: columnTotals[stage]?.toStringAsFixed(2) ?? "0",
           ),
@@ -2739,70 +3245,70 @@ class _MypipelineState extends State<Mypipeline> {
     if (selectedChart == "bar") {
       return showNoDataMessage
           ? Column(
-        children: [
-          Center(child: Image.asset('assets/nodata.png')),
-          Text(
-            "No data to display",
-            style: TextStyle(color: Colors.blueGrey),
-          ),
-        ],
-      )
+              children: [
+                Center(child: Image.asset('assets/nodata.png')),
+                Text(
+                  "No data to display",
+                  style: TextStyle(color: Colors.blueGrey),
+                ),
+              ],
+            )
           : SfCartesianChart(
-        primaryXAxis: CategoryAxis(),
-        series: <CartesianSeries<ChartData, String>>[
-          ColumnSeries<ChartData, String>(
-            dataSource: chartDatavalues,
-            xValueMapper: (ChartData data, _) => data.x,
-            yValueMapper: (ChartData data, _) => data.y,
-            color: Color(0xFF9EA700),
-          ),
-        ],
-      );
+              primaryXAxis: CategoryAxis(),
+              series: <CartesianSeries<ChartData, String>>[
+                ColumnSeries<ChartData, String>(
+                  dataSource: chartDatavalues,
+                  xValueMapper: (ChartData data, _) => data.x,
+                  yValueMapper: (ChartData data, _) => data.y,
+                  color: Color(0xFF9EA700),
+                ),
+              ],
+            );
     } else if (selectedChart == "line") {
       return showNoDataMessage
           ? Column(
-        children: [
-          Center(child: Image.asset('assets/nodata.png')),
-          Text(
-            "No data to display",
-            style: TextStyle(color: Colors.blueGrey),
-          ),
-        ],
-      )
+              children: [
+                Center(child: Image.asset('assets/nodata.png')),
+                Text(
+                  "No data to display",
+                  style: TextStyle(color: Colors.blueGrey),
+                ),
+              ],
+            )
           : SfCartesianChart(
-        primaryXAxis: CategoryAxis(),
-        series: <CartesianSeries<ChartData, String>>[
-          LineSeries<ChartData, String>(
-            dataSource: chartDatavalues,
-            xValueMapper: (ChartData data, _) => data.x,
-            yValueMapper: (ChartData data, _) => data.y,
-            color: Color(0xFF9EA700),
-          ),
-        ],
-      );
+              primaryXAxis: CategoryAxis(),
+              series: <CartesianSeries<ChartData, String>>[
+                LineSeries<ChartData, String>(
+                  dataSource: chartDatavalues,
+                  xValueMapper: (ChartData data, _) => data.x,
+                  yValueMapper: (ChartData data, _) => data.y,
+                  color: Color(0xFF9EA700),
+                ),
+              ],
+            );
     } else {
       return showNoDataMessage
           ? Column(
-        children: [
-          Center(child: Image.asset('assets/nodata.png')),
-          Text(
-            "No data to display",
-            style: TextStyle(color: Colors.blueGrey),
-          ),
-        ],
-      )
+              children: [
+                Center(child: Image.asset('assets/nodata.png')),
+                Text(
+                  "No data to display",
+                  style: TextStyle(color: Colors.blueGrey),
+                ),
+              ],
+            )
           : SfCircularChart(
-        legend: Legend(isVisible: true),
-        series: <CircularSeries<ChartData, String>>[
-          PieSeries<ChartData, String>(
-            dataLabelSettings: DataLabelSettings(isVisible: true),
-            explode: true,
-            dataSource: chartDatavalues,
-            xValueMapper: (ChartData data, _) => data.x,
-            yValueMapper: (ChartData data, _) => data.y,
-          ),
-        ],
-      );
+              legend: Legend(isVisible: true),
+              series: <CircularSeries<ChartData, String>>[
+                PieSeries<ChartData, String>(
+                  dataLabelSettings: DataLabelSettings(isVisible: true),
+                  explode: true,
+                  dataSource: chartDatavalues,
+                  xValueMapper: (ChartData data, _) => data.x,
+                  yValueMapper: (ChartData data, _) => data.y,
+                ),
+              ],
+            );
     }
   }
 
@@ -2811,6 +3317,7 @@ class _MypipelineState extends State<Mypipeline> {
       selectedChart = type;
     });
   }
+
   void filterOptions() {
     showModalBottomSheet(
       context: context,
@@ -2860,7 +3367,7 @@ class _MypipelineState extends State<Mypipeline> {
                         borderRadius: BorderRadius.circular(12)),
                     tileColor: Color(0x1B9EA700),
                     contentPadding:
-                    EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   ),
                 ),
                 SizedBox(
@@ -2895,7 +3402,7 @@ class _MypipelineState extends State<Mypipeline> {
                       tileColor: Color(0x1B9EA700),
                       focusColor: Colors.red,
                       contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     ),
                   ),
                 SizedBox(
@@ -2931,7 +3438,7 @@ class _MypipelineState extends State<Mypipeline> {
                             borderRadius: BorderRadius.circular(12)),
                         tileColor: Color(0x1B9EA700),
                         contentPadding:
-                        EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       ),
                     ),
                   SizedBox(
@@ -2965,7 +3472,7 @@ class _MypipelineState extends State<Mypipeline> {
                             borderRadius: BorderRadius.circular(12)),
                         tileColor: Color(0x1B9EA700),
                         contentPadding:
-                        EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       ),
                     ),
                   SizedBox(
@@ -2999,7 +3506,7 @@ class _MypipelineState extends State<Mypipeline> {
                           borderRadius: BorderRadius.circular(12)),
                       tileColor: Color(0x1B9EA700),
                       contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     ),
                   ),
                   SizedBox(
@@ -3032,7 +3539,7 @@ class _MypipelineState extends State<Mypipeline> {
                           borderRadius: BorderRadius.circular(12)),
                       tileColor: Color(0x1B9EA700),
                       contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     ),
                   ),
                   SizedBox(
@@ -3066,7 +3573,7 @@ class _MypipelineState extends State<Mypipeline> {
                             borderRadius: BorderRadius.circular(12)),
                         tileColor: Color(0x1B9EA700),
                         contentPadding:
-                        EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       ),
                     ),
                   SizedBox(
@@ -3078,7 +3585,7 @@ class _MypipelineState extends State<Mypipeline> {
                       border: Border(
                         left: BorderSide(
                           color: selectedFilter ==
-                              "recurring_revenue_monthly_prorated"
+                                  "recurring_revenue_monthly_prorated"
                               ? Color(0xFF656805)
                               : Colors.transparent,
                           width: 7, // Border thickness
@@ -3101,7 +3608,7 @@ class _MypipelineState extends State<Mypipeline> {
                           borderRadius: BorderRadius.circular(12)),
                       tileColor: Color(0x1B9EA700),
                       contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     ),
                   ),
                   SizedBox(
@@ -3136,7 +3643,7 @@ class _MypipelineState extends State<Mypipeline> {
                       tileColor: Color(0x1B9EA700),
                       focusColor: Colors.red,
                       contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     ),
                   ),
                   SizedBox(
@@ -3169,7 +3676,7 @@ class _MypipelineState extends State<Mypipeline> {
                           borderRadius: BorderRadius.circular(12)),
                       tileColor: Color(0x1B9EA700),
                       contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     ),
                   ),
                   SizedBox(
@@ -3202,7 +3709,7 @@ class _MypipelineState extends State<Mypipeline> {
                           borderRadius: BorderRadius.circular(12)),
                       tileColor: Color(0x1B9EA700),
                       contentPadding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     ),
                   ),
                 ],
@@ -3213,6 +3720,7 @@ class _MypipelineState extends State<Mypipeline> {
       },
     );
   }
+
   void applyFilter(String filter, String showfilterName) {
     setState(() {
       selectedFilter = filter;
@@ -3223,15 +3731,14 @@ class _MypipelineState extends State<Mypipeline> {
     Navigator.pop(context);
   }
 
-
-
-
   Widget buildChartSelection() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.start,
       children: [
         Padding(
-          padding: EdgeInsets.only(left: 10, ),
+          padding: EdgeInsets.only(
+            left: 10,
+          ),
           child: Container(
             width: 105,
             height: 30,
@@ -3251,20 +3758,24 @@ class _MypipelineState extends State<Mypipeline> {
                     padding: const EdgeInsets.only(left: 12),
                     child: Text('Measures'),
                   ),
-                  Expanded(child: Icon(Icons.arrow_drop_down,color: Colors.white,)),
+                  Expanded(
+                      child: Icon(
+                    Icons.arrow_drop_down,
+                    color: Colors.white,
+                  )),
                 ],
               ),
             ),
           ),
         ),
-        SizedBox(width: 150,),
+        SizedBox(
+          width: 150,
+        ),
         Container(
           height: 37,
           width: 37,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(7),
-            color: Color(0x279EA700)
-          ),
+              borderRadius: BorderRadius.circular(7), color: Color(0x279EA700)),
           child: IconButton(
               onPressed: () => changeChartType("bar"),
               icon: Icon(Icons.bar_chart_rounded,
@@ -3272,14 +3783,14 @@ class _MypipelineState extends State<Mypipeline> {
                       ? Color(0xFF9EA700)
                       : Colors.black)),
         ),
-        SizedBox(width: 5,),
+        SizedBox(
+          width: 5,
+        ),
         Container(
           height: 37,
           width: 37,
           decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(7),
-              color: Color(0x279EA700)
-          ),
+              borderRadius: BorderRadius.circular(7), color: Color(0x279EA700)),
           child: IconButton(
               onPressed: () => changeChartType("line"),
               icon: Icon(Icons.stacked_line_chart_rounded,
@@ -3287,7 +3798,9 @@ class _MypipelineState extends State<Mypipeline> {
                       ? Color(0xFF9EA700)
                       : Colors.black)),
         ),
-        SizedBox(width: 5,),
+        SizedBox(
+          width: 5,
+        ),
         Padding(
           padding: EdgeInsets.only(right: 6),
           child: Container(
@@ -3295,8 +3808,7 @@ class _MypipelineState extends State<Mypipeline> {
             width: 37,
             decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(7),
-                color: Color(0x279EA700)
-            ),
+                color: Color(0x279EA700)),
             child: IconButton(
                 onPressed: () => changeChartType("pie"),
                 icon: Icon(Icons.pie_chart_rounded,
@@ -3311,14 +3823,15 @@ class _MypipelineState extends State<Mypipeline> {
 
   Widget customCard(AppFlowyGroupItem item) {
     if (item is LeadItem) {
-      return InkWell( onTap: (){
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => LeadDetailPage(leadId: item.leadId),
-          ),
-        );
-      },
+      return InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => LeadDetailPage(leadId: item.leadId),
+            ),
+          );
+        },
         child: Row(
           children: [
             Expanded(
@@ -3375,7 +3888,8 @@ class _MypipelineState extends State<Mypipeline> {
                             color: Colors.blue.shade100,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Text(tag, style: const TextStyle(fontSize: 12)),
+                          child:
+                              Text(tag, style: const TextStyle(fontSize: 12)),
                         );
                       }).toList(),
                     ),
@@ -3393,56 +3907,25 @@ class _MypipelineState extends State<Mypipeline> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        ActivityIconDesign(item.activityState, item.activityType),
+                        ActivityIconDesign(
+                            item.activityState, item.activityType),
                         SizedBox(
                           width: 58,
                         ),
-                        FutureBuilder<Uint8List?>(
-                          future: item.salespersonId != null && client != null
-                              ? GetImage().fetchImage(item.salespersonId!, client!)
-                              : Future.value(null),
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState == ConnectionState.waiting) {
-                              return Container(
-                                width: 24,
-                                height: 24,
-                                margin: EdgeInsets.only(left: 8),
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.grey,
-                                ),
-                              );
-                            } else if (snapshot.hasData && snapshot.data != null) {
-                              return Container(
-                                width: 24,
-                                height: 24,
-                                margin: EdgeInsets.only(left: 8),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(4),
-                                  image: DecorationImage(
-                                    image: MemoryImage(snapshot.data!),
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                              );
-                            } else {
-                              return Container(
-                                width: 24,
-                                height: 24,
-                                margin: EdgeInsets.only(left: 8),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Colors.grey.shade300,
-                                ),
-                                child: Icon(
-                                  Icons.person,
-                                  size: 16,
-                                  color: Colors.grey.shade700,
-                                ),
-                              );
-                            }
-                          },
-                        ),
+                        item.salespersonId != null
+                            ? OdooAvatar(
+                                client: client,
+                                model: 'res.users',
+                                recordId: item.salespersonId!,
+                                size: 25,
+                                borderRadius: 5,
+                                shape: BoxShape.rectangle,
+                              )
+                            : Icon(
+                                Icons.person_outline,
+                                size: 25,
+                                color: Colors.grey,
+                              ), // Pla
                       ],
                     ),
                   ],
@@ -3455,25 +3938,25 @@ class _MypipelineState extends State<Mypipeline> {
     }
     throw UnimplementedError();
   }
+
   @override
   void initState() {
     super.initState();
-    if (widget.teamId == null && (widget.domain == null || widget.domain!.isEmpty)) {
+    if (widget.teamId == null &&
+        (widget.domain == null || widget.domain!.isEmpty)) {
       selectedFilters = {'my_pipeline'};
     } else {
       selectedFilters = {};
     }
+    loadFromIsar();
     initializeOdooClient();
     boardController = AppFlowyBoardScrollController();
     searchController.addListener(_onSearchChanged);
   }
 
-
-  Future<void> getSession()async{
+  Future<void> getSession() async {
     final prefs = await SharedPreferences.getInstance();
     final session = prefs.getString("sessionId") ?? "";
-
-
   }
 
   @override
@@ -3483,27 +3966,33 @@ class _MypipelineState extends State<Mypipeline> {
         iconTheme: IconThemeData(color: Colors.white),
         title: isSearching
             ? TextField(
-          controller: searchController,
-          autofocus: true,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: 'Search...',
-            hintStyle: const TextStyle(color: Colors.white70),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20),
-              borderSide: BorderSide.none,
-            ),
-            filled: true,
-            fillColor: Colors.white.withOpacity(0.2),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-          ),
-        )
-            : const Text("Pipeline",style: TextStyle(color: Colors.white),),
+                controller: searchController,
+                autofocus: true,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Search...',
+                  hintStyle: const TextStyle(color: Colors.white70),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.2),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
+              )
+            : const Text(
+                "Pipeline",
+                style: TextStyle(color: Colors.white),
+              ),
         elevation: 0,
         backgroundColor: const Color(0xFF9EA700),
         actions: [
           IconButton(
-            icon: Icon(isSearching ? Icons.close : Icons.search,color: Colors.white,),
+            icon: Icon(
+              isSearching ? Icons.close : Icons.search,
+              color: Colors.white,
+            ),
             onPressed: () {
               setState(() {
                 if (isSearching) {
@@ -3517,58 +4006,61 @@ class _MypipelineState extends State<Mypipeline> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.filter_list,color: Colors.white,),
+            icon: const Icon(
+              Icons.filter_list,
+              color: Colors.white,
+            ),
             onPressed: () => showFilterDialog(context),
           ),
         ],
       ),
       backgroundColor: Colors.white,
-      body:isLoading
+      body: isLoading && leadsList.isEmpty
           ? Center(
-        child: LoadingAnimationWidget.fourRotatingDots(
-          color: Color(0xFF9EA700),
-          size: 100,
-        ),
-      )
+              child: LoadingAnimationWidget.fourRotatingDots(
+                color: Color(0xFF9EA700),
+                size: 100,
+              ),
+            )
           : leadsList.isEmpty
-          ? Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Center(child: Image.asset('assets/nodata.png')),
-          Text(
-            "No data to display",
-            style: TextStyle(color: Colors.blueGrey),
-          ),
-        ],
-      )
-          :
-      Column(
-        children: [
-          Divider(thickness: 2, color: Colors.grey.shade300),
-          Padding(
-            padding: const EdgeInsets.all(10.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Pipeline',
-                  style: TextStyle(
-                      fontSize: 25,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey),
+              ? Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Center(child: Image.asset('assets/nodata.png')),
+                    Text(
+                      "No data to display",
+                      style: TextStyle(color: Colors.blueGrey),
+                    ),
+                  ],
+                )
+              : Column(
+                  children: [
+                    Divider(thickness: 2, color: Colors.grey.shade300),
+                    Padding(
+                      padding: const EdgeInsets.all(10.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Pipeline',
+                            style: TextStyle(
+                                fontSize: 25,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Divider(thickness: 1, color: Colors.grey.shade300),
+                    ChartSelection(),
+                    Divider(thickness: 1, color: Colors.grey.shade300),
+                    selectedView == 4 ? buildChartSelection() : SizedBox(),
+                    SizedBox(
+                      height: 7,
+                    ),
+                    Expanded(child: iconSelectedView()),
+                  ],
                 ),
-              ],
-            ),
-          ),
-          Divider(thickness: 1, color: Colors.grey.shade300),
-          ChartSelection(),
-          Divider(thickness: 1, color: Colors.grey.shade300),
-          selectedView == 4 ?
-          buildChartSelection():SizedBox(),
-          SizedBox(height: 7,),
-          Expanded(child: iconSelectedView()),
-        ],
-      ),
     );
   }
 }
@@ -3605,9 +4097,9 @@ class _SalesDataGridWidgetState extends State<SalesDataGridWidget> {
 
     List<Map<String, dynamic>> filteredOpportunities = widget.opportunitiesList
         .where((opportunity) =>
-    opportunity['activity_type_id'] != null &&
-        opportunity['activity_type_id'] is List &&
-        opportunity['activity_type_id'].length > 1)
+            opportunity['activity_type_id'] != null &&
+            opportunity['activity_type_id'] is List &&
+            opportunity['activity_type_id'].length > 1)
         .toList();
 
     final currentUserId = await getCurrentUserId();
@@ -3677,7 +4169,8 @@ class _SalesDataGridWidgetState extends State<SalesDataGridWidget> {
   Future<void> fetchUserImages() async {
     final prefs = await SharedPreferences.getInstance();
     final userIds = widget.opportunitiesList
-        .where((opp) => opp['activity_user_id'] != null && opp['activity_user_id'] is List)
+        .where((opp) =>
+            opp['activity_user_id'] != null && opp['activity_user_id'] is List)
         .map((opp) => opp['activity_user_id'][0] as int)
         .toSet()
         .toList();
@@ -3707,7 +4200,8 @@ class _SalesDataGridWidgetState extends State<SalesDataGridWidget> {
         return;
       }
 
-      final List<Map<String, dynamic>> data = List<Map<String, dynamic>>.from(response);
+      final List<Map<String, dynamic>> data =
+          List<Map<String, dynamic>>.from(response);
       setState(() {
         for (var user in data) {
           var imageData = user['image_1920'];
@@ -3723,7 +4217,8 @@ class _SalesDataGridWidgetState extends State<SalesDataGridWidget> {
     }
   }
 
-  List<Map<String, dynamic>> processOpportunities(List<Map<String, dynamic>> opportunities) {
+  List<Map<String, dynamic>> processOpportunities(
+      List<Map<String, dynamic>> opportunities) {
     return opportunities.map((opportunity) {
       Map<String, dynamic> salesData = {
         'id': opportunity['id'],
@@ -3731,20 +4226,22 @@ class _SalesDataGridWidgetState extends State<SalesDataGridWidget> {
         'expected_revenue': opportunity['expected_revenue'] != null
             ? '\$${opportunity['expected_revenue'].toString()}'
             : '\$0',
-        'stage_id': opportunity['stage_id'] != null && opportunity['stage_id'] is List
-            ? opportunity['stage_id'][1].toString()
-            : 'New',
-        'partner_id': opportunity['partner_id'] != null && opportunity['partner_id'] is List
+        'stage_id':
+            opportunity['stage_id'] != null && opportunity['stage_id'] is List
+                ? opportunity['stage_id'][1].toString()
+                : 'New',
+        'partner_id': opportunity['partner_id'] != null &&
+                opportunity['partner_id'] is List
             ? opportunity['partner_id'][1].toString()
             : '',
         'activity_user_id': opportunity['activity_user_id'] != null &&
-            opportunity['activity_user_id'] is List
+                opportunity['activity_user_id'] is List
             ? opportunity['activity_user_id'][0] as int
             : null,
-        'user_id' :opportunity['user_id'] != null &&
-            opportunity['user_id'] is List
-            ? opportunity['user_id'][0] as int
-            : null,
+        'user_id':
+            opportunity['user_id'] != null && opportunity['user_id'] is List
+                ? opportunity['user_id'][0] as int
+                : null,
       };
 
       for (var type in widget.activityTypes) {
@@ -3836,7 +4333,7 @@ class SalesDataSource extends DataGridSource {
   SalesDataSource(List<Map<String, dynamic>> salesList, this.activityTypes,
       this.userImages, this.context) {
     currentUserImage = null;
-    _getCurrentUserImage();
+    // _getCurrentUserImage();
 
     dataGridRows = salesList.map<DataGridRow>((salesData) {
       List<DataGridCell> cells = [];
@@ -3861,39 +4358,39 @@ class SalesDataSource extends DataGridSource {
     }).toList();
   }
 
-  Future<void> _getCurrentUserImage() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final currentUserId = prefs.getInt('userId');
-
-      if (currentUserId != null && userImages.containsKey(currentUserId)) {
-        currentUserImage = userImages[currentUserId];
-      } else if (currentUserId != null) {
-        final response = await client?.callKw({
-          'model': 'res.users',
-          'method': 'search_read',
-          'args': [
-            [
-              ['id', '=', currentUserId],
-            ]
-          ],
-          'kwargs': {
-            'fields': ['image_1920'],
-          },
-        });
-
-        if (response != null && response is List && response.isNotEmpty) {
-          final userData = response[0];
-          var imageData = userData['image_1920'];
-          if (imageData != null && imageData is String) {
-            currentUserImage = base64Decode(imageData);
-          }
-        }
-      }
-    } catch (e) {
-      print("Error fetching current user image: $e");
-    }
-  }
+  // Future<void> _getCurrentUserImage() async {
+  //   try {
+  //     final prefs = await SharedPreferences.getInstance();
+  //     final currentUserId = prefs.getInt('userId');
+  //
+  //     if (currentUserId != null && userImages.containsKey(currentUserId)) {
+  //       currentUserImage = userImages[currentUserId];
+  //     } else if (currentUserId != null) {
+  //       final response = await client?.callKw({
+  //         'model': 'res.users',
+  //         'method': 'search_read',
+  //         'args': [
+  //           [
+  //             ['id', '=', currentUserId],
+  //           ]
+  //         ],
+  //         'kwargs': {
+  //           'fields': ['image_1920'],
+  //         },
+  //       });
+  //
+  //       if (response != null && response is List && response.isNotEmpty) {
+  //         final userData = response[0];
+  //         var imageData = userData['image_1920'];
+  //         if (imageData != null && imageData is String) {
+  //           currentUserImage = base64Decode(imageData);
+  //         }
+  //       }
+  //     }
+  //   } catch (e) {
+  //     print("Error fetching current user image: $e");
+  //   }
+  // }
 
   @override
   List<DataGridRow> get rows => dataGridRows;
@@ -3904,11 +4401,13 @@ class SalesDataSource extends DataGridSource {
       cells: row.getCells().map<Widget>((dataCell) {
         if (dataCell.columnName == 'opportunity') {
           final salesData = dataCell.value as Map<String, dynamic>;
-          return OpportunityColumn(salesData, currentUserImage, context); // Pass context here
+          return OpportunityColumn(
+              salesData, currentUserImage, context); // Pass context here
         }
 
         String activityDate = dataCell.value.toString();
-        DateTime? parsedDate = activityDate.isNotEmpty ? DateTime.tryParse(activityDate) : null;
+        DateTime? parsedDate =
+            activityDate.isNotEmpty ? DateTime.tryParse(activityDate) : null;
         DateTime today = DateTime.now();
 
         Color cellColor = Colors.transparent;
@@ -3920,7 +4419,9 @@ class SalesDataSource extends DataGridSource {
           }
         }
 
-        final opportunityCell = row.getCells().firstWhere((cell) => cell.columnName == 'opportunity');
+        final opportunityCell = row
+            .getCells()
+            .firstWhere((cell) => cell.columnName == 'opportunity');
         final salesData = opportunityCell.value as Map<String, dynamic>;
         int? userId = salesData['activity_user_id'];
         Uint8List? userImage = userId != null ? userImages[userId] : null;
@@ -3958,9 +4459,8 @@ class SalesDataSource extends DataGridSource {
     );
   }
 
-  Widget OpportunityColumn(Map<String, dynamic> salesData, Uint8List? userImage, BuildContext context) {
-
-
+  Widget OpportunityColumn(Map<String, dynamic> salesData, Uint8List? userImage,
+      BuildContext context) {
     return InkWell(
       onTap: () {
         final leadId = salesData['id'];
@@ -4029,7 +4529,8 @@ class SalesDataSource extends DataGridSource {
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.person, size: 18, color: Colors.white),
+                  child:
+                      const Icon(Icons.person, size: 18, color: Colors.white),
                 );
               }
             },
@@ -4045,7 +4546,8 @@ class SalesDataSource extends DataGridSource {
                   children: [
                     Text(
                       salesData['name'] ?? 'No Name',
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w500),
                       overflow: TextOverflow.ellipsis,
                     ),
                     Padding(
@@ -4099,7 +4601,6 @@ class SalesDataSource extends DataGridSource {
   }
 }
 
-
 class AppointmentDataSource extends CalendarDataSource {
   AppointmentDataSource(List<Appointment> source) {
     appointments = source;
@@ -4146,9 +4647,8 @@ String formatDate(String date) {
   }
 }
 
-
 class LeadItem extends AppFlowyGroupItem {
-  final int  leadId ;
+  final int leadId;
   final String name;
   final String revenue;
   final String customerName;

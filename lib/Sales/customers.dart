@@ -1,11 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
+import 'package:cyllo_mobile/isarModel/customerViewModel.dart';
 import 'package:flutter/material.dart';
+import 'package:isar/isar.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_flutter_datagrid/datagrid.dart';
+import '../Leads/leads.dart';
+import '../getUserImage.dart';
+import '../main.dart';
 import 'Views/customerView.dart';
 
 class Customers extends StatefulWidget {
@@ -38,6 +43,7 @@ class _CustomersState extends State<Customers> {
   @override
   void initState() {
     super.initState();
+    loadFromIsar();
     initializeOdooClient();
     searchController.addListener(_onSearchChanged);
   }
@@ -134,37 +140,57 @@ class _CustomersState extends State<Customers> {
     super.dispose();
   }
 
-  Future<void> initializeOdooClient() async {
-    setState(() => isLoading = true);
+  Future<bool> ensureAuthenticated() async {
     final prefs = await SharedPreferences.getInstance();
     final baseUrl = prefs.getString("urldata") ?? "";
     final dbName = prefs.getString("selectedDatabase") ?? "";
     final userLogin = prefs.getString("userLogin") ?? "";
     final userPassword = prefs.getString("password") ?? "";
 
-    if (baseUrl.isNotEmpty &&
-        dbName.isNotEmpty &&
-        userLogin.isNotEmpty &&
-        userPassword.isNotEmpty) {
-      client = OdooClient(baseUrl);
-      try {
-        await client!.authenticate(dbName, userLogin, userPassword);
-        await fetchCustomerData();
-        await fetchCategoryData();
-        await fetchActivityTypes();
-      } catch (e) {
-        log("Odoo Authentication Failed: $e");
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Failed to connect to Odoo: $e")),
-          );
-        }
-      }
-    } else {
+    if (baseUrl.isEmpty || dbName.isEmpty || userLogin.isEmpty || userPassword.isEmpty) {
+      log("Missing connection details");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Missing connection details")),
         );
+      }
+      return false;
+    }
+
+    if (client == null) {
+      client = OdooClient(baseUrl);
+    }
+
+    try {
+      await client!.authenticate(dbName, userLogin, userPassword);
+      log("Odoo client authenticated successfully");
+      return true;
+    } catch (e) {
+      log("Odoo Authentication Failed: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Failed to authenticate with Odoo: $e")),
+        );
+      }
+      return false;
+    }
+  }
+
+  Future<void> initializeOdooClient() async {
+    setState(() => isLoading = true);
+    if (await ensureAuthenticated()) {
+      try {
+        await fetchCustomerData(savetoIsar: true);
+        await fetchCategoryData(savetoIsar: true);
+        await fetchActivityTypes();
+        await fetchActivityData(savetoIsar: true);
+      } catch (e) {
+        log("Error during initialization: $e");
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Initialization failed: $e")),
+          );
+        }
       }
     }
     if (mounted) {
@@ -229,7 +255,7 @@ class _CustomersState extends State<Customers> {
     );
   }
 
-  Future<void> fetchActivityTypes() async {
+  Future<void>  fetchActivityTypes() async {
     if (client == null) return;
 
     try {
@@ -259,12 +285,40 @@ class _CustomersState extends State<Customers> {
     }
   }
 
-  Future<void> fetchActivityData() async {
+  Future<void> fetchActivityData({bool savetoIsar = false}) async {
+    // Try loading from Isar first
+    final activitiesFromIsar = await isar.activitys.where().findAll();
+    if (activitiesFromIsar.isNotEmpty && !savetoIsar) {
+      Map<int, List<dynamic>> tempActivities = {};
+      for (var activity in activitiesFromIsar) {
+        tempActivities.putIfAbsent(activity.customerId, () => []).add({
+          'res_id': activity.customerId,
+          'activity_type_id': activity.activityTypeId != null && activity.activityTypeName != null
+              ? [activity.activityTypeId, activity.activityTypeName]
+              : null,
+          'date_deadline': activity.dateDeadline,
+          'summary': activity.summary,
+          'user_id': activity.userId != null && activity.userName != null
+              ? [activity.userId, activity.userName]
+              : null,
+          'user_image': activity.userImage,
+        });
+      }
+      setState(() {
+        customerActivities = tempActivities;
+      });
+      log("Loaded activities for ${customerActivities.length} customers from Isar");
+    }
+
+    // Fetch from Odoo if needed
     if (client == null) return;
 
     try {
-      List<int> customerIds =
-          customers.map((customer) => customer['id'] as int).toList();
+      List<int> customerIds = customers.map((customer) => customer['id'] as int).toList();
+      if (customerIds.isEmpty) {
+        log("No customer IDs available for activity fetch");
+        return;
+      }
 
       final response = await client!.callKw({
         'model': 'mail.activity',
@@ -277,33 +331,37 @@ class _CustomersState extends State<Customers> {
         ],
         'kwargs': {
           'fields': [
+            'id',
             'res_id',
             'activity_type_id',
             'date_deadline',
             'summary',
-            'user_id'
+            'user_id',
           ],
         },
       });
 
+      log("Raw activity response: $response");
+
+      if (response is! List) {
+        throw FormatException("Unexpected response format: $response");
+      }
+
       if (response != null && mounted) {
         Map<int, List<dynamic>> tempActivities = {};
+        Set<int> userIds = {};
+
         for (var activity in response) {
           int customerId = activity['res_id'];
           tempActivities.putIfAbsent(customerId, () => []).add(activity);
-        }
-
-        Set<int> userIds = {};
-        for (var activities in tempActivities.values) {
-          for (var activity in activities) {
-            if (activity['user_id'] != null &&
-                activity['user_id'] is List &&
-                activity['user_id'].length > 0) {
-              userIds.add(activity['user_id'][0]);
-            }
+          if (activity['user_id'] != null &&
+              activity['user_id'] is List &&
+              activity['user_id'].length > 0) {
+            userIds.add(activity['user_id'][0]);
           }
         }
 
+        // Fetch user images
         if (userIds.isNotEmpty) {
           final userResponse = await client!.callKw({
             'model': 'res.users',
@@ -318,18 +376,16 @@ class _CustomersState extends State<Customers> {
             },
           });
 
-          // Add user images to the activities
+          log("Raw user response: $userResponse");
+
           if (userResponse != null) {
             Map<int, String> userImageMap = {};
             for (var user in userResponse) {
-              if (user['image_128'] != null &&
-                  user['image_128'] is String &&
-                  user['image_128'].isNotEmpty) {
+              if (user['image_128'] != null && user['image_128'] is String && user['image_128'].isNotEmpty) {
                 userImageMap[user['id']] = user['image_128'];
               }
             }
 
-            // Update activities with user images
             for (var activities in tempActivities.values) {
               for (var activity in activities) {
                 if (activity['user_id'] != null &&
@@ -345,10 +401,43 @@ class _CustomersState extends State<Customers> {
           }
         }
 
+        // Save to Isar
+        if (savetoIsar) {
+          await isar.writeTxn(() async {
+            await isar.activitys.clear(); // Clear existing activities
+            for (var activity in response) {
+              try {
+                final activityModel = Activity()
+                  ..odooId = activity['id']
+                  ..customerId = activity['res_id']
+                  ..activityTypeId = activity['activity_type_id'] is List && activity['activity_type_id'].isNotEmpty
+                      ? activity['activity_type_id'][0]
+                      : null
+                  ..activityTypeName = activity['activity_type_id'] is List && activity['activity_type_id'].length > 1
+                      ? activity['activity_type_id'][1]?.toString()
+                      : null
+                  ..dateDeadline = activity['date_deadline']?.toString()
+                  ..summary = activity['summary']?.toString()
+                  ..userId = activity['user_id'] is List && activity['user_id'].isNotEmpty
+                      ? activity['user_id'][0]
+                      : null
+                  ..userName = activity['user_id'] is List && activity['user_id'].length > 1
+                      ? activity['user_id'][1]?.toString()
+                      : null
+                  ..userImage = activity['user_image']?.toString();
+
+                await isar.activitys.put(activityModel);
+              } catch (e) {
+                log("Error saving activity ID ${activity['id']}: $e");
+              }
+            }
+          });
+          log("Saved ${response.length} activities to Isar");
+        }
+
         setState(() {
           customerActivities = tempActivities;
         });
-
         log("Fetched activities for ${customerActivities.length} customers");
       }
     } catch (e) {
@@ -358,24 +447,62 @@ class _CustomersState extends State<Customers> {
           SnackBar(content: Text("Error fetching activities: $e")),
         );
       }
+      // Fall back to Isar data if available
+      if (activitiesFromIsar.isNotEmpty) {
+        Map<int, List<dynamic>> tempActivities = {};
+        for (var activity in activitiesFromIsar) {
+          tempActivities.putIfAbsent(activity.customerId, () => []).add({
+            'res_id': activity.customerId,
+            'activity_type_id': activity.activityTypeId != null && activity.activityTypeName != null
+                ? [activity.activityTypeId, activity.activityTypeName]
+                : null,
+            'date_deadline': activity.dateDeadline,
+            'summary': activity.summary,
+            'user_id': activity.userId != null && activity.userName != null
+                ? [activity.userId, activity.userName]
+                : null,
+            'user_image': activity.userImage,
+          });
+        }
+        setState(() {
+          customerActivities = tempActivities;
+        });
+        log("Fallback: Loaded activities for ${customerActivities.length} customers from Isar");
+      }
     }
   }
 
-  Future<void> fetchCategoryData() async {
-    if (client == null) return;
+  Future<void> fetchCategoryData({bool savetoIsar = false}) async {
+    // Try loading from Isar first
+    final categoriesFromIsar = await isar.categorys.where().findAll();
+    if (categoriesFromIsar.isNotEmpty && !savetoIsar) {
+      setState(() {
+        categoryMap = {for (var cat in categoriesFromIsar) cat.odooId: cat.name ?? 'Unknown'};
+        categoryPathMap = {
+          for (var cat in categoriesFromIsar)
+            cat.odooId: cat.parentPath?.isNotEmpty ?? false
+                ? cat.parentPath!.split('/').where((id) => id.isNotEmpty).map((id) {
+              int catId = int.tryParse(id) ?? 0;
+              return categoryMap[catId] ?? 'Unknown';
+            }).join('/')
+                : cat.name ?? 'Unknown'
+        };
+      });
+      log("Loaded ${categoriesFromIsar.length} categories from Isar");
+    }
+
+    // Fetch from Odoo if needed
+    if (client == null ) return;
 
     try {
       Set<int> categoryIds = {};
       for (var customer in customers) {
-        if (customer['category_id'] != null &&
-            customer['category_id'] is List) {
+        if (customer['category_id'] != null && customer['category_id'] is List) {
           final categoryList = customer['category_id'] as List;
           for (var category in categoryList) {
             if (category is int) {
               categoryIds.add(category);
-            } else if (category is List &&
-                category.isNotEmpty &&
-                category[0] is int) {
+            } else if (category is List && category.isNotEmpty && category[0] is int) {
               categoryIds.add(category[0]);
             }
           }
@@ -387,8 +514,8 @@ class _CustomersState extends State<Customers> {
           'model': 'res.partner.category',
           'method': 'search_read',
           'args': [
-            [
-              ['id', 'in', categoryIds.toList()]
+          [
+            ['id', 'in', categoryIds.toList()]
             ]
           ],
           'kwargs': {
@@ -401,10 +528,8 @@ class _CustomersState extends State<Customers> {
           for (var category in initialResponse) {
             String parentPath = category['parent_path'] ?? '';
             if (parentPath.isNotEmpty) {
-              List<String> pathIds =
-                  parentPath.split('/').where((id) => id.isNotEmpty).toList();
-              pathIds
-                  .forEach((id) => allCategoryIds.add(int.tryParse(id) ?? 0));
+              List<String> pathIds = parentPath.split('/').where((id) => id.isNotEmpty).toList();
+              pathIds.forEach((id) => allCategoryIds.add(int.tryParse(id) ?? 0));
             }
           }
 
@@ -421,36 +546,75 @@ class _CustomersState extends State<Customers> {
             },
           });
 
+          log("Raw category response: $fullResponse");
+
           if (fullResponse != null && mounted) {
-            Map<int, String> tempCategoryMap = {
-              for (var cat in fullResponse) cat['id']: cat['name']
-            };
+            Map<int, String> tempCategoryMap = {for (var cat in fullResponse) cat['id']: cat['name']};
+
+            // Save to Isar
+            if (savetoIsar) {
+              await isar.writeTxn(() async {
+                await isar.categorys.clear(); // Clear existing categories
+                for (var category in fullResponse) {
+                  try {
+                    final categoryModel = Category()
+                      ..odooId = category['id']
+                      ..name = category['name']?.toString()
+                      ..parentPath = category['parent_path']?.toString();
+                    await isar.categorys.put(categoryModel);
+                  } catch (e) {
+                    log("Error saving category ID ${category['id']}: $e");
+                  }
+                }
+              });
+              log("Saved ${fullResponse.length} categories to Isar");
+            }
+
             setState(() {
               categoryMap = tempCategoryMap;
-            });
-
-            for (var category in fullResponse) {
-              String parentPath = category['parent_path'] ?? '';
-              if (parentPath.isNotEmpty) {
-                List<String> pathIds =
-                    parentPath.split('/').where((id) => id.isNotEmpty).toList();
-                List<String> pathNames = pathIds.map((id) {
-                  int catId = int.tryParse(id) ?? 0;
-                  return tempCategoryMap[catId] ?? 'Unknown';
-                }).toList();
-                categoryPathMap[category['id']] = pathNames.join('/');
-              } else {
-                categoryPathMap[category['id']] = category['name'];
+              for (var category in fullResponse) {
+                String parentPath = category['parent_path'] ?? '';
+                if (parentPath.isNotEmpty) {
+                  List<String> pathIds = parentPath.split('/').where((id) => id.isNotEmpty).toList();
+                  List<String> pathNames = pathIds.map((id) {
+                    int catId = int.tryParse(id) ?? 0;
+                    return tempCategoryMap[catId] ?? 'Unknown';
+                  }).toList();
+                  categoryPathMap[category['id']] = pathNames.join('/');
+                } else {
+                  categoryPathMap[category['id']] = category['name'];
+                }
               }
-            }
+            });
+            log("Fetched ${fullResponse.length} categories");
           }
         }
       }
     } catch (e) {
       log("Error fetching categories: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error fetching categories: $e")),
+        );
+      }
+      // Fall back to Isar data if available
+      if (categoriesFromIsar.isNotEmpty) {
+        setState(() {
+          categoryMap = {for (var cat in categoriesFromIsar) cat.odooId: cat.name ?? 'Unknown'};
+          categoryPathMap = {
+            for (var cat in categoriesFromIsar)
+              cat.odooId: cat.parentPath?.isNotEmpty ?? false
+                  ? cat.parentPath!.split('/').where((id) => id.isNotEmpty).map((id) {
+                int catId = int.tryParse(id) ?? 0;
+                return categoryMap[catId] ?? 'Unknown';
+              }).join('/')
+                  : cat.name ?? 'Unknown'
+          };
+        });
+        log("Fallback: Loaded ${categoriesFromIsar.length} categories from Isar");
+      }
     }
   }
-
   Map<String, Map<String, dynamic>> getFilters() {
     return {
       'individuals': {
@@ -957,8 +1121,119 @@ class _CustomersState extends State<Customers> {
       }
     }
   }
+  Future<void> loadFromIsar() async {
+    // setState(() => isLoading = true);
+    try {
+      // Load customers
+      final customersFromIsar = await isar.customers.where().findAll();
+      if (customersFromIsar.isNotEmpty) {
+        setState(() {
+          customers = customersFromIsar.map((customer) {
+            return {
+              'id': customer.odooId,
+              'name': customer.name,
+              'email': customer.email,
+              'phone': customer.phone,
+              'city': customer.city,
+              'category_id': customer.categoryIds,
+              'image_128': customer.image128,
+              'company_type': customer.companyType,
+              'company_id': customer.companyId != null && customer.companyName != null
+                  ? [customer.companyId, customer.companyName]
+                  : null,
+              'commercial_partner_id': customer.commercialPartnerId != null &&
+                  customer.commercialPartnerName != null
+                  ? [customer.commercialPartnerId, customer.commercialPartnerName]
+                  : null,
+              // 'function': customer.function,
+              'is_company': customer.isCompany,
+              'customer_rank': customer.customerRank,
+              'supplier_rank': customer.supplierRank,
+              'active': customer.active,
+              'country_id': customer.countryId != null && customer.countryName != null
+                  ? [customer.countryId, customer.countryName]
+                  : null,
+              'state_id': customer.stateId != null && customer.stateName != null
+                  ? [customer.stateId, customer.stateName]
+                  : null,
+            };
+          }).toList();
+        });
+        log("Loaded ${customers.length} customers from Isar");
+      }
 
-  Future<void> fetchCustomerData() async {
+      // Load categories
+      final categoriesFromIsar = await isar.categorys.where().findAll();
+      if (categoriesFromIsar.isNotEmpty) {
+        setState(() {
+          categoryMap = {for (var cat in categoriesFromIsar) cat.odooId: cat.name ?? 'Unknown'};
+          categoryPathMap = {
+            for (var cat in categoriesFromIsar)
+              cat.odooId: cat.parentPath?.isNotEmpty ?? false
+                  ? cat.parentPath!.split('/').where((id) => id.isNotEmpty).map((id) {
+                int catId = int.tryParse(id) ?? 0;
+                return categoryMap[catId] ?? 'Unknown';
+              }).join('/')
+                  : cat.name ?? 'Unknown'
+          };
+        });
+        log("Loaded ${categoriesFromIsar.length} categories from Isar");
+      }
+
+      // Load activities
+      final activitiesFromIsar = await isar.activitys.where().findAll();
+      if (activitiesFromIsar.isNotEmpty) {
+        Map<int, List<dynamic>> tempActivities = {};
+        for (var activity in activitiesFromIsar) {
+          tempActivities.putIfAbsent(activity.customerId, () => []).add({
+            'res_id': activity.customerId,
+            'activity_type_id': activity.activityTypeId != null && activity.activityTypeName != null
+                ? [activity.activityTypeId, activity.activityTypeName]
+                : null,
+            'date_deadline': activity.dateDeadline,
+            'summary': activity.summary,
+            'user_id': activity.userId != null && activity.userName != null
+                ? [activity.userId, activity.userName]
+                : null,
+            'user_image': activity.userImage,
+          });
+        }
+        setState(() {
+          customerActivities = tempActivities;
+        });
+        log("Loaded activities for ${customerActivities.length} customers from Isar");
+      }
+
+      // Fetch from Odoo if Isar is empty
+      if (customersFromIsar.isEmpty) {
+        await initializeOdooClient();
+      } else {
+        // Fetch fresh data in the background
+        if (await ensureAuthenticated()) {
+          await fetchCustomerData(savetoIsar: true);
+          await fetchCategoryData(savetoIsar: true);
+          await fetchActivityTypes();
+          await fetchActivityData(savetoIsar: true);
+        }
+      }
+    } catch (e) {
+      log("Isar Load Failed: $e");
+    }
+  }
+  bool isValidBase64(String? input) {
+    if (input == null || input.isEmpty || input == 'false') {
+      return false;
+    }
+    try {
+      if (input.length % 4 != 0) return false;
+      base64Decode(input); // Attempt to decode
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<void> fetchCustomerData({bool savetoIsar = false}) async {
     try {
       final response = await client?.callKw({
         'model': 'res.partner',
@@ -986,9 +1261,81 @@ class _CustomersState extends State<Customers> {
           ],
         },
       });
-      if (mounted) {
+      if (response != null && mounted) {
+        if (savetoIsar) {
+          await isar.writeTxn(() async {
+            await isar.customers.clear();
+            log('Cleared Customer collection');
+
+            for (var customer in response) {
+              try {
+                final customerModel = Customer()
+                  ..odooId = customer['id']
+                  ..name = customer['name']?.toString()
+                  ..email = customer['email']?.toString()
+                  ..phone = customer['phone']?.toString()
+                  ..city = customer['city']?.toString()
+                  ..categoryIds = customer['category_id'] is List
+                      ? (customer['category_id'] as List)
+                      .whereType<int>()
+                      .toList()
+                      : null
+                  // ..image128 = customer['image_128']?.toString()
+                  ..image128 = isValidBase64(customer['image_128']?.toString())
+                      ? customer['image_128']?.toString()
+                      : null
+                  ..companyType = customer['company_type']?.toString()
+                  ..companyId = customer['company_id'] is List &&
+                      customer['company_id'].isNotEmpty
+                      ? customer['company_id'][0]
+                      : null
+                  ..companyName = customer['company_id'] is List &&
+                      customer['company_id'].length > 1
+                      ? customer['company_id'][1]?.toString()
+                      : null
+                  ..commercialPartnerId = customer['commercial_partner_id'] is List &&
+                      customer['commercial_partner_id'].isNotEmpty
+                      ? customer['commercial_partner_id'][0]
+                      : null
+                  ..commercialPartnerName = customer['commercial_partner_id'] is List &&
+                      customer['commercial_partner_id'].length > 1
+                      ? customer['commercial_partner_id'][1]?.toString()
+                      : null
+                  ..function = customer['function']?.toString()
+                  ..isCompany = customer['is_company']
+                  ..customerRank = customer['customer_rank']
+                  ..supplierRank = customer['supplier_rank']
+                  ..active = customer['active']
+                  ..countryId = customer['country_id'] is List &&
+                      customer['country_id'].isNotEmpty
+                      ? customer['country_id'][0]
+                      : null
+                  ..countryName = customer['country_id'] is List &&
+                      customer['country_id'].length > 1
+                      ? customer['country_id'][1]?.toString()
+                      : null
+                  ..stateId = customer['state_id'] is List &&
+                      customer['state_id'].isNotEmpty
+                      ? customer['state_id'][0]
+                      : null
+                  ..stateName = customer['state_id'] is List &&
+                      customer['state_id'].length > 1
+                      ? customer['state_id'][1]?.toString()
+                      : null;
+
+                await isar.customers.put(customerModel);
+                log('Saved customer: ${customer['name']}');
+              } catch (e) {
+                log('Error saving customer: ${customer['name']}, Error: $e');
+                log('Customer data: $customer');
+              }
+            }
+          });
+        }
+
         setState(() {
-          customers = response ?? [];
+          customers = response;
+          isLoading = false;
         });
         await fetchCategoryData();
         await fetchActivityData();
@@ -1002,9 +1349,12 @@ class _CustomersState extends State<Customers> {
           SnackBar(content: Text("Error fetching customers: $e")),
         );
       }
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1062,35 +1412,14 @@ class _CustomersState extends State<Customers> {
             height: 15,
           ), // Added here at the start
           Expanded(
-            child: isLoading
+            child: isLoading && customers.isEmpty
                 ?Center(
               child: LoadingAnimationWidget.fourRotatingDots(
                 color: Color(0xFF9EA700),
                 size: 100,
               ),
             )
-                : customers.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.people_outline,
-                              size: 64,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              "No Customers Found",
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
+
                     : RefreshIndicator(
                         onRefresh: () async {
                           await fetchCustomerData();
@@ -1176,24 +1505,15 @@ class _CustomersState extends State<Customers> {
                       shape: BoxShape.circle,
                       color: Colors.grey[200],
                     ),
-                    child: imageBase64 != null
-                        ? ClipOval(
-                            child: Image.memory(
-                              Base64Decoder().convert(imageBase64),
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  Icon(
-                                isCompany ? Icons.business : Icons.person,
-                                size: 24,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          )
-                        : Icon(
-                            isCompany ? Icons.business : Icons.person,
-                            size: 24,
-                            color: Colors.grey[600],
-                          ),
+                    child: OdooAvatar(
+                      client: client!, // Use the OdooClient from _CustomersState
+                      model: 'res.partner',
+                      recordId: customer['id'], // Customer ID
+                      size: 70,
+                      borderRadius: 35,
+                      shape: BoxShape.circle,
+                      // Optional: Add a placeholder or errorBuilder if OdooAvatar supports it
+                    ),
                   ),
                   if (hasCompanyImage) ...[
                     const SizedBox(width: 8),
@@ -1582,24 +1902,20 @@ class CustomerActivityDataSource extends DataGridSource {
                         shape: BoxShape.circle,
                         color: Colors.white.withOpacity(0.8),
                       ),
-                      child: userImage != null
-                          ? ClipRRect(
-                              child: Image.memory(
-                                Base64Decoder().convert(userImage),
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    Icon(
-                                  Icons.person,
-                                  size: 16,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            )
+                      child: activityData['user_id'] != null && activityData['user_id'] is List && activityData['user_id'].isNotEmpty
+                          ? OdooAvatar(
+                        client:client, // Pass the OdooClient from _CustomersState
+                        model: 'res.users',
+                        recordId: activityData['user_id'][0], // User ID
+                        size: 24,
+                        borderRadius: 12,
+                        shape: BoxShape.circle,
+                      )
                           : Icon(
-                              Icons.person,
-                              size: 16,
-                              color: Colors.grey[600],
-                            ),
+                        Icons.person,
+                        size: 16,
+                        color: Colors.grey[600],
+                      ),
                     ),
                     const SizedBox(width: 4),
                     Text(

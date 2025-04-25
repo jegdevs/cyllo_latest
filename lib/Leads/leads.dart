@@ -2,8 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'dart:typed_data';
+import 'package:cyllo_mobile/isarModel/leadModel.dart';
+import 'package:cyllo_mobile/isarModel/pipelineModel.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:isar/isar.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,6 +14,8 @@ import 'package:syncfusion_flutter_calendar/calendar.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datagrid/datagrid.dart';
 
+import '../getUserImage.dart';
+import '../main.dart';
 import 'Views/leadView.dart';
 
 class Leads extends StatefulWidget {
@@ -28,6 +33,8 @@ OdooClient? client;
 bool isLoading = true;
 
 class _LeadsState extends State<Leads> {
+  List<String> _creationDates = [];
+  List<String> _closedDates = [];
   int? currentUserId;
   Map<int, Uint8List?> salespersonImages = {};
   List<ChartData> chartDatavalues = [];
@@ -47,6 +54,7 @@ class _LeadsState extends State<Leads> {
   @override
   void initState() {
     super.initState();
+    loadLeadsFromIsar();
     initializeOdooClient();
     searchController.addListener(_onSearchChanged);
   }
@@ -55,7 +63,7 @@ class _LeadsState extends State<Leads> {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () {
       if (searchController.text.isNotEmpty) {
-        leadData(query:searchController.text);
+        leadData(query: searchController.text);
       } else {
         leadData();
       }
@@ -86,11 +94,18 @@ class _LeadsState extends State<Leads> {
         final auth =
             await client!.authenticate(dbName, userLogin, userPassword);
         print("Odoo Authenticated: $auth");
-        await leadData();
+        await syncTagsFromOdoo();
+        await leadData(savetoIsar: true);
         await buildChart();
         await fetchActivityTypes();
         await fetchLeadActivities();
+        final dates = await fetchAllDates();
+        setState(() {
+          _creationDates = dates['creationDates']!;
+          _closedDates = dates['closedDates']!;
+        });
       } catch (e) {
+        await loadLeadsFromIsar();
         print("Odoo Authentication Failed: $e");
       }
     }
@@ -185,189 +200,168 @@ class _LeadsState extends State<Leads> {
           ),
           content: StatefulBuilder(
             builder: (context, setDialogState) {
-              return FutureBuilder<Map<String, List<String>>>(
-                future: fetchAllDates(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return SizedBox(
-                      height: 100,
-                      child: Center(
-                          child: CircularProgressIndicator(
-                              color: Color(0xFF9EA700))),
-                    );
-                  }
+              List<String> creationDates = _creationDates;
+              List<String> closedDates = _closedDates;
 
-                  List<String> creationDates = snapshot.data!['creationDates']!;
-                  List<String> closedDates = snapshot.data!['closedDates']!;
+              if (!creationDates.contains("None")) {
+                creationDates = ["None", ...creationDates];
+              }
+              if (!closedDates.contains("None")) {
+                closedDates = ["None", ...closedDates];
+              }
 
-                  if (!creationDates.contains("None")) {
-                    creationDates.insert(0, "None");
-                  }
-                  if (!closedDates.contains("None")) {
-                    closedDates.insert(0, "None");
-                  }
-
-                  return Container(
-                    width: double.maxFinite,
-                    constraints: BoxConstraints(maxHeight: 400),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (currentFilters.isEmpty)
-                            Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Text(
-                                "No filters available",
-                                style: TextStyle(color: Colors.grey[600]),
-                              ),
-                            ),
-                          ...currentFilters.entries.map((entry) {
-                            if (entry.key == 'created_on') {
-                              return Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      entry.value['name'],
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.blueGrey[700],
-                                      ),
-                                    ),
-                                    SizedBox(height: 8),
-                                    Container(
-                                      padding:
-                                          EdgeInsets.symmetric(horizontal: 12),
-                                      decoration: BoxDecoration(
-                                        border: Border.all(
-                                            color: Colors.grey[300]!),
-                                        borderRadius: BorderRadius.circular(8),
-                                        color: Colors.grey[50],
-                                      ),
-                                      child: DropdownButton<String>(
-                                        value:
-                                            tempSelectedCreationDate ?? "None",
-                                        hint: Text("Select a month"),
-                                        isExpanded: true,
-                                        underline: SizedBox(),
-                                        items: creationDates.map((String date) {
-                                          return DropdownMenuItem<String>(
-                                            value: date,
-                                            child: Text(date),
-                                          );
-                                        }).toList(),
-                                        onChanged: (String? newValue) {
-                                          setDialogState(() {
-                                            tempSelectedCreationDate =
-                                                newValue == "None"
-                                                    ? null
-                                                    : newValue;
-                                            if (newValue != "None") {
-                                              tempSelectedFilters
-                                                  .add('created_on');
-                                            } else {
-                                              tempSelectedFilters
-                                                  .remove('created_on');
-                                            }
-                                          });
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            } else if (entry.key == 'closed_on') {
-                              return Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      entry.value['name'],
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.blueGrey[700],
-                                      ),
-                                    ),
-                                    SizedBox(height: 8),
-                                    Container(
-                                      padding:
-                                          EdgeInsets.symmetric(horizontal: 12),
-                                      decoration: BoxDecoration(
-                                        border: Border.all(
-                                            color: Colors.grey[300]!),
-                                        borderRadius: BorderRadius.circular(8),
-                                        color: Colors.grey[50],
-                                      ),
-                                      child: DropdownButton<String>(
-                                        value: tempSelectedClosedDate ?? "None",
-                                        hint: Text("Select a month"),
-                                        isExpanded: true,
-                                        underline: SizedBox(),
-                                        items: closedDates.map((String date) {
-                                          return DropdownMenuItem<String>(
-                                            value: date,
-                                            child: Text(date),
-                                          );
-                                        }).toList(),
-                                        onChanged: (String? newValue) {
-                                          setDialogState(() {
-                                            tempSelectedClosedDate =
-                                                newValue == "None"
-                                                    ? null
-                                                    : newValue;
-                                            if (newValue != "None") {
-                                              tempSelectedFilters
-                                                  .add('closed_on');
-                                            } else {
-                                              tempSelectedFilters
-                                                  .remove('closed_on');
-                                            }
-                                          });
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }
-                            return Card(
-                              elevation: 0,
-                              color: Colors.grey[50],
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: CheckboxListTile(
-                                title: Text(
+              return Container(
+                width: double.maxFinite,
+                constraints: BoxConstraints(maxHeight: 400),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (currentFilters.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Text(
+                            "No filters available",
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                        ),
+                      ...currentFilters.entries.map((entry) {
+                        if (entry.key == 'created_on') {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
                                   entry.value['name'],
-                                  style: TextStyle(color: Colors.blueGrey[800]),
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.blueGrey[700],
+                                  ),
                                 ),
-                                value: tempSelectedFilters.contains(entry.key),
-                                activeColor: Color(0xFF9EA700),
-                                onChanged: (bool? value) {
-                                  setDialogState(() {
-                                    if (value == true) {
-                                      tempSelectedFilters.add(entry.key);
-                                    } else {
-                                      tempSelectedFilters.remove(entry.key);
-                                    }
-                                  });
-                                },
-                              ),
-                            );
-                          }).toList(),
-                        ],
-                      ),
-                    ),
-                  );
-                },
+                                SizedBox(height: 8),
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 12),
+                                  decoration: BoxDecoration(
+                                    border:
+                                        Border.all(color: Colors.grey[300]!),
+                                    borderRadius: BorderRadius.circular(8),
+                                    color: Colors.grey[50],
+                                  ),
+                                  child: DropdownButton<String>(
+                                    value: tempSelectedCreationDate ?? "None",
+                                    hint: Text("Select a month"),
+                                    isExpanded: true,
+                                    underline: SizedBox(),
+                                    items: creationDates.map((String date) {
+                                      return DropdownMenuItem<String>(
+                                        value: date,
+                                        child: Text(date),
+                                      );
+                                    }).toList(),
+                                    onChanged: (String? newValue) {
+                                      setDialogState(() {
+                                        tempSelectedCreationDate =
+                                            newValue == "None"
+                                                ? null
+                                                : newValue;
+                                        if (newValue != "None") {
+                                          tempSelectedFilters.add('created_on');
+                                        } else {
+                                          tempSelectedFilters
+                                              .remove('created_on');
+                                        }
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        } else if (entry.key == 'closed_on') {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  entry.value['name'],
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.blueGrey[700],
+                                  ),
+                                ),
+                                SizedBox(height: 8),
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 12),
+                                  decoration: BoxDecoration(
+                                    border:
+                                        Border.all(color: Colors.grey[300]!),
+                                    borderRadius: BorderRadius.circular(8),
+                                    color: Colors.grey[50],
+                                  ),
+                                  child: DropdownButton<String>(
+                                    value: tempSelectedClosedDate ?? "None",
+                                    hint: Text("Select a month"),
+                                    isExpanded: true,
+                                    underline: SizedBox(),
+                                    items: closedDates.map((String date) {
+                                      return DropdownMenuItem<String>(
+                                        value: date,
+                                        child: Text(date),
+                                      );
+                                    }).toList(),
+                                    onChanged: (String? newValue) {
+                                      setDialogState(() {
+                                        tempSelectedClosedDate =
+                                            newValue == "None"
+                                                ? null
+                                                : newValue;
+                                        if (newValue != "None") {
+                                          tempSelectedFilters.add('closed_on');
+                                        } else {
+                                          tempSelectedFilters
+                                              .remove('closed_on');
+                                        }
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                        return Card(
+                          elevation: 0,
+                          color: Colors.grey[50],
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: CheckboxListTile(
+                            title: Text(
+                              entry.value['name'],
+                              style: TextStyle(color: Colors.blueGrey[800]),
+                            ),
+                            value: tempSelectedFilters.contains(entry.key),
+                            activeColor: Color(0xFF9EA700),
+                            onChanged: (bool? value) {
+                              setDialogState(() {
+                                if (value == true) {
+                                  tempSelectedFilters.add(entry.key);
+                                } else {
+                                  tempSelectedFilters.remove(entry.key);
+                                }
+                              });
+                            },
+                          ),
+                        );
+                      }).toList(),
+                    ],
+                  ),
+                ),
               );
             },
           ),
@@ -500,7 +494,155 @@ class _LeadsState extends State<Leads> {
     }
   }
 
-  Future<void> leadData({String query=""}) async {
+  Future<void> loadLeadsFromIsar() async {
+    setState(() {
+      isLoading = true;
+      selectedView = 0;
+    });
+    try {
+      final leads = await isar.leadisars.where().findAll();
+
+      if (leads.isNotEmpty) {
+        leadsList = leads.map((lead) {
+          return {
+            'id': lead.leadId,
+            'name': lead.name,
+            'email_from': lead.emailFrom,
+            'city': lead.city,
+            'country_id': lead.countryId,
+            'user_id': lead.userId,
+            'partner_assigned_id': lead.partnerAssignedId,
+            'team_id': lead.teamId,
+            'contact_name': lead.contactName,
+            'priority': lead.priority,
+            'tag_ids': lead.tagIds,
+            'activity_date_deadline': lead.activityDateDeadline,
+            'expected_revenue': lead.expectedRevenue,
+            'partner_id': lead.partnerId,
+            'stage_id': lead.stageId != null
+                ? [
+                    lead.stageId![0],
+                    lead.stageId!.length > 1 ? lead.stageId![1] : ''
+                  ]
+                : null,
+            'create_date': lead.createDate,
+            'day_open': lead.dayOpen,
+            'day_close': lead.dayClose,
+            'recurring_revenue_monthly': lead.recurringRevenueMonthly,
+            'probability': lead.probability,
+            'recurring_revenue_monthly_prorated':
+                lead.recurringRevenueMonthlyProrated,
+            'recurring_revenue_prorated': lead.recurringRevenueProrated,
+            'prorated_revenue': lead.proratedRevenue,
+            'recurring_revenue': lead.recurringRevenue,
+            'activity_user_id': lead.activityUserId,
+            'date_closed': lead.dateClosed,
+            'activity_ids': lead.activityIds,
+            'type': 'lead',
+          };
+        }).toList();
+
+        Map<String, double> stageValues = {};
+        Map<String, int> stageIdToName = {};
+        for (var item in leadsList) {
+          if (item['stage_id'] != null &&
+              item['stage_id'] is List &&
+              item['stage_id'].length > 1) {
+            String stageName = item['stage_id'][1].toString();
+            int stageId = item['stage_id'][0] as int;
+            stageIdToName[stageName] = stageId;
+            double value;
+            if (selectedFilter == "count") {
+              value = (stageValues[stageName] ?? 0) + 1;
+            } else if (selectedFilter == "day_open" &&
+                item['day_open'] != null &&
+                item['day_open'] != false) {
+              value =
+                  (stageValues[stageName] ?? 0) + (item['day_open'] as double);
+            } else if (selectedFilter == "day_close" &&
+                item['day_close'] != null &&
+                item['day_close'] != false) {
+              value =
+                  (stageValues[stageName] ?? 0) + (item['day_close'] as double);
+            } else if (selectedFilter == "recurring_revenue_monthly" &&
+                item['recurring_revenue_monthly'] != null &&
+                item['recurring_revenue_monthly'] != false) {
+              value = (stageValues[stageName] ?? 0) +
+                  (item['recurring_revenue_monthly'] as double);
+            } else if (selectedFilter == "expected_revenue" &&
+                item['expected_revenue'] != null &&
+                item['expected_revenue'] != false) {
+              value = (stageValues[stageName] ?? 0) +
+                  (item['expected_revenue'] as double);
+            } else if (selectedFilter == "probability" &&
+                item['probability'] != null &&
+                item['probability'] != false) {
+              value = (stageValues[stageName] ?? 0) +
+                  (item['probability'] as double);
+            } else if (selectedFilter == "recurring_revenue_monthly_prorated" &&
+                item['recurring_revenue_monthly_prorated'] != null &&
+                item['recurring_revenue_monthly_prorated'] != false) {
+              value = (stageValues[stageName] ?? 0) +
+                  (item['recurring_revenue_monthly_prorated'] as double);
+            } else if (selectedFilter == "recurring_revenue_prorated" &&
+                item['recurring_revenue_prorated'] != null &&
+                item['recurring_revenue_prorated'] != false) {
+              value = (stageValues[stageName] ?? 0) +
+                  (item['recurring_revenue_prorated'] as double);
+            } else if (selectedFilter == "prorated_revenue" &&
+                item['prorated_revenue'] != null &&
+                item['prorated_revenue'] != false) {
+              value = (stageValues[stageName] ?? 0) +
+                  (item['prorated_revenue'] as double);
+            } else if (selectedFilter == "recurring_revenue" &&
+                item['recurring_revenue'] != null &&
+                item['recurring_revenue'] != false) {
+              value = (stageValues[stageName] ?? 0) +
+                  (item['recurring_revenue'] as double);
+            } else {
+              value = 0;
+            }
+            stageValues[stageName] = value;
+          }
+        }
+
+        setState(() {
+          chartDatavalues.clear();
+          List<String> stageNames = stageValues.keys.toList();
+          stageNames
+              .sort((a, b) => stageIdToName[a]!.compareTo(stageIdToName[b]!));
+          List<ChartData> sortedData = stageNames
+              .where((stage) => stageValues.containsKey(stage))
+              .map((stage) => ChartData(stage, stageValues[stage]!))
+              .toList();
+          chartDatavalues = sortedData;
+
+          if (stageNames.isEmpty || sortedData.every((data) => data.y == 0)) {
+            showNoDataMessage = true;
+          } else {
+            showNoDataMessage = false;
+          }
+          isLoading = false;
+        });
+      } else {
+        setState(() {
+          chartDatavalues.clear();
+          showNoDataMessage = true;
+          isLoading = false;
+        });
+        await initializeOdooClient();
+      }
+    } catch (e) {
+      log("Isar Load Failed: $e");
+      setState(() {
+        isLoading = false;
+        showNoDataMessage = true;
+      });
+    }
+  }
+
+  Future<void> leadData({String query = "", bool savetoIsar = false}) async {
+    setState(() => isLoading = true);
     try {
       List<dynamic> domain = [
         ['type', '=', 'lead']
@@ -516,10 +658,8 @@ class _LeadsState extends State<Leads> {
       bool hasTodayActivities = selectedFilters.contains('today_activities');
       bool hasFutureActivities = selectedFilters.contains('future_activities');
       bool hasArchived = selectedFilters.contains('archived');
-      log('selytt$selectedFilters');
 
       // Temporary list to hold the OR conditions for "Unassigned or My Activities or My Assigned Partners"
-
       List<dynamic> unassignedOrMyActivitiesDomain = [];
 
       // Handle "Unassigned or My Activities or My Assigned Partners" with OR logic
@@ -557,10 +697,10 @@ class _LeadsState extends State<Leads> {
             .addAll(filters['my_assigned_partners']!['domain']);
       }
 
-// Temporary list to hold the OR conditions for "Late Activities or Today Activities or Future Activities"
+      // Temporary list to hold the OR conditions for "Late Activities or Today Activities or Future Activities"
       List<dynamic> activitiesDomain = [];
 
-// Handle "Late Activities or Today Activities or Future Activities" with OR logic
+      // Handle "Late Activities or Today Activities or Future Activities" with OR logic
       if (hasLateActivities && hasTodayActivities && hasFutureActivities) {
         activitiesDomain.add('|');
         activitiesDomain.add('|');
@@ -587,10 +727,10 @@ class _LeadsState extends State<Leads> {
         activitiesDomain.addAll(filters['future_activities']!['domain']);
       }
 
-// Build the domain by combining all conditions
+      // Build the domain by combining all conditions
       bool hasDateFilter = false;
 
-// Handle date filters (created_on and closed_on)
+      // Handle date filters (created_on and closed_on)
       for (String filterKey in selectedFilters) {
         if (filterKey == 'created_on' && selectedCreationDate != null) {
           DateTime selectedMonth =
@@ -623,7 +763,7 @@ class _LeadsState extends State<Leads> {
         }
       }
 
-// Combine the unassigned/my activities/my assigned partners block
+      // Combine the unassigned/my activities/my assigned partners block
       if (unassignedOrMyActivitiesDomain.isNotEmpty) {
         if (hasDateFilter) {
           domain = ['&', ...domain, ...unassignedOrMyActivitiesDomain];
@@ -632,7 +772,7 @@ class _LeadsState extends State<Leads> {
         }
       }
 
-// Combine the activities block (Late/Today/Future)
+      // Combine the activities block (Late/Today/Future)
       if (activitiesDomain.isNotEmpty) {
         if (unassignedOrMyActivitiesDomain.isNotEmpty || hasDateFilter) {
           domain = ['&', ...domain, ...activitiesDomain];
@@ -641,7 +781,7 @@ class _LeadsState extends State<Leads> {
         }
       }
 
-// Add "Lost" filter with AND logic
+      // Add "Lost" filter with AND logic
       if (hasLost) {
         if (unassignedOrMyActivitiesDomain.isNotEmpty ||
             activitiesDomain.isNotEmpty ||
@@ -652,7 +792,7 @@ class _LeadsState extends State<Leads> {
         }
       }
 
-// Add "Archived" filter with AND logic
+      // Add "Archived" filter with AND logic
       if (hasArchived) {
         if (unassignedOrMyActivitiesDomain.isNotEmpty ||
             activitiesDomain.isNotEmpty ||
@@ -664,9 +804,8 @@ class _LeadsState extends State<Leads> {
         }
       }
 
-      if(query.isNotEmpty){
+      if (query.isNotEmpty) {
         List<dynamic> domaina = [
-          ['type','=','lead'],
           '|',
           '|',
           '|',
@@ -675,9 +814,8 @@ class _LeadsState extends State<Leads> {
           ['contact_name', 'ilike', query],
           ['name', 'ilike', query],
         ];
-        domain=[...domain,...domaina];
+        domain = ['&', ...domain, ...domaina];
       }
-      log('takkaaa$domain');
 
       final response = await client?.callKw({
         'model': 'crm.lead',
@@ -718,53 +856,165 @@ class _LeadsState extends State<Leads> {
 
       if (response != null) {
         leadsList = List<Map<String, dynamic>>.from(response);
+      } else {
+        leadsList = [];
       }
 
-      // Rest of your leadData logic remains unchanged
+      // Write to Isar
+      await isar.writeTxn(() async {
+        // Clear existing leads
+        await isar.leadisars.clear();
+        log('Cleared leadisars collection');
+
+        for (var lead in leadsList) {
+          try {
+            if (lead['id'] == null) {
+              log('Skipping lead with null ID: $lead');
+              continue;
+            }
+
+            final leadisar = Leadisar()
+              ..leadId = lead['id']
+              ..name = lead['name']?.toString()
+              ..emailFrom = lead['email_from']?.toString()
+              ..city = lead['city']?.toString()
+              ..countryId =
+                  lead['country_id'] is List && lead['country_id'].isNotEmpty
+                      ? [lead['country_id'][0]]
+                      : null
+              ..userId = lead['user_id'] is List && lead['user_id'].isNotEmpty
+                  ? [lead['user_id'][0]]
+                  : null
+              ..partnerAssignedId = lead['partner_assigned_id'] is List &&
+                      lead['partner_assigned_id'].isNotEmpty
+                  ? [lead['partner_assigned_id'][0]]
+                  : null
+              ..teamId = lead['team_id'] is List && lead['team_id'].isNotEmpty
+                  ? [lead['team_id'][0]]
+                  : null
+              ..contactName = lead['contact_name']?.toString()
+              ..priority = lead['priority']?.toString()
+              ..tagIds = lead['tag_ids'] is List
+                  ? List<int>.from(lead['tag_ids'])
+                  : null
+              ..activityDateDeadline =
+                  lead['activity_date_deadline']?.toString()
+              ..expectedRevenue = lead['expected_revenue'] is num
+                  ? lead['expected_revenue'].toDouble()
+                  : null
+              ..partnerId =
+                  lead['partner_id'] is List && lead['partner_id'].isNotEmpty
+                      ? [lead['partner_id'][0]]
+                      : null
+              ..stageId =
+                  lead['stage_id'] is List && lead['stage_id'].isNotEmpty
+                      ? [lead['stage_id'][0]]
+                      : null
+              ..createDate = lead['create_date']?.toString()
+              ..dayOpen =
+                  lead['day_open'] is num ? lead['day_open'].toDouble() : null
+              ..dayClose =
+                  lead['day_close'] is num ? lead['day_close'].toDouble() : null
+              ..recurringRevenueMonthly =
+                  lead['recurring_revenue_monthly'] is num
+                      ? lead['recurring_revenue_monthly'].toDouble()
+                      : null
+              ..probability = lead['probability'] is num
+                  ? lead['probability'].toDouble()
+                  : null
+              ..recurringRevenueMonthlyProrated =
+                  lead['recurring_revenue_monthly_prorated'] is num
+                      ? lead['recurring_revenue_monthly_prorated'].toDouble()
+                      : null
+              ..recurringRevenueProrated =
+                  lead['recurring_revenue_prorated'] is num
+                      ? lead['recurring_revenue_prorated'].toDouble()
+                      : null
+              ..proratedRevenue = lead['prorated_revenue'] is num
+                  ? lead['prorated_revenue'].toDouble()
+                  : null
+              ..recurringRevenue = lead['recurring_revenue'] is num
+                  ? lead['recurring_revenue'].toDouble()
+                  : null
+              ..activityUserId = lead['activity_user_id'] is List &&
+                      lead['activity_user_id'].isNotEmpty
+                  ? [lead['activity_user_id'][0]]
+                  : null
+              ..dateClosed = lead['date_closed']?.toString()
+              ..activityIds = lead['activity_ids'] is List
+                  ? List<int>.from(lead['activity_ids'])
+                  : null;
+
+            await isar.leadisars.put(leadisar);
+            log('Successfully saved lead ID: ${lead['id']} to Isar');
+          } catch (e, stackTrace) {
+            log('Error saving lead ID: ${lead['id']}, Error: $e, StackTrace: $stackTrace');
+            log('Lead data: $lead');
+          }
+        }
+
+        // Verify the data was written
+        final savedLeads = await isar.leadisars.where().findAll();
+        log('Total leads saved to Isar: ${savedLeads.length}');
+      });
+
+      // Update chart data
       if (leadsList.isNotEmpty) {
         Map<String, double> stageValues = {};
+        Map<String, int> stageIdToName = {};
 
         for (var item in leadsList) {
           if (item['stage_id'] != null &&
               item['stage_id'] is List &&
               item['stage_id'].length > 1) {
             String stageName = item['stage_id'][1].toString();
+            int stageId = item['stage_id'][0] as int;
+            stageIdToName[stageName] = stageId;
             double value;
             if (selectedFilter == "count") {
               value = (stageValues[stageName] ?? 0) + 1;
             } else if (selectedFilter == "day_open" &&
+                item['day_open'] != null &&
                 item['day_open'] != false) {
               value =
                   (stageValues[stageName] ?? 0) + (item['day_open'] as double);
             } else if (selectedFilter == "day_close" &&
+                item['day_close'] != null &&
                 item['day_close'] != false) {
               value =
                   (stageValues[stageName] ?? 0) + (item['day_close'] as double);
             } else if (selectedFilter == "recurring_revenue_monthly" &&
+                item['recurring_revenue_monthly'] != null &&
                 item['recurring_revenue_monthly'] != false) {
               value = (stageValues[stageName] ?? 0) +
                   (item['recurring_revenue_monthly'] as double);
             } else if (selectedFilter == "expected_revenue" &&
+                item['expected_revenue'] != null &&
                 item['expected_revenue'] != false) {
               value = (stageValues[stageName] ?? 0) +
                   (item['expected_revenue'] as double);
             } else if (selectedFilter == "probability" &&
+                item['probability'] != null &&
                 item['probability'] != false) {
               value = (stageValues[stageName] ?? 0) +
                   (item['probability'] as double);
             } else if (selectedFilter == "recurring_revenue_monthly_prorated" &&
+                item['recurring_revenue_monthly_prorated'] != null &&
                 item['recurring_revenue_monthly_prorated'] != false) {
               value = (stageValues[stageName] ?? 0) +
                   (item['recurring_revenue_monthly_prorated'] as double);
             } else if (selectedFilter == "recurring_revenue_prorated" &&
+                item['recurring_revenue_prorated'] != null &&
                 item['recurring_revenue_prorated'] != false) {
               value = (stageValues[stageName] ?? 0) +
                   (item['recurring_revenue_prorated'] as double);
             } else if (selectedFilter == "prorated_revenue" &&
+                item['prorated_revenue'] != null &&
                 item['prorated_revenue'] != false) {
               value = (stageValues[stageName] ?? 0) +
                   (item['prorated_revenue'] as double);
             } else if (selectedFilter == "recurring_revenue" &&
+                item['recurring_revenue'] != null &&
                 item['recurring_revenue'] != false) {
               value = (stageValues[stageName] ?? 0) +
                   (item['recurring_revenue'] as double);
@@ -777,22 +1027,17 @@ class _LeadsState extends State<Leads> {
 
         setState(() {
           chartDatavalues.clear();
-
-          Set<String> stageOrderSet = stageValues.keys.toSet();
-          List<String> stageOrder = stageOrderSet.toList();
-          List<ChartData> sortedData = stageOrder
+          List<String> stageNames = stageValues.keys.toList();
+          stageNames
+              .sort((a, b) => stageIdToName[a]!.compareTo(stageIdToName[b]!));
+          List<ChartData> sortedData = stageNames
               .where((stage) => stageValues.containsKey(stage))
               .map((stage) => ChartData(stage, stageValues[stage]!))
               .toList();
-
           chartDatavalues = sortedData;
 
-          if (stageOrder.isEmpty || sortedData.every((data) => data.y == 0)) {
-            showNoDataMessage = true;
-          } else {
-            showNoDataMessage = false;
-          }
-
+          showNoDataMessage =
+              stageNames.isEmpty || sortedData.every((data) => data.y == 0);
           isLoading = false;
         });
       } else {
@@ -802,9 +1047,12 @@ class _LeadsState extends State<Leads> {
           isLoading = false;
         });
       }
-    } catch (e) {
-      print("error loading data$e");
-      setState(() => isLoading = false);
+    } catch (e, stackTrace) {
+      log("Error loading lead data: $e, StackTrace: $stackTrace");
+      setState(() {
+        isLoading = false;
+        showNoDataMessage = true;
+      });
     }
   }
 
@@ -812,30 +1060,55 @@ class _LeadsState extends State<Leads> {
     if (tagIds == null || tagIds.isEmpty) return 'None';
 
     try {
-      final response = await client?.callKw({
+      List<int> tagIdList = tagIds.map((id) => id as int).toList();
+
+      List<Tag> tags = [];
+      for (int tagId in tagIdList) {
+        final tag = await isar.tags.where().tagIdEqualTo(tagId).findFirst();
+        if (tag != null) {
+          tags.add(tag);
+        }
+      }
+
+      // Extract tag names and join them
+      final tagNames = tags.map((tag) => tag.name ?? 'Unknown').join(', ');
+
+      return tagNames.isEmpty ? 'None' : tagNames;
+    } catch (e) {
+      print("Error fetching tag names from Isar: $e");
+      return 'None';
+    }
+  }
+
+  Future<void> syncTagsFromOdoo() async {
+    if (client == null) return;
+
+    try {
+      final response = await client!.callKw({
         'model': 'crm.tag',
         'method': 'search_read',
-        'args': [
-          [
-            ['id', 'in', tagIds]
-          ]
-        ],
+        'args': [[]],
         'kwargs': {
-          'fields': ['name'],
+          'fields': ['id', 'name'],
         },
       });
 
-      if (response != null && response is List && response.isNotEmpty) {
-        final List<Map<String, dynamic>> tags =
-            List<Map<String, dynamic>>.from(response);
-        final tagNames =
-            tags.map((tag) => tag['name']?.toString() ?? 'Unknown').join(', ');
-        return tagNames.isEmpty ? 'None' : tagNames;
+      if (response != null && response is List) {
+        await isar.writeTxn(() async {
+          await isar.tags.clear();
+
+          // Store new tags
+          for (var tag in response) {
+            final tagIsar = Tag()
+              ..tagId = tag['id']
+              ..name = tag['name']?.toString();
+            await isar.tags.put(tagIsar);
+          }
+        });
+        print('Successfully synced ${response.length} tags to Isar');
       }
-      return 'None';
     } catch (e) {
-      print("Error fetching tag names: $e");
-      return 'None';
+      print("Error syncing tags from Odoo: $e");
     }
   }
 
@@ -884,7 +1157,7 @@ class _LeadsState extends State<Leads> {
 
   Widget ChartSelection() {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 15),
+      padding: EdgeInsets.symmetric(horizontal: 50),
       child: Container(
         width: double.infinity,
         height: 50,
@@ -917,13 +1190,13 @@ class _LeadsState extends State<Leads> {
                     color:
                         selectedView == 2 ? Color(0xFF9EA700) : Colors.black),
               ),
-              VerticalDivider(thickness: 2, color: Colors.white),
-              IconButton(
-                onPressed: () => setState(() => selectedView = 3),
-                icon: Icon(Icons.table_rows_outlined,
-                    color:
-                        selectedView == 3 ? Color(0xFF9EA700) : Colors.black),
-              ),
+              // VerticalDivider(thickness: 2, color: Colors.white),
+              // IconButton(
+              //   onPressed: () => setState(() => selectedView = 3),
+              //   icon: Icon(Icons.table_rows_outlined,
+              //       color:
+              //           selectedView == 3 ? Color(0xFF9EA700) : Colors.black),
+              // ),
               VerticalDivider(thickness: 2, color: Colors.white),
               IconButton(
                 onPressed: () => setState(() => selectedView = 4),
@@ -1103,103 +1376,35 @@ class _LeadsState extends State<Leads> {
                                               mainAxisAlignment:
                                                   MainAxisAlignment.start,
                                               children: [
-                                                FutureBuilder<Uint8List?>(
-                                                  future: salespersonId != null
-                                                      ? fetchSalespersonImage(
-                                                          salespersonId)
-                                                      : Future.value(null),
-                                                  builder: (context, snapshot) {
-                                                    if (snapshot
-                                                            .connectionState ==
-                                                        ConnectionState
-                                                            .waiting) {
-                                                      return Container(
-                                                        width: 32,
-                                                        height: 32,
-                                                        child:
-                                                            CircularProgressIndicator(
-                                                          strokeWidth: 2,
-                                                          color:
-                                                              Color(0xFF9EA700),
-                                                        ),
-                                                      );
-                                                    }
-                                                    final imageBytes =
-                                                        snapshot.data;
-                                                    return imageBytes != null
-                                                        ? Container(
-                                                            width: 32,
-                                                            height: 32,
-                                                            decoration:
-                                                                BoxDecoration(
-                                                              borderRadius:
-                                                                  BorderRadius
-                                                                      .circular(
-                                                                          6),
-                                                              boxShadow: [
-                                                                BoxShadow(
-                                                                  color: Colors
-                                                                      .black
-                                                                      .withOpacity(
-                                                                          0.1),
-                                                                  blurRadius: 4,
-                                                                  offset:
-                                                                      Offset(
-                                                                          0, 2),
-                                                                ),
-                                                              ],
-                                                              image:
-                                                                  DecorationImage(
-                                                                image: MemoryImage(
-                                                                    imageBytes),
-                                                                fit: BoxFit
-                                                                    .cover,
-                                                              ),
-                                                            ),
-                                                          )
-                                                        : Container(
-                                                            width: 32,
-                                                            height: 32,
-                                                            decoration:
-                                                                BoxDecoration(
-                                                              borderRadius:
-                                                                  BorderRadius
-                                                                      .circular(
-                                                                          6),
-                                                              gradient:
-                                                                  LinearGradient(
-                                                                colors: [
-                                                                  Colors.blue
-                                                                      .shade700,
-                                                                  Colors.blue
-                                                                      .shade500
-                                                                ],
-                                                                begin: Alignment
-                                                                    .topLeft,
-                                                                end: Alignment
-                                                                    .bottomRight,
-                                                              ),
-                                                              boxShadow: [
-                                                                BoxShadow(
-                                                                  color: Colors
-                                                                      .blue
-                                                                      .withOpacity(
-                                                                          0.3),
-                                                                  blurRadius: 4,
-                                                                  offset:
-                                                                      Offset(
-                                                                          0, 2),
-                                                                ),
-                                                              ],
-                                                            ),
-                                                            child: Icon(
-                                                                Icons.person,
-                                                                size: 18,
-                                                                color: Colors
-                                                                    .white),
-                                                          );
-                                                  },
-                                                ),
+                                                if (salespersonId != null) ...[
+                                                  OdooAvatar(
+                                                    client: client,
+                                                    model: 'res.users',
+                                                    recordId: salespersonId,
+                                                    size: 32,
+                                                    borderRadius: 5,
+                                                    shape: BoxShape.rectangle,
+                                                  ),
+                                                ],
+                                                if (salespersonId == null) ...[
+                                                  Container(
+                                                    width: 32,
+                                                    height: 32,
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.grey[300],
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              5),
+                                                    ),
+                                                    alignment: Alignment.center,
+                                                    child: Icon(
+                                                      Icons.person,
+                                                      // You can change this to any icon
+                                                      size: 18,
+                                                      color: Colors.grey[600],
+                                                    ),
+                                                  ),
+                                                ],
                                                 SizedBox(width: 8),
                                                 Expanded(
                                                   child: Text(
@@ -1706,14 +1911,17 @@ class _LeadsState extends State<Leads> {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 ElevatedButton.icon(
-                  icon: Icon(Icons.edit, size: 16, color: Colors.black,),
+                  icon: Icon(
+                    Icons.edit,
+                    size: 16,
+                    color: Colors.black,
+                  ),
                   label: Text('Edit'),
                   onPressed: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => Leadview(leadId: lead["id"]),
-
                       ),
                     );
                   },
@@ -1727,9 +1935,13 @@ class _LeadsState extends State<Leads> {
                   ),
                 ),
                 ElevatedButton.icon(
-                  icon: Icon(Icons.delete, size: 16,color: Colors.black,),
+                  icon: Icon(
+                    Icons.delete,
+                    size: 16,
+                    color: Colors.black,
+                  ),
                   label: Text('Delete'),
-                  onPressed: () async{
+                  onPressed: () async {
                     bool? confirmDelete = await showDialog<bool>(
                       context: context,
                       builder: (BuildContext context) {
@@ -1779,10 +1991,12 @@ class _LeadsState extends State<Leads> {
                               children: [
                                 ElevatedButton(
                                   onPressed: () {
-                                    Navigator.of(context).pop(true); // Confirm delete
+                                    Navigator.of(context)
+                                        .pop(true); // Confirm delete
                                   },
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Color(0xFF9EA700), // Green color for Delete
+                                    backgroundColor: Color(0xFF9EA700),
+                                    // Green color for Delete
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
@@ -1834,7 +2048,7 @@ class _LeadsState extends State<Leads> {
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:  Colors.grey[200],
+                    backgroundColor: Colors.grey[200],
                     foregroundColor: Color(0xFF9EA700),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
@@ -2702,27 +2916,33 @@ class _LeadsState extends State<Leads> {
         iconTheme: IconThemeData(color: Colors.white),
         title: isSearching
             ? TextField(
-          controller: searchController,
-          autofocus: true,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: 'Search...',
-            hintStyle: const TextStyle(color: Colors.white70),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20),
-              borderSide: BorderSide.none,
-            ),
-            filled: true,
-            fillColor: Colors.white.withOpacity(0.2),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-          ),
-        )
-            : const Text("Leads",style: TextStyle(color: Colors.white),),
+                controller: searchController,
+                autofocus: true,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Search...',
+                  hintStyle: const TextStyle(color: Colors.white70),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.2),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                ),
+              )
+            : const Text(
+                "Leads",
+                style: TextStyle(color: Colors.white),
+              ),
         elevation: 0,
         backgroundColor: const Color(0xFF9EA700),
         actions: [
           IconButton(
-            icon: Icon(isSearching ? Icons.close : Icons.search,color: Colors.white,),
+            icon: Icon(
+              isSearching ? Icons.close : Icons.search,
+              color: Colors.white,
+            ),
             onPressed: () {
               setState(() {
                 if (isSearching) {
@@ -2736,7 +2956,10 @@ class _LeadsState extends State<Leads> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.filter_list,color: Colors.white,),
+            icon: const Icon(
+              Icons.filter_list,
+              color: Colors.white,
+            ),
             onPressed: () => showFilterDialog(context),
           ),
         ],
@@ -2749,63 +2972,63 @@ class _LeadsState extends State<Leads> {
       //     ),
       //   ],
       // ),
-      body: isLoading
+      body: isLoading && leadsList.isEmpty
           ? Center(
               child: LoadingAnimationWidget.fourRotatingDots(
                 color: Color(0xFF9EA700),
                 size: 100,
               ),
-            ):
-      leadsList.isEmpty
-          ? Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Center(child: Image.asset('assets/nodata.png')),
-          Text(
-            "No data to display",
-            style: TextStyle(color: Colors.blueGrey),
-          ),
-        ],
-      )
-          : Column(
-              children: [
-                Divider(thickness: 2, color: Colors.grey.shade300),
-                Padding(
-                  padding: const EdgeInsets.all(10.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Leads',
-                        style: TextStyle(
-                            fontSize: 25,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey),
+            )
+          :isLoading==false&& leadsList.isEmpty
+              ? Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Center(child: Image.asset('assets/nodata.png')),
+                    Text(
+                      "No data to display",
+                      style: TextStyle(color: Colors.blueGrey),
+                    ),
+                  ],
+                )
+              : Column(
+                  children: [
+                    Divider(thickness: 2, color: Colors.grey.shade300),
+                    Padding(
+                      padding: const EdgeInsets.all(10.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Leads',
+                            style: TextStyle(
+                                fontSize: 25,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey),
+                          ),
+                          // ElevatedButton(
+                          //     onPressed: () {},
+                          //     style: ElevatedButton.styleFrom(
+                          //       backgroundColor: Colors.grey.shade200,
+                          //       shape: RoundedRectangleBorder(
+                          //           borderRadius: BorderRadius.circular(7)),
+                          //       foregroundColor: Color(0xFF9EA700),
+                          //     ),
+                          //     child: Text(
+                          //       'Generate Leads',
+                          //       style: TextStyle(
+                          //           fontWeight: FontWeight.bold, fontSize: 15),
+                          //     )),
+                        ],
                       ),
-                      // ElevatedButton(
-                      //     onPressed: () {},
-                      //     style: ElevatedButton.styleFrom(
-                      //       backgroundColor: Colors.grey.shade200,
-                      //       shape: RoundedRectangleBorder(
-                      //           borderRadius: BorderRadius.circular(7)),
-                      //       foregroundColor: Color(0xFF9EA700),
-                      //     ),
-                      //     child: Text(
-                      //       'Generate Leads',
-                      //       style: TextStyle(
-                      //           fontWeight: FontWeight.bold, fontSize: 15),
-                      //     )),
-                    ],
-                  ),
+                    ),
+                    Divider(thickness: 1, color: Colors.grey.shade300),
+                    ChartSelection(),
+                    Divider(thickness: 1, color: Colors.grey.shade300),
+                    selectedView == 4 ? buildChartSelection() : SizedBox(),
+                    SizedBox(height: 7),
+                    Expanded(child: iconSelectedView()),
+                  ],
                 ),
-                Divider(thickness: 1, color: Colors.grey.shade300),
-                ChartSelection(),
-                Divider(thickness: 1, color: Colors.grey.shade300),
-                selectedView == 4 ? buildChartSelection() : SizedBox(),
-                SizedBox(height: 7),
-                Expanded(child: iconSelectedView()),
-              ],
-            ),
     );
   }
 }

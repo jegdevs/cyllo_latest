@@ -164,7 +164,7 @@ class _CustomerViewState extends State<CustomerView> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
             content:
-                Text('Missing authentication details. Please check settings.')),
+            Text('Missing authentication details. Please check settings.')),
       );
       setState(() => isLoading = false);
       return;
@@ -276,48 +276,48 @@ class _CustomerViewState extends State<CustomerView> {
 
   void updateControllers() {
     nameController.text = (customerData!['name'] == null ||
-            customerData!['name'] == false ||
-            customerData!['name'] == '')
+        customerData!['name'] == false ||
+        customerData!['name'] == '')
         ? 'N/A'
         : customerData!['name'].toString();
     streetController.text = (customerData!['street'] == null ||
-            customerData!['street'] == false ||
-            customerData!['street'] == '')
+        customerData!['street'] == false ||
+        customerData!['street'] == '')
         ? 'N/A'
         : customerData!['street'].toString();
     cityController.text = (customerData!['city'] == null ||
-            customerData!['city'] == false ||
-            customerData!['city'] == '')
+        customerData!['city'] == false ||
+        customerData!['city'] == '')
         ? 'N/A'
         : customerData!['city'].toString();
     zipController.text = (customerData!['zip'] == null ||
-            customerData!['zip'] == false ||
-            customerData!['zip'] == '')
+        customerData!['zip'] == false ||
+        customerData!['zip'] == '')
         ? 'N/A'
         : customerData!['zip'].toString();
     phoneController.text = (customerData!['phone'] == null ||
-            customerData!['phone'] == false ||
-            customerData!['phone'] == '')
+        customerData!['phone'] == false ||
+        customerData!['phone'] == '')
         ? 'N/A'
         : customerData!['phone'].toString();
     mobileController.text = (customerData!['mobile'] == null ||
-            customerData!['mobile'] == false ||
-            customerData!['mobile'] == '')
+        customerData!['mobile'] == false ||
+        customerData!['mobile'] == '')
         ? 'N/A'
         : customerData!['mobile'].toString();
     emailController.text = (customerData!['email'] == null ||
-            customerData!['email'] == false ||
-            customerData!['email'] == '')
+        customerData!['email'] == false ||
+        customerData!['email'] == '')
         ? 'N/A'
         : customerData!['email'].toString();
     websiteController.text = (customerData!['website'] == null ||
-            customerData!['website'] == false ||
-            customerData!['website'] == '')
+        customerData!['website'] == false ||
+        customerData!['website'] == '')
         ? 'N/A'
         : customerData!['website'].toString();
     vatController.text = (customerData!['vat'] == null ||
-            customerData!['vat'] == false ||
-            customerData!['vat'] == '')
+        customerData!['vat'] == false ||
+        customerData!['vat'] == '')
         ? 'N/A'
         : customerData!['vat'].toString();
     selectedCountryIndex = customerData!['country_id'] is List
@@ -340,14 +340,14 @@ class _CustomerViewState extends State<CustomerView> {
         ? customerData!['team_id'][1].toString()
         : '';
     selectedPaymentTermsSalesIndex =
-        customerData!['property_payment_term_id'] is List
-            ? paymentTerms.indexWhere(
-                (p) => p['id'] == customerData!['property_payment_term_id'][0])
-            : null;
+    customerData!['property_payment_term_id'] is List
+        ? paymentTerms.indexWhere(
+            (p) => p['id'] == customerData!['property_payment_term_id'][0])
+        : null;
     paymentTermsSalesController.text =
-        customerData!['property_payment_term_id'] is List
-            ? customerData!['property_payment_term_id'][1].toString()
-            : '';
+    customerData!['property_payment_term_id'] is List
+        ? customerData!['property_payment_term_id'][1].toString()
+        : '';
     selectedImplementedByIndex = customerData!['assigned_partner_id'] is List
         ? partners.indexWhere(
             (p) => p['id'] == customerData!['assigned_partner_id'][0])
@@ -360,46 +360,46 @@ class _CustomerViewState extends State<CustomerView> {
             (p) => p['id'] == customerData!['property_product_pricelist'][0])
         : null;
     pricelistController.text =
-        customerData!['property_product_pricelist'] is List
-            ? customerData!['property_product_pricelist'][1].toString()
-            : '';
+    customerData!['property_product_pricelist'] is List
+        ? customerData!['property_product_pricelist'][1].toString()
+        : '';
     selectedDeliveryMethodIndex = customerData!['property_delivery_carrier_id']
-            is List
+    is List
         ? deliveryCarriers.indexWhere(
             (d) => d['id'] == customerData!['property_delivery_carrier_id'][0])
         : null;
     deliveryMethodController.text =
-        customerData!['property_delivery_carrier_id'] is List
-            ? customerData!['property_delivery_carrier_id'][1].toString()
-            : '';
+    customerData!['property_delivery_carrier_id'] is List
+        ? customerData!['property_delivery_carrier_id'][1].toString()
+        : '';
     selectedPaymentTermsPurchaseIndex =
-        customerData!['property_supplier_payment_term_id'] is List
-            ? paymentTerms.indexWhere((p) =>
-                p['id'] ==
-                customerData!['property_supplier_payment_term_id'][0])
-            : null;
+    customerData!['property_supplier_payment_term_id'] is List
+        ? paymentTerms.indexWhere((p) =>
+    p['id'] ==
+        customerData!['property_supplier_payment_term_id'][0])
+        : null;
     paymentTermsPurchaseController.text =
-        customerData!['property_supplier_payment_term_id'] is List
-            ? customerData!['property_supplier_payment_term_id'][1].toString()
-            : '';
+    customerData!['property_supplier_payment_term_id'] is List
+        ? customerData!['property_supplier_payment_term_id'][1].toString()
+        : '';
     selectedPaymentMethodIndex = customerData!['property_payment_method_id']
-            is List
+    is List
         ? paymentMethods.indexWhere(
             (p) => p['id'] == customerData!['property_payment_method_id'][0])
         : null;
     paymentMethodController.text =
-        customerData!['property_payment_method_id'] is List
-            ? customerData!['property_payment_method_id'][1].toString()
-            : '';
+    customerData!['property_payment_method_id'] is List
+        ? customerData!['property_payment_method_id'][1].toString()
+        : '';
     selectedFiscalPositionIndex = customerData!['property_account_position_id']
-            is List
+    is List
         ? fiscalPositions.indexWhere(
             (f) => f['id'] == customerData!['property_account_position_id'][0])
         : null;
     fiscalPositionController.text =
-        customerData!['property_account_position_id'] is List
-            ? customerData!['property_account_position_id'][1].toString()
-            : '';
+    customerData!['property_account_position_id'] is List
+        ? customerData!['property_account_position_id'][1].toString()
+        : '';
     selectedCompanyIndex = customerData!['company_id'] is List
         ? companies.indexWhere((c) => c['id'] == customerData!['company_id'][0])
         : null;
@@ -412,29 +412,29 @@ class _CustomerViewState extends State<CustomerView> {
         : '';
     selectedIndustryIndex = customerData!['industry_id'] is List
         ? industries
-            .indexWhere((i) => i['id'] == customerData!['industry_id'][0])
+        .indexWhere((i) => i['id'] == customerData!['industry_id'][0])
         : null;
     industryController.text = customerData!['industry_id'] is List
         ? customerData!['industry_id'][1].toString()
         : '';
     selectedCustomerLocationIndex =
-        customerData!['property_stock_customer'] is List
-            ? locations.indexWhere(
-                (l) => l['id'] == customerData!['property_stock_customer'][0])
-            : null;
+    customerData!['property_stock_customer'] is List
+        ? locations.indexWhere(
+            (l) => l['id'] == customerData!['property_stock_customer'][0])
+        : null;
     customerLocationController.text =
-        customerData!['property_stock_customer'] is List
-            ? customerData!['property_stock_customer'][1].toString()
-            : 'Partners/Customers';
+    customerData!['property_stock_customer'] is List
+        ? customerData!['property_stock_customer'][1].toString()
+        : 'Partners/Customers';
     selectedVendorLocationIndex =
-        customerData!['property_stock_supplier'] is List
-            ? locations.indexWhere(
-                (l) => l['id'] == customerData!['property_stock_supplier'][0])
-            : null;
+    customerData!['property_stock_supplier'] is List
+        ? locations.indexWhere(
+            (l) => l['id'] == customerData!['property_stock_supplier'][0])
+        : null;
     vendorLocationController.text =
-        customerData!['property_stock_supplier'] is List
-            ? customerData!['property_stock_supplier'][1].toString()
-            : 'Partners/Vendors';
+    customerData!['property_stock_supplier'] is List
+        ? customerData!['property_stock_supplier'][1].toString()
+        : 'Partners/Vendors';
 
     selectedPartnerLevelIndex = customerData!['grade_id'] is List
         ? grades.indexWhere((g) => g['id'] == customerData!['grade_id'][0])
@@ -444,7 +444,7 @@ class _CustomerViewState extends State<CustomerView> {
         : '';
     selectedActivationIndex = customerData!['activation'] is List
         ? activations
-            .indexWhere((a) => a['id'] == customerData!['activation'][0])
+        .indexWhere((a) => a['id'] == customerData!['activation'][0])
         : null;
     activationController.text = customerData!['activation'] is List
         ? customerData!['activation'][1].toString()
@@ -455,18 +455,18 @@ class _CustomerViewState extends State<CustomerView> {
     // nextReviewController.text = customerData!['date_review_next']?.toString() ?? '';
     // partnershipDateController.text = customerData!['date_partnership']?.toString() ?? '';
     latestReviewController.text = (customerData!['date_review'] != null &&
-            customerData!['date_review'] != false)
+        customerData!['date_review'] != false)
         ? customerData!['date_review'].toString()
         : '';
     nextReviewController.text = (customerData!['date_review_next'] != null &&
-            customerData!['date_review_next'] != false)
+        customerData!['date_review_next'] != false)
         ? customerData!['date_review_next'].toString()
         : '';
     partnershipDateController.text =
-        (customerData!['date_partnership'] != null &&
-                customerData!['date_partnership'] != false)
-            ? customerData!['date_partnership'].toString()
-            : '';
+    (customerData!['date_partnership'] != null &&
+        customerData!['date_partnership'] != false)
+        ? customerData!['date_partnership'].toString()
+        : '';
 
     selectedWebsiteIndex = customerData!['website'] != null
         ? websites.indexWhere((w) => w['name'] == customerData!['website'])
@@ -508,7 +508,7 @@ class _CustomerViewState extends State<CustomerView> {
         },
       });
       setState(
-          () => countries = List<Map<String, dynamic>>.from(countryResponse));
+              () => countries = List<Map<String, dynamic>>.from(countryResponse));
 
       // Users (for salesperson and buyer)
       final userResponse = await client!.callKw({
@@ -542,7 +542,7 @@ class _CustomerViewState extends State<CustomerView> {
         },
       });
       setState(() =>
-          paymentTerms = List<Map<String, dynamic>>.from(paymentResponse));
+      paymentTerms = List<Map<String, dynamic>>.from(paymentResponse));
 
       // Partners
       final partnerResponse = await client!.callKw({
@@ -554,7 +554,7 @@ class _CustomerViewState extends State<CustomerView> {
         },
       });
       setState(
-          () => partners = List<Map<String, dynamic>>.from(partnerResponse));
+              () => partners = List<Map<String, dynamic>>.from(partnerResponse));
 
       // Pricelists
       final pricelistResponse = await client!.callKw({
@@ -566,7 +566,7 @@ class _CustomerViewState extends State<CustomerView> {
         },
       });
       setState(() =>
-          pricelists = List<Map<String, dynamic>>.from(pricelistResponse));
+      pricelists = List<Map<String, dynamic>>.from(pricelistResponse));
 
       // Delivery Carriers
       final carrierResponse = await client!.callKw({
@@ -578,7 +578,7 @@ class _CustomerViewState extends State<CustomerView> {
         },
       });
       setState(() =>
-          deliveryCarriers = List<Map<String, dynamic>>.from(carrierResponse));
+      deliveryCarriers = List<Map<String, dynamic>>.from(carrierResponse));
 
       // Payment Methods
       final paymentMethodResponse = await client!.callKw({
@@ -590,7 +590,7 @@ class _CustomerViewState extends State<CustomerView> {
         },
       });
       setState(() => paymentMethods =
-          List<Map<String, dynamic>>.from(paymentMethodResponse));
+      List<Map<String, dynamic>>.from(paymentMethodResponse));
 
       // Fiscal Positions
       final fiscalResponse = await client!.callKw({
@@ -602,7 +602,7 @@ class _CustomerViewState extends State<CustomerView> {
         },
       });
       setState(() =>
-          fiscalPositions = List<Map<String, dynamic>>.from(fiscalResponse));
+      fiscalPositions = List<Map<String, dynamic>>.from(fiscalResponse));
 
       // Companies
       final companyResponse = await client!.callKw({
@@ -614,7 +614,7 @@ class _CustomerViewState extends State<CustomerView> {
         },
       });
       setState(
-          () => companies = List<Map<String, dynamic>>.from(companyResponse));
+              () => companies = List<Map<String, dynamic>>.from(companyResponse));
 
       // Industries
       final industryResponse = await client!.callKw({
@@ -626,7 +626,7 @@ class _CustomerViewState extends State<CustomerView> {
         },
       });
       setState(
-          () => industries = List<Map<String, dynamic>>.from(industryResponse));
+              () => industries = List<Map<String, dynamic>>.from(industryResponse));
 
       // Locations (using complete_name)
       final locationResponse = await client!.callKw({
@@ -638,7 +638,7 @@ class _CustomerViewState extends State<CustomerView> {
         },
       });
       setState(
-          () => locations = List<Map<String, dynamic>>.from(locationResponse));
+              () => locations = List<Map<String, dynamic>>.from(locationResponse));
 
       // Grades
       final gradeResponse = await client!.callKw({
@@ -661,7 +661,7 @@ class _CustomerViewState extends State<CustomerView> {
         },
       });
       setState(() =>
-          activations = List<Map<String, dynamic>>.from(activationResponse));
+      activations = List<Map<String, dynamic>>.from(activationResponse));
 
       // Websites (fetching from website model for Sales & Purchase)
       final websiteResponse = await client!.callKw({
@@ -673,7 +673,7 @@ class _CustomerViewState extends State<CustomerView> {
         },
       });
       setState(
-          () => websites = List<Map<String, dynamic>>.from(websiteResponse));
+              () => websites = List<Map<String, dynamic>>.from(websiteResponse));
 
       // Update controllers after fetching dropdown data
       if (customerData != null) {
@@ -723,7 +723,7 @@ class _CustomerViewState extends State<CustomerView> {
             String parentPath = category['parent_path'] ?? '';
             if (parentPath.isNotEmpty) {
               List<String> pathIds =
-                  parentPath.split('/').where((id) => id.isNotEmpty).toList();
+              parentPath.split('/').where((id) => id.isNotEmpty).toList();
               pathIds
                   .forEach((id) => allCategoryIds.add(int.tryParse(id) ?? 0));
             }
@@ -754,7 +754,7 @@ class _CustomerViewState extends State<CustomerView> {
               String parentPath = category['parent_path'] ?? '';
               if (parentPath.isNotEmpty) {
                 List<String> pathIds =
-                    parentPath.split('/').where((id) => id.isNotEmpty).toList();
+                parentPath.split('/').where((id) => id.isNotEmpty).toList();
                 List<String> pathNames = pathIds.map((id) {
                   int catId = int.tryParse(id) ?? 0;
                   return tempCategoryMap[catId] ?? 'Unknown';
@@ -834,40 +834,40 @@ class _CustomerViewState extends State<CustomerView> {
         'vat': vatController.text.isEmpty ? '' : vatController.text,
         'is_company': customerData!['is_company'] ?? '',
         'user_id':
-            selectedSalespersonIndex != null && selectedSalespersonIndex! >= 0
-                ? users[selectedSalespersonIndex!]['id']
-                : null,
+        selectedSalespersonIndex != null && selectedSalespersonIndex! >= 0
+            ? users[selectedSalespersonIndex!]['id']
+            : null,
         'team_id':
-            selectedSalesTeamIndex != null && selectedSalesTeamIndex! >= 0
-                ? teams[selectedSalesTeamIndex!]['id']
-                : null,
+        selectedSalesTeamIndex != null && selectedSalesTeamIndex! >= 0
+            ? teams[selectedSalesTeamIndex!]['id']
+            : null,
         'property_payment_term_id': selectedPaymentTermsSalesIndex != null &&
-                selectedPaymentTermsSalesIndex! >= 0
+            selectedPaymentTermsSalesIndex! >= 0
             ? paymentTerms[selectedPaymentTermsSalesIndex!]['id']
             : null,
         'assigned_partner_id': selectedImplementedByIndex != null &&
-                selectedImplementedByIndex! >= 0
+            selectedImplementedByIndex! >= 0
             ? partners[selectedImplementedByIndex!]['id']
             : null,
         'property_product_pricelist':
-            selectedPricelistIndex != null && selectedPricelistIndex! >= 0
-                ? pricelists[selectedPricelistIndex!]['id']
-                : null,
+        selectedPricelistIndex != null && selectedPricelistIndex! >= 0
+            ? pricelists[selectedPricelistIndex!]['id']
+            : null,
         'property_delivery_carrier_id': selectedDeliveryMethodIndex != null &&
-                selectedDeliveryMethodIndex! >= 0
+            selectedDeliveryMethodIndex! >= 0
             ? deliveryCarriers[selectedDeliveryMethodIndex!]['id']
             : null,
         'property_supplier_payment_term_id':
-            selectedPaymentTermsPurchaseIndex != null &&
-                    selectedPaymentTermsPurchaseIndex! >= 0
-                ? paymentTerms[selectedPaymentTermsPurchaseIndex!]['id']
-                : null,
+        selectedPaymentTermsPurchaseIndex != null &&
+            selectedPaymentTermsPurchaseIndex! >= 0
+            ? paymentTerms[selectedPaymentTermsPurchaseIndex!]['id']
+            : null,
         'property_payment_method_id': selectedPaymentMethodIndex != null &&
-                selectedPaymentMethodIndex! >= 0
+            selectedPaymentMethodIndex! >= 0
             ? paymentMethods[selectedPaymentMethodIndex!]['id']
             : null,
         'property_account_position_id': selectedFiscalPositionIndex != null &&
-                selectedFiscalPositionIndex! >= 0
+            selectedFiscalPositionIndex! >= 0
             ? fiscalPositions[selectedFiscalPositionIndex!]['id']
             : null,
         'company_id': selectedCompanyIndex != null && selectedCompanyIndex! >= 0
@@ -875,25 +875,25 @@ class _CustomerViewState extends State<CustomerView> {
             : null,
         'ref': referenceController.text.isEmpty ? '' : referenceController.text,
         'industry_id':
-            selectedIndustryIndex != null && selectedIndustryIndex! >= 0
-                ? industries[selectedIndustryIndex!]['id']
-                : null,
+        selectedIndustryIndex != null && selectedIndustryIndex! >= 0
+            ? industries[selectedIndustryIndex!]['id']
+            : null,
         'property_stock_customer': selectedCustomerLocationIndex != null &&
-                selectedCustomerLocationIndex! >= 0
+            selectedCustomerLocationIndex! >= 0
             ? locations[selectedCustomerLocationIndex!]['id']
             : null,
         'property_stock_supplier': selectedVendorLocationIndex != null &&
-                selectedVendorLocationIndex! >= 0
+            selectedVendorLocationIndex! >= 0
             ? locations[selectedVendorLocationIndex!]['id']
             : null,
         'grade_id':
-            selectedPartnerLevelIndex != null && selectedPartnerLevelIndex! >= 0
-                ? grades[selectedPartnerLevelIndex!]['id']
-                : null,
+        selectedPartnerLevelIndex != null && selectedPartnerLevelIndex! >= 0
+            ? grades[selectedPartnerLevelIndex!]['id']
+            : null,
         'activation':
-            selectedActivationIndex != null && selectedActivationIndex! >= 0
-                ? activations[selectedActivationIndex!]['id']
-                : null,
+        selectedActivationIndex != null && selectedActivationIndex! >= 0
+            ? activations[selectedActivationIndex!]['id']
+            : null,
         'partner_weight': int.tryParse(levelWeightController.text) ?? 0,
         'date_review': latestReviewController.text.isEmpty
             ? null
@@ -958,7 +958,7 @@ class _CustomerViewState extends State<CustomerView> {
     if (picked != null && mounted) {
       setState(() {
         controller.text =
-            picked.toString().split(' ')[0]; // Format as YYYY-MM-DD
+        picked.toString().split(' ')[0]; // Format as YYYY-MM-DD
       });
     }
   }
@@ -993,36 +993,36 @@ class _CustomerViewState extends State<CustomerView> {
         ),
       )
           : customerData == null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text('No customer data available'),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () => fetchCustomerData(),
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
-                )
-              : SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildCustomerHeader(),
-                      _buildAddressSection(),
-                      _buildContactInfoSection(),
-                      _buildTabBar(),
-                      if (selectedTab == 'Contacts & Addresses')
-                        _buildContactCards(),
-                      if (selectedTab == 'Sales & Purchase')
-                        _buildSalesAndPurchaseSection(),
-                      if (selectedTab == 'Partner Assignment')
-                        _buildPartnerAssignmentSection(),
-                    ],
-                  ),
-                ),
+          ? Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('No customer data available'),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => fetchCustomerData(),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      )
+          : SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildCustomerHeader(),
+            _buildAddressSection(),
+            _buildContactInfoSection(),
+            _buildTabBar(),
+            if (selectedTab == 'Contacts & Addresses')
+              _buildContactCards(),
+            if (selectedTab == 'Sales & Purchase')
+              _buildSalesAndPurchaseSection(),
+            if (selectedTab == 'Partner Assignment')
+              _buildPartnerAssignmentSection(),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1045,12 +1045,12 @@ class _CustomerViewState extends State<CustomerView> {
                     groupValue: customerType,
                     onChanged: isEditing
                         ? (value) {
-                            setState(() {
-                              customerType = value!; // Update local display
-                              customerData!['is_company'] =
-                                  false; // Update data to save
-                            });
-                          }
+                      setState(() {
+                        customerType = value!; // Update local display
+                        customerData!['is_company'] =
+                        false; // Update data to save
+                      });
+                    }
                         : null, // Disable when not editing
                   ),
                   const Text('Individual'),
@@ -1060,12 +1060,12 @@ class _CustomerViewState extends State<CustomerView> {
                     groupValue: customerType,
                     onChanged: isEditing
                         ? (value) {
-                            setState(() {
-                              customerType = value!; // Update local display
-                              customerData!['is_company'] =
-                                  true; // Update data to save
-                            });
-                          }
+                      setState(() {
+                        customerType = value!; // Update local display
+                        customerData!['is_company'] =
+                        true; // Update data to save
+                      });
+                    }
                         : null, // Disable when not editing
                   ),
                   const Text('Company'),
@@ -1073,19 +1073,19 @@ class _CustomerViewState extends State<CustomerView> {
               ),
               isEditing
                   ? SizedBox(
-                      width: 200,
-                      child: TextField(
-                        controller: nameController,
-                        decoration: const InputDecoration(labelText: 'Name'),
-                      ),
-                    )
+                width: 200,
+                child: TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Name'),
+                ),
+              )
                   : Text(
-                      customerData!['name']?.toString() ?? 'Unknown',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                customerData!['name']?.toString() ?? 'Unknown',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
           Container(
@@ -1093,24 +1093,24 @@ class _CustomerViewState extends State<CustomerView> {
             width: 80,
             decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
             child:
-                customerImageBase64 != null && customerImageBase64!.isNotEmpty
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.memory(
-                          base64Decode(customerImageBase64!),
-                          fit: BoxFit.cover,
-                          width: 80,
-                          height: 80,
-                        ),
-                      )
-                    : Container(
-                        color: Colors.grey[200],
-                        child: const Icon(
-                          Icons.person,
-                          size: 40,
-                          color: Colors.grey,
-                        ),
-                      ),
+            customerImageBase64 != null && customerImageBase64!.isNotEmpty
+                ? ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.memory(
+                base64Decode(customerImageBase64!),
+                fit: BoxFit.cover,
+                width: 80,
+                height: 80,
+              ),
+            )
+                : Container(
+              color: Colors.grey[200],
+              child: const Icon(
+                Icons.person,
+                size: 40,
+                color: Colors.grey,
+              ),
+            ),
           ),
         ],
       ),
@@ -1139,77 +1139,77 @@ class _CustomerViewState extends State<CustomerView> {
               children: [
                 isEditing
                     ? TextField(
-                        controller: streetController,
-                        decoration: const InputDecoration(labelText: 'Street'),
-                      )
+                  controller: streetController,
+                  decoration: const InputDecoration(labelText: 'Street'),
+                )
                     : Text(customerData!['street']?.toString() ?? ''),
                 isEditing
                     ? TextField(
-                        controller: cityController,
-                        decoration: const InputDecoration(labelText: 'City'),
-                      )
+                  controller: cityController,
+                  decoration: const InputDecoration(labelText: 'City'),
+                )
                     : Text(customerData!['city']?.toString() ?? ''),
                 isEditing && states.isNotEmpty
                     ? Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.only(top: 8),
-                        child: DropdownButtonFormField<int>(
-                          value: selectedStateIndex,
-                          decoration: const InputDecoration(
-                            labelText: 'State',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: states
+                  width: double.infinity,
+                  padding: const EdgeInsets.only(top: 8),
+                  child: DropdownButtonFormField<int>(
+                    value: selectedStateIndex,
+                    decoration: const InputDecoration(
+                      labelText: 'State',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: states
 
-                              .map((state) => DropdownMenuItem<int>(
-                                    value: states.indexOf(state),
-                                    child: Text(state['name']),
-                                  ))
-                              .toList(),
-                          onChanged: (value) =>
-                              setState(() => selectedStateIndex = value),
-                          isExpanded: true,
-                        ),
-                      )
+                        .map((state) => DropdownMenuItem<int>(
+                      value: states.indexOf(state),
+                      child: Text(state['name']),
+                    ))
+                        .toList(),
+                    onChanged: (value) =>
+                        setState(() => selectedStateIndex = value),
+                    isExpanded: true,
+                  ),
+                )
                     : Text(customerData!['state_id'] is List &&
-                            customerData!['state_id'].length > 1
-                        ? customerData!['state_id'][1].toString()
-                        : ''),
+                    customerData!['state_id'].length > 1
+                    ? customerData!['state_id'][1].toString()
+                    : ''),
                 isEditing
                     ? TextField(
-                        controller: zipController,
-                        decoration: const InputDecoration(labelText: 'Zip'),
-                      )
+                  controller: zipController,
+                  decoration: const InputDecoration(labelText: 'Zip'),
+                )
                     : Text(customerData!['zip']?.toString() ?? ''),
                 isEditing && countries.isNotEmpty
                     ? Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.only(top: 8),
-                        child: DropdownButtonFormField<int>(
-                          value: selectedCountryIndex,
-                          decoration: const InputDecoration(
-                            labelText: 'Country',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: countries
-                              .map((country) => DropdownMenuItem<int>(
-                                    value: countries.indexOf(country),
-                                    child: Text(country['name']),
-                                  ))
-                              .toList(),
-                          onChanged: (value) => setState(() {
-                            selectedCountryIndex = value;
-                            int actualCountryId = countries[selectedCountryIndex!]['id'];
-                            developer.log("Selected country ID: $actualCountryId");
-                            fetchState(actualCountryId);
-                          }),
-                          isExpanded: true,
-                        ),
-                      )
+                  width: double.infinity,
+                  padding: const EdgeInsets.only(top: 8),
+                  child: DropdownButtonFormField<int>(
+                    value: selectedCountryIndex,
+                    decoration: const InputDecoration(
+                      labelText: 'Country',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: countries
+                        .map((country) => DropdownMenuItem<int>(
+                      value: countries.indexOf(country),
+                      child: Text(country['name']),
+                    ))
+                        .toList(),
+                    onChanged: (value) => setState(() {
+                      selectedCountryIndex = value;
+                      int actualCountryId = countries[selectedCountryIndex!]['id'];
+                      developer.log("Selected country ID: $actualCountryId");
+                      fetchState(actualCountryId);
+                    }),
+                    isExpanded: true,
+                  ),
+                )
                     : Text(customerData!['country_id'] is List &&
-                            customerData!['country_id'].length > 1
-                        ? customerData!['country_id'][1].toString()
-                        : ''),
+                    customerData!['country_id'].length > 1
+                    ? customerData!['country_id'][1].toString()
+                    : ''),
               ],
             ),
           ),
@@ -1239,9 +1239,9 @@ class _CustomerViewState extends State<CustomerView> {
                 const SizedBox(height: 4),
                 isEditing
                     ? TextField(
-                        controller: vatController,
-                        decoration: const InputDecoration(labelText: 'Tax ID'),
-                      )
+                  controller: vatController,
+                  decoration: const InputDecoration(labelText: 'Tax ID'),
+                )
                     : Text(customerData!['vat']?.toString() ?? 'N/A'),
               ],
             ),
@@ -1293,14 +1293,14 @@ class _CustomerViewState extends State<CustomerView> {
           Expanded(
             child: isEditing
                 ? TextField(
-                    controller: controller,
-                    decoration: InputDecoration(labelText: label),
-                  )
+              controller: controller,
+              decoration: InputDecoration(labelText: label),
+            )
                 : Text(
-                    value,
-                    style: TextStyle(
-                        color: isLink ? const Color(0xFF9EA700) : Colors.black),
-                  ),
+              value,
+              style: TextStyle(
+                  color: isLink ? const Color(0xFF9EA700) : Colors.black),
+            ),
           ),
         ],
       ),
@@ -1344,24 +1344,24 @@ class _CustomerViewState extends State<CustomerView> {
               spacing: 4,
               children: categoryPaths.isNotEmpty
                   ? categoryPaths
-                      .take(2)
-                      .map((path) => Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: getCategoryColor(path),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              path,
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ))
-                      .toList()
+                  .take(2)
+                  .map((path) => Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: getCategoryColor(path),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  path,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ))
+                  .toList()
                   : [const Text('N/A')],
             ),
           ),
@@ -1439,20 +1439,20 @@ class _CustomerViewState extends State<CustomerView> {
         child: Row(
           children: contactList.isNotEmpty
               ? contactList.map((contact) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 16),
-                    child: _buildContactCard(
-                      contact['image_1920']?.toString(),
-                      contact['name']?.toString() ?? 'Unknown',
-                      contact['function']?.toString() ?? 'N/A',
-                      contact['email']?.toString() ?? 'N/A',
-                      contact['phone']?.toString() ?? 'N/A',
-                    ),
-                  );
-                }).toList()
+            return Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: _buildContactCard(
+                contact['image_1920']?.toString(),
+                contact['name']?.toString() ?? 'Unknown',
+                contact['function']?.toString() ?? 'N/A',
+                contact['email']?.toString() ?? 'N/A',
+                contact['phone']?.toString() ?? 'N/A',
+              ),
+            );
+          }).toList()
               : [
-                  const Text('No contacts available'),
-                ],
+            const Text('No contacts available'),
+          ],
         ),
       ),
     );
@@ -1481,11 +1481,11 @@ class _CustomerViewState extends State<CustomerView> {
               borderRadius: BorderRadius.circular(4),
               child: contactImageBase64 != null && contactImageBase64.isNotEmpty
                   ? Image.memory(
-                      base64Decode(contactImageBase64),
-                      fit: BoxFit.cover,
-                      width: 60,
-                      height: 60,
-                    )
+                base64Decode(contactImageBase64),
+                fit: BoxFit.cover,
+                width: 60,
+                height: 60,
+              )
                   : const Icon(Icons.person, size: 40, color: Colors.grey),
             ),
           ),
@@ -1540,22 +1540,22 @@ class _CustomerViewState extends State<CustomerView> {
     String salesperson = _getDisplayName(customerData!['user_id']);
     String salesTeam = _getDisplayName(customerData!['team_id']);
     String paymentTermsSales =
-        _getDisplayName(customerData!['property_payment_term_id']);
+    _getDisplayName(customerData!['property_payment_term_id']);
     String implementedBy =
-        _getDisplayName(customerData!['assigned_partner_id'], defaultValue: '');
+    _getDisplayName(customerData!['assigned_partner_id'], defaultValue: '');
     String pricelist =
-        _getDisplayName(customerData!['property_product_pricelist']);
+    _getDisplayName(customerData!['property_product_pricelist']);
     String deliveryMethod =
-        _getDisplayName(customerData!['property_delivery_carrier_id']);
+    _getDisplayName(customerData!['property_delivery_carrier_id']);
     String paymentTermsPurchase =
-        _getDisplayName(customerData!['property_supplier_payment_term_id']);
+    _getDisplayName(customerData!['property_supplier_payment_term_id']);
     String paymentMethod = _getDisplayName(
         customerData!['property_payment_method_id'],
         defaultValue: '');
     String receiptReminder =
         customerData!['receipt_reminder_email']?.toString() ?? '';
     String fiscalPosition =
-        _getDisplayName(customerData!['property_account_position_id']);
+    _getDisplayName(customerData!['property_account_position_id']);
     String companyId = _getDisplayName(customerData!['company_id']);
     String reference = _getDisplayName(customerData!['ref']);
     String company = _getDisplayName(customerData!['company_id']);
@@ -1592,9 +1592,9 @@ class _CustomerViewState extends State<CustomerView> {
             const SizedBox(height: 16),
             isEditing && users.isNotEmpty
                 ? _buildDropdownRow(
-                    'Salesperson',
-                    users,
-                    selectedSalespersonIndex,
+                'Salesperson',
+                users,
+                selectedSalespersonIndex,
                     (value) => selectedSalespersonIndex = value)
                 : _buildSalesPurchaseRow('Salesperson', salesperson),
             const SizedBox(height: 16),
@@ -1605,39 +1605,39 @@ class _CustomerViewState extends State<CustomerView> {
             const SizedBox(height: 16),
             isEditing && paymentTerms.isNotEmpty
                 ? _buildDropdownRow(
-                    'PAYMENT TERMS',
-                    paymentTerms,
-                    selectedPaymentTermsSalesIndex,
+                'PAYMENT TERMS',
+                paymentTerms,
+                selectedPaymentTermsSalesIndex,
                     (value) => selectedPaymentTermsSalesIndex = value)
                 : _buildSalesPurchaseRow('PAYMENT TERMS', paymentTermsSales),
             const SizedBox(height: 16),
             isEditing && partners.isNotEmpty
                 ? _buildDropdownRow(
-                    'IMPLEMENTED BY',
-                    partners,
-                    selectedImplementedByIndex,
+                'IMPLEMENTED BY',
+                partners,
+                selectedImplementedByIndex,
                     (value) => selectedImplementedByIndex = value,
-                    isHighlighted: true)
+                isHighlighted: true)
                 : _buildSalesPurchaseRow('IMPLEMENTED BY', implementedBy,
-                    isHighlighted: true),
+                isHighlighted: true),
             const SizedBox(height: 16),
             isEditing && pricelists.isNotEmpty
                 ? _buildDropdownRow(
-                    'PRICELIST',
-                    pricelists,
-                    selectedPricelistIndex,
+                'PRICELIST',
+                pricelists,
+                selectedPricelistIndex,
                     (value) => selectedPricelistIndex = value)
                 : _buildSalesPurchaseRow('PRICELIST', pricelist),
             const SizedBox(height: 16),
             isEditing && deliveryCarriers.isNotEmpty
                 ? _buildDropdownRow(
-                    'DELIVERY METHOD',
-                    deliveryCarriers,
-                    selectedDeliveryMethodIndex,
+                'DELIVERY METHOD',
+                deliveryCarriers,
+                selectedDeliveryMethodIndex,
                     (value) => selectedDeliveryMethodIndex = value,
-                    isHighlighted: true)
+                isHighlighted: true)
                 : _buildSalesPurchaseRow('DELIVERY METHOD', deliveryMethod,
-                    isHighlighted: true),
+                isHighlighted: true),
             const SizedBox(height: 32),
             Container(
               width: double.infinity,
@@ -1657,17 +1657,17 @@ class _CustomerViewState extends State<CustomerView> {
             const SizedBox(height: 16),
             isEditing && paymentTerms.isNotEmpty
                 ? _buildDropdownRow(
-                    'Payment Terms',
-                    paymentTerms,
-                    selectedPaymentTermsPurchaseIndex,
+                'Payment Terms',
+                paymentTerms,
+                selectedPaymentTermsPurchaseIndex,
                     (value) => selectedPaymentTermsPurchaseIndex = value)
                 : _buildSalesPurchaseRow('Payment Terms', paymentTermsPurchase),
             const SizedBox(height: 16),
             isEditing && paymentMethods.isNotEmpty
                 ? _buildDropdownRow(
-                    'PAYMENT METHOD',
-                    paymentMethods,
-                    selectedPaymentMethodIndex,
+                'PAYMENT METHOD',
+                paymentMethods,
+                selectedPaymentMethodIndex,
                     (value) => selectedPaymentMethodIndex = value)
                 : _buildSalesPurchaseRow('PAYMENT METHOD', paymentMethod),
             const SizedBox(height: 16),
@@ -1692,9 +1692,9 @@ class _CustomerViewState extends State<CustomerView> {
             const SizedBox(height: 16),
             isEditing && fiscalPositions.isNotEmpty
                 ? _buildDropdownRow(
-                    'Fiscal Position',
-                    fiscalPositions,
-                    selectedFiscalPositionIndex,
+                'Fiscal Position',
+                fiscalPositions,
+                selectedFiscalPositionIndex,
                     (value) => selectedFiscalPositionIndex = value)
                 : _buildSalesPurchaseRow('Fiscal Position', fiscalPosition),
             const SizedBox(height: 32),
@@ -1730,20 +1730,20 @@ class _CustomerViewState extends State<CustomerView> {
             isEditing && websites.isNotEmpty
                 ? _buildDropdownRow('Website', websites, selectedWebsiteIndex,
                     (value) {
-                    setState(() {
-                      selectedWebsiteIndex = value;
-                      websiteController.text = value != null && value >= 0
-                          ? websites[value]['name']
-                          : '';
-                    });
-                  })
+                  setState(() {
+                    selectedWebsiteIndex = value;
+                    websiteController.text = value != null && value >= 0
+                        ? websites[value]['name']
+                        : '';
+                  });
+                })
                 : _buildSalesPurchaseRow('Website', website),
             const SizedBox(height: 16),
             isEditing && industries.isNotEmpty
                 ? _buildDropdownRow(
-                    'Industry',
-                    industries,
-                    selectedIndustryIndex,
+                'Industry',
+                industries,
+                selectedIndustryIndex,
                     (value) => selectedIndustryIndex = value)
                 : _buildSalesPurchaseRow('Industry', industry),
             const SizedBox(height: 32),
@@ -1765,17 +1765,17 @@ class _CustomerViewState extends State<CustomerView> {
             const SizedBox(height: 16),
             isEditing && locations.isNotEmpty
                 ? _buildDropdownRow(
-                    'CUSTOMER LOCATION',
-                    locations,
-                    selectedCustomerLocationIndex,
+                'CUSTOMER LOCATION',
+                locations,
+                selectedCustomerLocationIndex,
                     (value) => selectedCustomerLocationIndex = value)
                 : _buildSalesPurchaseRow('CUSTOMER LOCATION', customerLocation),
             const SizedBox(height: 16),
             isEditing && locations.isNotEmpty
                 ? _buildDropdownRow(
-                    'VENDOR LOCATION',
-                    locations,
-                    selectedVendorLocationIndex,
+                'VENDOR LOCATION',
+                locations,
+                selectedVendorLocationIndex,
                     (value) => selectedVendorLocationIndex = value)
                 : _buildSalesPurchaseRow('VENDOR LOCATION', vendorLocation),
             const SizedBox(height: 32),
@@ -1796,10 +1796,10 @@ class _CustomerViewState extends State<CustomerView> {
     String partnerLevel = _getDisplayName(customerData!['grade_id']);
     String activation = _getDisplayName(customerData!['activation']);
     String levelWeight =
-        _getDisplayName(customerData!['partner_weight'], defaultValue: '0');
+    _getDisplayName(customerData!['partner_weight'], defaultValue: '0');
     String latestPartnerReview = _getDisplayName(customerData!['date_review']);
     String nextPartnerReview =
-        _getDisplayName(customerData!['date_review_next']);
+    _getDisplayName(customerData!['date_review_next']);
     String partnershipDate = _getDisplayName(customerData!['date_partnership']);
     String latitude = _getDisplayName(customerData!['date_localization'],
         defaultValue: '0.00000000');
@@ -1830,17 +1830,17 @@ class _CustomerViewState extends State<CustomerView> {
             const SizedBox(height: 16),
             isEditing && grades.isNotEmpty
                 ? _buildDropdownRow(
-                    'Partner Level',
-                    grades,
-                    selectedPartnerLevelIndex,
+                'Partner Level',
+                grades,
+                selectedPartnerLevelIndex,
                     (value) => selectedPartnerLevelIndex = value)
                 : _buildSalesPurchaseRow('Partner Level', partnerLevel),
             const SizedBox(height: 16),
             isEditing && activations.isNotEmpty
                 ? _buildDropdownRow(
-                    'Activation',
-                    activations,
-                    selectedActivationIndex,
+                'Activation',
+                activations,
+                selectedActivationIndex,
                     (value) => selectedActivationIndex = value)
                 : _buildSalesPurchaseRow('Activation', activation),
             const SizedBox(height: 16),
@@ -1866,94 +1866,94 @@ class _CustomerViewState extends State<CustomerView> {
             const SizedBox(height: 16),
             isEditing
                 ? Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4.0),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(
-                          width: 150,
-                          child: Text(
-                            'Latest Partner Review',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        Expanded(
-                          child: TextField(
-                            controller: latestReviewController,
-                            decoration: const InputDecoration(
-                              labelText: 'Latest Partner Review',
-                              suffixIcon: Icon(Icons.calendar_today),
-                            ),
-                            readOnly: true,
-                            onTap: () =>
-                                _selectDate(context, latestReviewController),
-                          ),
-                        ),
-                      ],
+              padding: const EdgeInsets.symmetric(vertical: 4.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 150,
+                    child: Text(
+                      'Latest Partner Review',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                  )
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: latestReviewController,
+                      decoration: const InputDecoration(
+                        labelText: 'Latest Partner Review',
+                        suffixIcon: Icon(Icons.calendar_today),
+                      ),
+                      readOnly: true,
+                      onTap: () =>
+                          _selectDate(context, latestReviewController),
+                    ),
+                  ),
+                ],
+              ),
+            )
                 : _buildSalesPurchaseRow(
-                    'Latest Partner Review', latestPartnerReview),
+                'Latest Partner Review', latestPartnerReview),
             const SizedBox(height: 16),
             isEditing
                 ? Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4.0),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(
-                          width: 150,
-                          child: Text(
-                            'Next Partner Review',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        Expanded(
-                          child: TextField(
-                            controller: nextReviewController,
-                            decoration: const InputDecoration(
-                              labelText: 'Next Partner Review',
-                              suffixIcon: Icon(Icons.calendar_today),
-                            ),
-                            readOnly: true,
-                            onTap: () =>
-                                _selectDate(context, nextReviewController),
-                          ),
-                        ),
-                      ],
+              padding: const EdgeInsets.symmetric(vertical: 4.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 150,
+                    child: Text(
+                      'Next Partner Review',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                  )
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: nextReviewController,
+                      decoration: const InputDecoration(
+                        labelText: 'Next Partner Review',
+                        suffixIcon: Icon(Icons.calendar_today),
+                      ),
+                      readOnly: true,
+                      onTap: () =>
+                          _selectDate(context, nextReviewController),
+                    ),
+                  ),
+                ],
+              ),
+            )
                 : _buildSalesPurchaseRow(
-                    'Next Partner Review', nextPartnerReview),
+                'Next Partner Review', nextPartnerReview),
             const SizedBox(height: 16),
             isEditing
                 ? Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4.0),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(
-                          width: 150,
-                          child: Text(
-                            'Partnership Date',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        Expanded(
-                          child: TextField(
-                            controller: partnershipDateController,
-                            decoration: const InputDecoration(
-                              labelText: 'Partnership Date',
-                              suffixIcon: Icon(Icons.calendar_today),
-                            ),
-                            readOnly: true,
-                            onTap: () =>
-                                _selectDate(context, partnershipDateController),
-                          ),
-                        ),
-                      ],
+              padding: const EdgeInsets.symmetric(vertical: 4.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 150,
+                    child: Text(
+                      'Partnership Date',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                  )
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: partnershipDateController,
+                      decoration: const InputDecoration(
+                        labelText: 'Partnership Date',
+                        suffixIcon: Icon(Icons.calendar_today),
+                      ),
+                      readOnly: true,
+                      onTap: () =>
+                          _selectDate(context, partnershipDateController),
+                    ),
+                  ),
+                ],
+              ),
+            )
                 : _buildSalesPurchaseRow('Partnership Date', partnershipDate),
             const SizedBox(height: 32),
             Container(
@@ -2054,8 +2054,8 @@ class _CustomerViewState extends State<CustomerView> {
               constraints: const BoxConstraints(maxWidth: 300),
               child: DropdownButtonFormField<int>(
                 value: selectedValue != null &&
-                        selectedValue >= 0 &&
-                        selectedValue < items.length
+                    selectedValue >= 0 &&
+                    selectedValue < items.length
                     ? selectedValue
                     : null,
                 decoration: InputDecoration(
@@ -2064,12 +2064,12 @@ class _CustomerViewState extends State<CustomerView> {
                 ),
                 items: items
                     .map((item) => DropdownMenuItem<int>(
-                          value: items.indexOf(item),
-                          child: Text(
-                            item['name'] ?? item['complete_name'] ?? 'Unknown',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ))
+                  value: items.indexOf(item),
+                  child: Text(
+                    item['name'] ?? item['complete_name'] ?? 'Unknown',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ))
                     .toList(),
                 onChanged: onChanged,
                 isExpanded: true,

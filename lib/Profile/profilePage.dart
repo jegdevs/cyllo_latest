@@ -2,12 +2,17 @@ import 'dart:convert';
 import 'dart:developer';
 import 'package:cyllo_mobile/Login/demo.dart';
 import 'package:cyllo_mobile/Profile/editProfile.dart';
+import 'package:cyllo_mobile/isarModel/profileModel.dart';
 import 'package:flutter/material.dart';
+import 'package:isar/isar.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:typed_data';
-
 import 'package:shimmer/shimmer.dart';
+
+import '../Login/login.dart';
+import '../getUserImage.dart';
+import '../main.dart';
 
 class Profilepage extends StatefulWidget {
   const Profilepage({super.key});
@@ -28,6 +33,10 @@ class _ProfilepageState extends State<Profilepage> {
   String? department;
   String? gender;
   String? dob;
+  int? usid;
+  final Color primaryColor = Color(0xFF9EA700);
+  final Color backgroundColor = Colors.white;
+  final Color cardBgColor = Color(0x1B9EA700);
 
   Future<void> initializeOdooClient() async {
     final prefs = await SharedPreferences.getInstance();
@@ -35,7 +44,9 @@ class _ProfilepageState extends State<Profilepage> {
     final dbName = prefs.getString("selectedDatabase") ?? "";
     final userLogin = prefs.getString("userLogin") ?? "";
     final userPassword = prefs.getString("password") ?? "";
+    final userId = prefs.getInt("userId") ?? 0;
 
+    usid = userId;
     if (baseUrl.isNotEmpty &&
         dbName.isNotEmpty &&
         userLogin.isNotEmpty &&
@@ -45,15 +56,52 @@ class _ProfilepageState extends State<Profilepage> {
         final auth =
             await client!.authenticate(dbName, userLogin, userPassword);
         print("Odoo Authenticated: $auth");
-        await getProfileData();
+        await getProfileData(userId);
       } catch (e) {
+        await loadFromIsar();
         print("Odoo Authentication Failed: $e");
       }
     }
-    setState(() => isLoading = false);
   }
 
-  Future<void> getProfileData() async {
+  Future<void> loadFromIsar() async {
+    setState(() => isLoading = true);
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt("userId") ?? 0;
+
+    try {
+      final profile =
+          await isar?.userProfiles.where().userIdEqualTo(userId).findFirst();
+      if (profile != null) {
+        setState(() {
+          email = profile.email;
+          phone = profile.phone;
+          loaction = profile.location;
+          name = profile.name;
+          profileImage = profile.profileImage != null
+              ? Uint8List.fromList(profile.profileImage!)
+              : null;
+          privateAddress = profile.privateAddress;
+          privateAddress2 = profile.privateAddress2;
+          privateAddress3 = profile.privateAddress3;
+          zipCode = profile.zipCode;
+          country = profile.country;
+          department = profile.department;
+          gender = profile.gender;
+          dob = profile.dob;
+        });
+        print("Loaded profile for user $userId from Isar");
+      } else {
+        print("No profile found in Isar for user $userId");
+      }
+    } catch (e) {
+      log("Isar Load Failed: $e");
+    } finally {
+      setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> getProfileData(int userId) async {
     final prefs = await SharedPreferences.getInstance();
     final userid = prefs.getInt("userId") ?? "";
     print('iddddd$userid');
@@ -91,72 +139,141 @@ class _ProfilepageState extends State<Profilepage> {
         setState(() => isLoading = false);
         return;
       }
-      try {
-        final List<Map<String, dynamic>> data =
-            List<Map<String, dynamic>>.from(response);
-        setState(() {
-          email = data[0]['work_email'];
-          phone = data[0]['work_phone'];
-          var locationData = data[0]['work_location_id'];
-          if (locationData != null &&
-              locationData is List &&
-              locationData.isNotEmpty) {
-            loaction = locationData[1];
-          } else {
-            loaction = locationData?.toString();
-          }
-          name = data[0]['name'];
-          var imageData = data[0]['image_1920'];
-          if (imageData != null && imageData is String) {
-            profileImage = base64Decode(imageData);
-            print('imageeeeee$profileImage');
-          }
-          privateAddress = data[0]['private_street'];
-          privateAddress2 = data[0]['private_city'];
-          var privateAddressState = data[0]['private_state_id'];
-          if (privateAddressState != null &&
-              privateAddressState is List &&
-              privateAddressState.isNotEmpty) {
-            privateAddress3 = privateAddressState[1];
-          } else {
-            privateAddress3 = privateAddressState.toString();
-          }
-          zipCode = data[0]['private_zip'];
-          var country1 = data[0]['private_country_id'];
-          if (country1 != null && country1 is List && country1.isNotEmpty) {
-            country = country1[1];
-          } else {
-            country = country1.toString();
-          }
-          var departments = data[0]['department_id'];
-          if (departments != null &&
-              departments is List &&
-              departments.isNotEmpty) {
-            department = departments[1];
-          } else {
-            department = departments.toString();
-          }
-          gender = data[0]['gender'];
-          dob = data[0]['birthday'];
-          print('Email: $email');
-          print('Phone: $phone');
-          print('Location: $loaction');
-          print('Address:$privateAddress');
-        });
-        print('dataaaaaaaaaaaaa$data');
-        print('response$response');
-      } catch (e) {
-        print("Odoo fetch Failed: $e");
-      }
+
+      final List<Map<String, dynamic>> data =
+          List<Map<String, dynamic>>.from(response);
+      final profileData = data[0];
+
+      // Update UI
+      setState(() {
+        email = profileData['work_email'];
+        phone = profileData['work_phone'];
+        var locationData = profileData['work_location_id'];
+        loaction = locationData != null &&
+                locationData is List &&
+                locationData.isNotEmpty
+            ? locationData[1]
+            : locationData?.toString();
+        name = profileData['name'];
+        var imageData = profileData['image_1920'];
+        profileImage = imageData != null && imageData is String
+            ? base64Decode(imageData)
+            : null;
+        privateAddress = profileData['private_street'];
+        privateAddress2 = profileData['private_city'];
+        var privateAddressState = profileData['private_state_id'];
+        privateAddress3 = privateAddressState != null &&
+                privateAddressState is List &&
+                privateAddressState.isNotEmpty
+            ? privateAddressState[1]
+            : privateAddressState?.toString();
+        zipCode = profileData['private_zip'];
+        var country1 = profileData['private_country_id'];
+        country = country1 != null && country1 is List && country1.isNotEmpty
+            ? country1[1]
+            : country1?.toString();
+        var departments = profileData['department_id'];
+        department =
+            departments != null && departments is List && departments.isNotEmpty
+                ? departments[1]
+                : departments?.toString();
+        gender = profileData['gender'];
+        dob = profileData['birthday'];
+      });
+
+      // Save to Isar
+      await isar?.writeTxn(() async {
+        await isar?.userProfiles.where().userIdEqualTo(userId).deleteAll();
+
+        final profile = UserProfile()
+          ..userId = userId
+          ..email = profileData['work_email']
+          ..phone = profileData['work_phone']
+          ..location = profileData['work_location_id'] is List &&
+                  profileData['work_location_id'].isNotEmpty
+              ? profileData['work_location_id'][1]
+              : profileData['work_location_id']?.toString()
+          ..name = profileData['name']
+          // ..profileImage = profileData['image_1920'] != null && profileData['image_1920'] is String
+          //     ? base64Decode(profileData['image_1920'])
+          //     : null
+          ..profileImage = profileData['image_1920'] != null &&
+                  profileData['image_1920'] is String
+              ? base64Decode(profileData['image_1920'])
+                  .toList() // Convert Uint8List to List<int>
+              : null
+          ..privateAddress = profileData['private_street']
+          ..privateAddress2 = profileData['private_city']
+          ..privateAddress3 = profileData['private_state_id'] is List &&
+                  profileData['private_state_id'].isNotEmpty
+              ? profileData['private_state_id'][1]
+              : profileData['private_state_id']?.toString()
+          ..zipCode = profileData['private_zip']
+          ..country = profileData['private_country_id'] is List &&
+                  profileData['private_country_id'].isNotEmpty
+              ? profileData['private_country_id'][1]
+              : profileData['private_country_id']?.toString()
+          ..department = profileData['department_id'] is List &&
+                  profileData['department_id'].isNotEmpty
+              ? profileData['department_id'][1]
+              : profileData['department_id']?.toString()
+          ..gender = profileData['gender']
+          ..dob = profileData['birthday'];
+
+        await isar?.userProfiles.put(profile);
+        print('Saved profile for user $userId to Isar');
+      });
     } catch (e) {
-      print("Error processing forecast data ");
+      print("Error fetching profile data: $e");
       setState(() => isLoading = false);
     }
   }
 
-  Widget SimmerLoad() {
+  Future<void> logout() async {
+    // Show confirmation dialog
+    bool confirm = await showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            title: Text('Logout'),
+            content: Text('Are you sure you want to logout?'),
+            actions: [
+              TextButton(
+                child: Text('Cancel'),
+                onPressed: () => Navigator.of(context).pop(false),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                ),
+                child: Text('Logout'),
+                onPressed: () => Navigator.of(context).pop(true),
+              ),
+            ],
+          );
+        });
+
+    if (confirm == true) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => Login()),
+        (route) => false,
+      );
+    }
+  }
+
+  Widget shimmerLoad() {
     return Padding(
-      padding: EdgeInsets.all(8),
+      padding: EdgeInsets.all(16),
       child: Shimmer.fromColors(
         baseColor: Colors.grey[300]!,
         highlightColor: Colors.grey[100]!,
@@ -165,7 +282,7 @@ class _ProfilepageState extends State<Profilepage> {
             child: Padding(
               padding: EdgeInsets.symmetric(vertical: 16),
               child: CircleAvatar(
-                radius: 100.0,
+                radius: 60.0,
                 backgroundColor: Colors.white,
               ),
             ),
@@ -173,26 +290,36 @@ class _ProfilepageState extends State<Profilepage> {
           Padding(
             padding: EdgeInsets.symmetric(vertical: 8),
             child: Container(
-              height: 15.0,
-              width: 150,
-              color: Colors.white,
+              height: 24.0,
+              width: 200,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(4),
+              ),
             ),
           ),
           Padding(
             padding: EdgeInsets.symmetric(vertical: 8),
             child: Container(
-              height: 12.0,
-              width: 130,
-              color: Colors.white,
+              height: 16.0,
+              width: 150,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(4),
+              ),
             ),
           ),
+          SizedBox(height: 20),
           ...List.generate(5, (index) {
             return Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
+              padding: EdgeInsets.symmetric(vertical: 10),
               child: Container(
-                height: 79.0,
-                width: 500,
-                color: Colors.white,
+                height: 80.0,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             );
           }),
@@ -204,203 +331,182 @@ class _ProfilepageState extends State<Profilepage> {
   @override
   void initState() {
     super.initState();
+    loadFromIsar();
     initializeOdooClient();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: backgroundColor,
       appBar: AppBar(
-        actions: [
-          // IconButton(
-          //     onPressed: () {
-          //       Navigator.push(context,
-          //           MaterialPageRoute(builder: (context) => Editprofile()));
-          //     },
-          //     icon: Icon(Icons.edit)),
-          SizedBox(
-            width: 5,
-          ),
-        ],
-        backgroundColor: Color(0xFF9EA700),
+        elevation: 0,
+        backgroundColor: primaryColor,
         leading: IconButton(
-            onPressed: () {
-              Navigator.push(
-                  context, MaterialPageRoute(builder: (context) => Demo()));
-            },
-            icon: Icon(Icons.navigate_before)),
-        title: Text('Profile'),
+          onPressed: () {
+            Navigator.push(
+                context, MaterialPageRoute(builder: (context) => Demo()));
+          },
+          icon: Icon(Icons.navigate_before, color: Colors.white, size: 28),
+        ),
+        actions: [
+          IconButton(
+            onPressed: logout,
+            icon: Icon(Icons.logout, color: Colors.white),
+          ),
+          SizedBox(width: 5),
+        ],
+        title: Text(
+          'Profile',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         centerTitle: true,
       ),
-      resizeToAvoidBottomInset: false,
       body: isLoading
-          ? SimmerLoad()
+          ? shimmerLoad()
           : SingleChildScrollView(
               child: Column(
                 children: [
-                  SizedBox(
-                    height: 20,
+                  // Profile header with gradient background
+                  Container(
+                    height: 120,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [primaryColor, primaryColor.withOpacity(0.1)],
+                      ),
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(30),
+                        bottomRight: Radius.circular(30),
+                      ),
+                    ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
+                  Transform.translate(
+                    offset: Offset(0, -80),
                     child: Column(
                       children: [
                         Container(
                           decoration: BoxDecoration(
-                            boxShadow: [new BoxShadow(
-                              color: Colors.grey.shade400,
-                              blurRadius: 14.0,
-                            ),],
-                            color: Colors.grey.shade200,
-                            borderRadius: BorderRadius.circular(10),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white,
+                              width: 4.0,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 10,
+                                offset: Offset(0, 5),
+                              ),
+                            ],
                           ),
-                          height: 130,
-                          width: 500,
-                          child: Row(
+                          child: CircleAvatar(
+                            backgroundImage: profileImage != null
+                                ? MemoryImage(profileImage!)
+                                : AssetImage('assets/pf.jpeg') as ImageProvider,
+                            radius: 60.0,
+                          ),
+                        ),
+                        SizedBox(height: 10),
+                        // Name and designation
+                        Text(
+                          name ?? 'User',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: 5),
+                        Text(
+                          'Chief Executive Officer',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        SizedBox(height: 10),
+                        // Edit profile button
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => Editprofile()));
+                          },
+                          icon: Icon(Icons.edit),
+                          label: Text('Edit Profile'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            foregroundColor: Colors.white,
+                            elevation: 3,
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 10),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30.0),
+                            ),
+                          ),
+                        ),
+
+                        // Information cards
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
                             children: [
-                              SizedBox(
-                                width: 8,
-                              ),
-                              CircleAvatar(
-                                backgroundImage: profileImage != null
-                                    ? MemoryImage(profileImage!)
-                                    : AssetImage('assets/pf.jpeg')
-                                        as ImageProvider,
-                                radius: 50.0,
-                              ),
-                              SizedBox(
-                                width: 20,
-                              ),
-                              Column(crossAxisAlignment: CrossAxisAlignment.start,
+                              // Personal Information Card
+                              buildInfoCard(
+                                title: 'Personal Information',
+                                icon: Icons.person,
                                 children: [
-                                  SizedBox(height: 20,),
-                                  Text(
-                                    name!,
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.bold, fontSize: 18),
+                                  buildInfoTile(
+                                    icon: Icons.male_rounded,
+                                    title: 'Gender',
+                                    subtitle: gender ?? 'Not available',
                                   ),
-                                  SizedBox(height: 5,),
-                                  Text('Chief Executive Officer'),
-                                  SizedBox(height: 3,),
-                                  ElevatedButton(onPressed: (){
-                                    Navigator.push(context,
-                                        MaterialPageRoute(builder: (context) => Editprofile()));
-                                  },
-                                    child: Text('Edit profile'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor:  Color(0xFF9EA700),
-                                      foregroundColor: Colors.white,
-                                      shape:RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8.0),
-                                          side: BorderSide(color: Color(0xFF9EA700)),
-                                      ),
-                                    ) ,),
+                                  buildInfoTile(
+                                    icon: Icons.date_range_rounded,
+                                    title: 'Date of Birth',
+                                    subtitle: dob ?? 'Not available',
+                                  ),
+                                  buildInfoTile(
+                                    icon: Icons.email,
+                                    title: 'Work Email',
+                                    subtitle: email ?? 'Not available',
+                                  ),
+                                  buildInfoTile(
+                                    icon: Icons.phone,
+                                    title: 'Work Phone',
+                                    subtitle: phone ?? 'Not available',
+                                  ),
                                 ],
                               ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(
-                          height: 20,
-                        ),
-                        Container(
-                          height: 300,
-                          width: 500,
-                          decoration: BoxDecoration(
-                            color: Color(0x1B9EA700),
-                            borderRadius: BorderRadius.circular(10),
-                              boxShadow: [new BoxShadow(
-                                color:Color(0x1B9EA700),
-                                blurRadius: 20.0,
-                              ),]
-                          ),
-                          child: Column(
-                            children: [
-                              ListTile(
-                                leading: Icon(
-                                  Icons.male_rounded,
-                                  color: Color(0xFF9EA700),
-                                ),
-                                title: Text('Gender'),
-                                subtitle: Text(gender ?? 'Not available'),
-                              ),
-                              ListTile(
-                                leading: Icon(
-                                  Icons.date_range_rounded,
-                                  color: Color(0xFF9EA700),
-                                ),
-                                title: Text('Date of Birth'),
-                                subtitle: Text(dob ?? 'Not available'),
-                              ),
-                              ListTile(
-                                leading: Icon(
-                                  Icons.email,
-                                  color: Color(0xFF9EA700),
-                                ),
-                                title: Text('Work Email'),
-                                subtitle: Text(email!),
-                              ),
-                              ListTile(
-                                leading: Icon(
-                                  Icons.phone,
-                                  color: Color(0xFF9EA700),
-                                ),
-                                title: Text('Work Phone'),
-                                subtitle: Text(phone!),
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(
-                          height: 10,
-                        ),
-                        Container(
-                          height: 300,
-                          width: 500,
-                          decoration: BoxDecoration(
-                            color: Color(0x1B9EA700),
-                            borderRadius: BorderRadius.circular(10),
-                              boxShadow: [new BoxShadow(
-                                color:Color(0x1B9EA700),
-                                blurRadius: 20.0,
-                              ),],
-                          ),
-                          child: Column(
-                            children: [
-                              SizedBox(
-                                height: 20,
-                              ),
-                              ListTile(
-                                leading: Icon(
-                                  Icons.location_city,
-                                  color: Color(0xFF9EA700),
-                                ),
-                                title: Text('Work Location'),
-                                subtitle: Text(loaction!),
-                              ),
-                              SizedBox(
-                                height: 10,
-                              ),
-                              ListTile(
-                                leading: Icon(
-                                  Icons.location_city,
-                                  color: Color(0xFF9EA700),
-                                ),
-                                title: Text('Private Address'),
-                                subtitle: Text(
-                                    '${privateAddress!} , ${privateAddress2} , ${privateAddress3} , ${zipCode} , ${country}'),
-                              ),
-                              SizedBox(
-                                height: 10,
-                              ),
-                              ListTile(
-                                leading: Icon(
-                                  Icons.topic,
-                                  color: Color(0xFF9EA700),
-                                ),
-                                title: Text('Departmnet'),
-                                subtitle: Text(department!),
+                              SizedBox(height: 16),
+                              // Location Information Card
+                              buildInfoCard(
+                                title: 'Location & Department',
+                                icon: Icons.location_on,
+                                children: [
+                                  buildInfoTile(
+                                    icon: Icons.location_city,
+                                    title: 'Work Location',
+                                    subtitle: loaction ?? 'Not available',
+                                  ),
+                                  buildInfoTile(
+                                    icon: Icons.home,
+                                    title: 'Private Address',
+                                    subtitle: (privateAddress != null)
+                                        ? '${privateAddress}, ${privateAddress2 ?? ''}, ${privateAddress3 ?? ''}, ${zipCode ?? ''}, ${country ?? ''}'
+                                        : 'Not available',
+                                  ),
+                                  buildInfoTile(
+                                    icon: Icons.business,
+                                    title: 'Department',
+                                    subtitle: department ?? 'Not available',
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -413,175 +519,114 @@ class _ProfilepageState extends State<Profilepage> {
             ),
     );
   }
-}
 
-//       SafeArea(
-//         child: Center(
-//           child: CircleAvatar(
-//             backgroundImage: profileImage != null
-//                 ? MemoryImage(profileImage!)
-//                 : AssetImage('assets/pf.jpeg') as ImageProvider,
-//             radius: 100.0,
-//           ),
-//       ),
-//       ),
-//       Text(
-//         name!,
-//         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-//       ),
-//       Text('Chief Executive Officer'),
-//       SizedBox(
-//         height: 20,
-//       ),
-//       Padding(
-//         padding: const EdgeInsets.only(left: 10.0 ,right: 10),
-//         child: ListTile(
-//           leading: Icon(
-//             Icons.person,
-//             color: Color(0xFF9EA700),
-//           ),
-//           title: Text('Name'),
-//           subtitle: Text(name!),
-//           shape:
-//               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-//           tileColor: Color(0x1B9EA700),
-//           focusColor: Colors.red,
-//           contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
-//         ),
-//       ),
-//       SizedBox(
-//         height: 10,
-//       ),
-//       Padding(
-//         padding: const EdgeInsets.only(left: 10.0 ,right: 10),
-//         child: ListTile(
-//           leading: Icon(
-//             Icons.male_rounded,
-//             color: Color(0xFF9EA700),
-//           ),
-//           title: Text('Gender'),
-//           subtitle: Text(gender??'Not available'),
-//           shape:
-//           RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-//           tileColor: Color(0x1B9EA700),
-//           focusColor: Colors.red,
-//           contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
-//         ),
-//       ),
-//       SizedBox(
-//         height: 10,
-//       ),
-//       Padding(
-//         padding: const EdgeInsets.only(left: 10.0 ,right: 10),
-//         child: ListTile(
-//           leading: Icon(
-//             Icons.date_range_rounded,
-//             color: Color(0xFF9EA700),
-//           ),
-//           title: Text('Date of Birth'),
-//           subtitle: Text(dob??'Not available'),
-//           shape:
-//           RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-//           tileColor: Color(0x1B9EA700),
-//           focusColor: Colors.red,
-//           contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
-//         ),
-//       ),
-//       SizedBox(
-//         height: 10,
-//       ),
-//       Padding(
-//         padding: const EdgeInsets.only(left: 10.0 ,right: 10),
-//         child: ListTile(
-//           leading: Icon(
-//             Icons.email,
-//             color: Color(0xFF9EA700),
-//           ),
-//           title: Text('Work Email'),
-//           subtitle: Text(email!),
-//           shape:
-//               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-//           tileColor: Color(0x1B9EA700),
-//           focusColor: Colors.red,
-//           contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
-//         ),
-//       ),
-//       SizedBox(
-//         height: 10,
-//       ),
-//       Padding(
-//         padding: const EdgeInsets.only(left: 10.0 ,right: 10),
-//         child: ListTile(
-//           leading: Icon(
-//             Icons.phone,
-//             color: Color(0xFF9EA700),
-//           ),
-//           title: Text('Work Phone'),
-//           subtitle: Text(phone!),
-//           shape:
-//               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-//           tileColor: Color(0x1B9EA700),
-//           focusColor: Colors.red,
-//           contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
-//         ),
-//       ),
-//       SizedBox(
-//         height: 10,
-//       ),
-//       Padding(
-//         padding: const EdgeInsets.only(left: 10.0 ,right: 10),
-//         child: ListTile(
-//           leading: Icon(
-//             Icons.location_city,
-//             color: Color(0xFF9EA700),
-//           ),
-//           title: Text('Work Location'),
-//           subtitle: Text(loaction!),
-//           shape:
-//               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-//           tileColor: Color(0x1B9EA700),
-//           focusColor: Colors.red,
-//           contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
-//         ),
-//       ),
-//       SizedBox(
-//         height: 10,
-//       ),
-//       Padding(
-//         padding: const EdgeInsets.only(left: 10.0 ,right: 10),
-//         child: ListTile(
-//           leading: Icon(
-//             Icons.location_city,
-//             color: Color(0xFF9EA700),
-//           ),
-//           title: Text('Private Address'),
-//           subtitle: Text('${privateAddress!} , ${privateAddress2} , ${privateAddress3} , ${zipCode} , ${country}'),
-//           shape:
-//           RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-//           tileColor: Color(0x1B9EA700),
-//           focusColor: Colors.red,
-//           contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
-//         ),
-//       ),
-//       SizedBox(
-//         height: 10,
-//       ),
-//       Padding(
-//         padding: const EdgeInsets.only(left: 10.0 ,right: 10),
-//         child: ListTile(
-//           leading: Icon(
-//             Icons.topic,
-//             color: Color(0xFF9EA700),
-//           ),
-//           title: Text('Departmnet'),
-//           subtitle: Text(department!),
-//           shape:
-//           RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-//           tileColor: Color(0x1B9EA700),
-//           focusColor: Colors.red,
-//           contentPadding: EdgeInsets.symmetric(horizontal: 65, vertical: 8),
-//         ),
-//       ),
-//     ],
-//   ),
-// ),
+  Widget buildInfoCard({
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: primaryColor.withOpacity(0.1),
+            blurRadius: 10,
+            offset: Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Card header
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: primaryColor,
+                    size: 24,
+                  ),
+                ),
+                SizedBox(width: 12),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, thickness: 1, color: Colors.grey.withOpacity(0.2)),
+          // Card content
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(children: children),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget buildInfoTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: primaryColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              icon,
+              color: primaryColor,
+              size: 20,
+            ),
+          ),
+          SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -608,7 +608,7 @@ class _QuotationPageState extends State<QuotationPage> {
   double calculateTaxAmount() {
     double totalTax = 0.0;
     for (var line in orderLines) {
-      totalTax += (line['price_tax'] ?? 0.0); // Sum the price_tax for each line
+      totalTax += (line['price_tax'] ?? 0.0);
     }
     return double.parse(totalTax.toStringAsFixed(2));
   }
@@ -679,7 +679,7 @@ class _QuotationPageState extends State<QuotationPage> {
 
       await fetchOptionalProducts();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Optional product added successfully')),
+        const SnackBar(content: Text('Optional product added successfully'), backgroundColor: Color(0xFF9EA700),),
       );
     } catch (e) {
       print("Error adding optional product: $e");
@@ -712,7 +712,7 @@ class _QuotationPageState extends State<QuotationPage> {
       });
       await fetchOrderLines();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Product added successfully')),
+        const SnackBar(content: Text('Product added successfully'), backgroundColor: Color(0xFF9EA700),),
       );
     } catch (e) {
       print("Error adding product to order line: $e");
@@ -2353,7 +2353,7 @@ class _QuotationPageState extends State<QuotationPage> {
                 ElevatedButton(
                   onPressed: _saveSignature,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
+                    backgroundColor: Color(0xFF9EA700),
                     foregroundColor: Colors.white,
                   ),
                   child: const Text('Save'),
@@ -2368,36 +2368,142 @@ class _QuotationPageState extends State<QuotationPage> {
   void _showSignatureOptions() {
     showDialog(
       context: context,
+      barrierDismissible: true,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Add Signature'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.0),
+          ),
+          elevation: 8.0,
+          backgroundColor: Colors.white,
+          child: Container(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Add Signature',
+                      style: TextStyle(
+                        fontSize: 20.0,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF9EA700),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20.0),
+                _buildOptionCard(
+                  context,
+                  icon: Icons.upload_file,
+                  title: 'Upload Signature',
+                  subtitle: 'Choose from your device',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickSignatureImage();
+                  },
+                ),
+                const SizedBox(height: 12.0),
+                _buildOptionCard(
+                  context,
+                  icon: Icons.draw,
+                  title: 'Write Signature',
+                  subtitle: 'Draw with your finger',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showSignaturePad();
+                  },
+                ),
+                const SizedBox(height: 20.0),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.grey[600],
+                    ),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildOptionCard(
+      BuildContext context, {
+        required IconData icon,
+        required String title,
+        required String subtitle,
+        required VoidCallback onTap,
+      }) {
+    return Card(
+      elevation: 0,
+      color: Colors.grey[100],
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12.0),
+        side: BorderSide(color: Colors.grey[300]!, width: 1),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12.0),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
+          child: Row(
             children: [
-              ListTile(
-                title: const Text('Upload Signature'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _pickSignatureImage();
-                },
+              Container(
+                padding: const EdgeInsets.all(12.0),
+                decoration: BoxDecoration(
+                  color:Color(0x359EA700),
+                  borderRadius: BorderRadius.circular(10.0),
+                ),
+                child: Icon(
+                  icon,
+                  color:Color(0xFF9EA700),
+                  size: 24.0,
+                ),
               ),
-              ListTile(
-                title: const Text('Write Signature'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showSignaturePad();
-                },
+              const SizedBox(width: 16.0),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16.0,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4.0),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 14.0,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios,
+                color: Colors.grey[400],
+                size: 16.0,
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-          ],
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -2418,44 +2524,130 @@ class _QuotationPageState extends State<QuotationPage> {
     _signatureController.clear();
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Draw Signature'),
-          content: SizedBox(
-            width: 300,
-            height: 200,
-            child: Signature(
-              controller: _signatureController,
-              backgroundColor: Colors.white,
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.0),
+          ),
+          elevation: 8.0,
+          backgroundColor: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header with title and close button
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Draw Signature',
+                      style: TextStyle(
+                        fontSize: 20.0,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF9EA700),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () => Navigator.pop(context),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16.0),
+
+                // Instructions text
+                Text(
+                  'Please sign in the area below',
+                  style: TextStyle(
+                    fontSize: 14.0,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 12.0),
+
+                // Signature canvas with border
+                Container(
+                  width: 300,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(
+                      color: Colors.grey[300]!,
+                      width: 1.0,
+                    ),
+                    borderRadius: BorderRadius.circular(8.0),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8.0),
+                    child: Signature(
+                      controller: _signatureController,
+                      backgroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16.0),
+
+                // Action buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () {
+                        _signatureController.clear();
+                      },
+                      icon: const Icon(Icons.refresh, size: 18,color: Colors.black,),
+                      label: const Text('Clear'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.grey[700],
+                      ),
+                    ),
+                    const SizedBox(width: 8.0),
+                    ElevatedButton.icon(
+                      onPressed: () async {
+                        if (_signatureController.isNotEmpty) {
+                          final signatureBytes = await _signatureController.toPngBytes();
+                          if (signatureBytes != null) {
+                            final tempDir = await getTemporaryDirectory();
+                            final tempFile = File('${tempDir.path}/signature_${widget.quotationId}.png');
+                            await tempFile.writeAsBytes(signatureBytes);
+                            setState(() {
+                              _signatureImage = tempFile;
+                              _showSaveButton = true; // Show Save button after drawing
+                            });
+                            log('Signature drawn and saved to: ${tempFile.path}');
+                          }
+                        }
+                        Navigator.pop(context);
+                      },
+                      icon: const Icon(Icons.check, size: 18,color: Colors.white,),
+                      label: const Text('Done'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xFF9EA700),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8.0),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                _signatureController.clear();
-              },
-              child: const Text('Clear'),
-            ),
-            TextButton(
-              onPressed: () async {
-                if (_signatureController.isNotEmpty) {
-                  final signatureBytes = await _signatureController.toPngBytes();
-                  if (signatureBytes != null) {
-                    final tempDir = await getTemporaryDirectory();
-                    final tempFile = File('${tempDir.path}/signature_${widget.quotationId}.png');
-                    await tempFile.writeAsBytes(signatureBytes);
-                    setState(() {
-                      _signatureImage = tempFile;
-                      _showSaveButton = true; // Show Save button after drawing
-                    });
-                    log('Signature drawn and saved to: ${tempFile.path}');
-                  }
-                }
-                Navigator.pop(context);
-              },
-              child: const Text('Done'),
-            ),
-          ],
         );
       },
     );
